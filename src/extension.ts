@@ -13,12 +13,15 @@ import {
     JavaClassDefinitionProvider,
     XmlSqlFragmentDefinitionProvider,
     XmlResultMapPropertyDefinitionProvider,
-    XmlResultMapDefinitionProvider
+    XmlResultMapDefinitionProvider,
+    XmlParameterDefinitionProvider,
+    ParameterValidator
 } from './navigator';
 import { MybatisBindingDecorator } from './decorator';
 
 let fileMapper: FileMapper;
 let bindingDecorator: MybatisBindingDecorator;
+let parameterValidator: ParameterValidator;
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('[MyBatis Boost] Activating extension...');
@@ -80,10 +83,20 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.languages.registerDefinitionProvider(
             { language: 'xml', pattern: '**/*.xml' },
             new XmlResultMapDefinitionProvider()
+        ),
+
+        // Parameter reference navigation in XML to Java
+        vscode.languages.registerDefinitionProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            new XmlParameterDefinitionProvider(fileMapper)
         )
     );
 
     console.log('[MyBatis Boost] Definition providers registered');
+
+    // Initialize parameter validator
+    parameterValidator = new ParameterValidator(context, fileMapper);
+    console.log('[MyBatis Boost] Parameter validator initialized');
 
     // Initialize binding decorator if enabled
     const showBindingIcons = config.get<boolean>('showBindingIcons', true);
@@ -102,6 +115,9 @@ export async function activate(context: vscode.ExtensionContext) {
             }
             if (bindingDecorator) {
                 bindingDecorator.dispose();
+            }
+            if (parameterValidator) {
+                parameterValidator.dispose();
             }
         }
     });
@@ -193,5 +209,8 @@ export function deactivate() {
     }
     if (bindingDecorator) {
         bindingDecorator.dispose();
+    }
+    if (parameterValidator) {
+        parameterValidator.dispose();
     }
 }
