@@ -1,10 +1,10 @@
 # MyBatis Boost
 
-High-performance bidirectional navigation between MyBatis mapper interfaces (Java) and their corresponding XML mapping files.
+High-performance bidirectional navigation between MyBatis mapper interfaces (Java) and their corresponding XML mapping files. Achieve sub-100ms navigation latency through LRU caching, file watchers, and optimized parsing.
 
 ## Features
 
-### 🚀 Fast Navigation via Go-to-Definition
+### 🚀 9 Types of Go-to-Definition Navigation
 
 **Java ↔ XML:**
 - **F12 or Ctrl+Click** on Java **interface name** → XML `<mapper>` tag
@@ -20,14 +20,26 @@ High-performance bidirectional navigation between MyBatis mapper interfaces (Jav
 - **F12 or Ctrl+Click** on Java class names in XML attributes → class definitions
 - Supports `resultType`, `parameterType`, `type`, `ofType`, `javaType`
 
-**Other Features:**
-- Smart detection of MyBatis mapper files (via `@Mapper` annotation or MyBatis imports)
+**ResultMap Navigation (NEW):**
+- **F12 or Ctrl+Click** on `<result property="fieldName">` → Java class field definition
+- **F12 or Ctrl+Click** on `resultMap="xxx"` → `<resultMap id="xxx">` definition
+- **F12 or Ctrl+Click** on `<resultMap id="xxx">` → Shows all references to this resultMap
+
+**Smart Features:**
+- Content-based MyBatis mapper detection (via `@Mapper` annotation or MyBatis imports)
+- Intelligent XML file matching with 5-tier priority strategy
 
 ### 💾 Intelligent Caching
-- **LRU cache** with configurable size (default: 1000 entries)
+- **LRU cache** with configurable size (default: 5000 entries)
 - **Automatic cache invalidation** on file changes
 - **Incremental updates** via file system watchers
 - **Batch update processing** for optimal performance
+
+### 🎨 Visual Binding Indicators (NEW)
+- **Gutter icons** displayed next to Java methods and XML statements that are bound together
+- Quick visual feedback showing which methods have corresponding XML statements
+- Automatically updates when files change
+- Can be toggled via settings: `mybatis-boost.showBindingIcons`
 
 ## Installation
 
@@ -98,12 +110,37 @@ public interface UserMapper {
 </select>
 ```
 
+**7. ResultMap Property Navigation (NEW):**
+```xml
+<resultMap id="UserResultMap" type="com.example.User">
+  <result property="userId" column="user_id"/>
+    <!--            ^^^^^^ Ctrl+Click jumps to userId field in User class -->
+  <result property="userName" column="user_name"/>
+</resultMap>
+```
+
+**8. ResultMap Reference Navigation (NEW):**
+```xml
+<!-- Define resultMap -->
+<resultMap id="UserResultMap" type="com.example.User">
+  <!--         ^^^^^^^^^^^^^ Ctrl+Click shows all references to this resultMap -->
+  <id property="id" column="id"/>
+  <result property="userName" column="user_name"/>
+</resultMap>
+
+<!-- Use resultMap -->
+<select id="findAll" resultMap="UserResultMap">
+  <!--                          ^^^^^^^^^^^^^ Ctrl+Click jumps to resultMap definition -->
+  SELECT * FROM users
+</select>
+```
+
 ### Commands
 
 | Command | Description |
 |---------|-------------|
-| MyBatis: Clear Cache and Rebuild | Clear all cached mappings and rebuild |
-| MyBatis: Refresh Mappings | Refresh mappings with progress indicator |
+| MyBatis Boost: Clear Cache and Rebuild | Clear all cached mappings and rebuild |
+| MyBatis Boost: Refresh Mappings | Refresh mappings with progress indicator |
 
 ## Configuration
 
@@ -111,24 +148,35 @@ Open VS Code settings and search for "MyBatis Boost":
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `mybatis-boost.cacheSize` | number | 1000 | Maximum number of mapper pairs to cache |
-| `mybatis-boost.customXmlDirectories` | array | [] | Custom directories to search for XML files |
+| `mybatis-boost.cacheSize` | number | 5000 | Maximum number of mapper pairs to cache |
+| `mybatis-boost.customXmlDirectories` | array | [] | Custom directories to search for XML files (Priority 1 in matching strategy) |
 | `mybatis-boost.javaParseLines` | number | 100 | Number of lines to read for namespace extraction |
+| `mybatis-boost.showBindingIcons` | boolean | true | Show gutter icons for MyBatis bindings between Java methods and XML statements |
 
 ## Architecture
 
 ### Caching System
 
-- **LRU Memory Cache**: Recently used mappings kept in memory (configurable size)
+- **LRU Memory Cache**: Recently used mappings kept in memory (default: 5000 entries)
 - **Automatic cache invalidation** on file changes via file system watchers
 - **Modification timestamp tracking** for cache validation
 
-### File Mapping Strategy
+### File Mapping Strategy (5-Tier Priority)
 
-1. **MyBatis Mapper Detection**: Scans Java files for `@Mapper` annotations or MyBatis imports
-2. **Namespace Extraction**: Reads first N lines to extract package + interface name
-3. **XML File Matching**: Uses intelligent search strategy to find corresponding XML files
-4. **Incremental Updates**: File watchers automatically update cache on file changes
+The extension uses an intelligent 5-tier strategy to find XML files for Java mappers:
+
+1. **Priority 0 - Quick Paths**: Common structures (same dir, `mapper/` subdir, mirrored `resources/` path)
+2. **Priority 1 - Custom Directories**: User-configured via `mybatis-boost.customXmlDirectories`
+3. **Priority 2 - Common Patterns**: `/mapper/`, `/mappers/`, `/xml/`, `/dao/`, `/mybatis/`
+4. **Priority 3 - Package-Based**: Convert Java package to path (e.g., `com.example.UserMapper` → `**/com/example/UserMapper.xml`)
+5. **Priority 4 - Full Scan**: All remaining XML files with namespace verification
+
+### MyBatis Mapper Detection
+
+Content-based detection (not just filename patterns):
+- Must be Java `interface`
+- Must contain MyBatis annotations (`@Mapper`, `@Select`, `@Insert`, `@Update`, `@Delete`)
+- OR contain MyBatis imports (`org.apache.ibatis.*`, `org.mybatis.*`)
 
 ## Development
 
@@ -161,48 +209,46 @@ pnpm run check-types
 pnpm run lint
 ```
 
-### Project Structure
-
-```
-src/
-├── extension.ts                        # Main entry point and activation
-├── types.ts                            # TypeScript type definitions
-├── core/
-│   └── FileMapper.ts                   # File mapper with LRU caching
-├── providers/
-│   ├── JavaToXmlDefinitionProvider.ts  # Java method → XML navigation
-│   ├── XmlToJavaDefinitionProvider.ts  # XML statement → Java navigation
-│   └── JavaClassDefinitionProvider.ts  # Java class reference navigation
-├── parsers/
-│   ├── javaParser.ts                   # Java file parsing utilities
-│   └── xmlParser.ts                    # XML file parsing utilities
-├── utils/
-│   ├── fileUtils.ts                    # File I/O utilities
-│   └── javaExtensionAPI.ts             # Java language server integration
-└── test/
-    └── extension.test.ts               # Extension integration tests
-```
-
 ## Troubleshooting
 
 ### Navigation Not Working
 
-1. Ensure the Java file has MyBatis annotations (`@Mapper`) or imports
+1. Ensure the Java file has MyBatis annotations (`@Mapper`) or imports (`org.apache.ibatis.*`)
 2. Check that the XML file has a matching `namespace` attribute
-3. Try clearing cache: "MyBatis: Clear Cache and Rebuild"
+3. Try clearing cache: "MyBatis Boost: Clear Cache and Rebuild"
+
+### Custom XML Directories Not Working
+
+1. Ensure paths are relative to workspace root
+2. Check that XML files have correct `namespace` attributes
+3. Example configuration:
+   ```json
+   {
+     "mybatis-boost.customXmlDirectories": [
+       "src/main/resources/mybatis/mappers",
+       "config/xml"
+     ]
+   }
+   ```
 
 ### Mappings Not Updating
 
 1. File watchers may be disabled in large workspaces
-2. Manually refresh: "MyBatis: Refresh Mappings"
+2. Manually refresh: "MyBatis Boost: Refresh Mappings"
 3. Check VS Code file watcher limit: `files.watcherExclude`
+
+### Binding Icons Not Showing
+
+1. Ensure `mybatis-boost.showBindingIcons` is set to `true`
+2. Check that Java method names match XML statement IDs exactly
+3. Try reopening the file or refreshing mappings
 
 ### Extension Not Activating
 
 1. Ensure workspace contains a Java project:
    - `pom.xml` (Maven)
    - `build.gradle` or `build.gradle.kts` (Gradle)
-   - `src/main/java` directory
+   - `src/main/java/` directory
 2. Check VS Code Output panel for errors
 3. Restart VS Code
 
@@ -228,7 +274,7 @@ MIT
 ## Changelog
 
 ### 0.0.1 (Current)
-- ✨ **7 types of Go-to-Definition navigation** (F12/Ctrl+Click):
+- ✨ **9 types of Go-to-Definition navigation** (F12/Ctrl+Click):
   1. Java interface name → XML `<mapper>` tag
   2. Java method name → XML SQL statement
   3. XML namespace attribute → Java interface
@@ -236,9 +282,14 @@ MIT
   5. Java class references in XML → Java class definition
   6. `<include refid>` → `<sql id>` fragment definition
   7. `<sql id>` → All `<include>` references (shows all usages)
-- ✨ LRU cache with configurable size
+  8. **NEW**: `<result property>` → Java class field definition
+  9. **NEW**: `resultMap` reference ↔ `<resultMap>` definition (bidirectional)
+- ✨ **NEW**: Visual binding indicators - gutter icons show Java methods ↔ XML statement bindings
+- ✨ LRU cache with configurable size (default: 5000 entries)
 - ✨ Automatic cache invalidation on file changes
 - ✨ File system watchers for incremental updates
-- ✨ Smart MyBatis mapper detection (via `@Mapper` or imports)
+- ✨ Smart MyBatis mapper detection (content-based, not just filename)
+- ✨ 5-tier intelligent XML file matching strategy
+- ✨ Custom XML directories support (Priority 1 in matching)
 - ✨ Multi-line tag parsing support
 - ✨ Configurable settings
