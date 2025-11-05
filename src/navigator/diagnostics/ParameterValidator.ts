@@ -68,14 +68,12 @@ export class ParameterValidator {
 
         try {
             // Only validate if this is a MyBatis mapper file
-            const mapping = this.fileMapper.getByXmlPath(document.uri.fsPath);
-            if (!mapping) {
+            const javaPath = await this.fileMapper.getJavaPath(document.uri.fsPath);
+            if (!javaPath) {
                 // Not a MyBatis mapper, clear any existing diagnostics
                 this.diagnosticCollection.set(document.uri, []);
                 return;
             }
-
-            const javaPath = mapping.javaPath;
             const statements = await extractXmlStatements(document.uri.fsPath);
 
             // Validate each statement

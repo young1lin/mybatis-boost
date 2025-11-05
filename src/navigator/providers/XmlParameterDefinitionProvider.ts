@@ -56,13 +56,12 @@ export class XmlParameterDefinitionProvider implements vscode.DefinitionProvider
         console.log(`[XmlParameterDefinitionProvider] Parameter info:`, paramInfo);
 
         // Find the corresponding Java file
-        const mapping = this.fileMapper.getByXmlPath(document.uri.fsPath);
-        if (!mapping) {
+        const javaPath = await this.fileMapper.getJavaPath(document.uri.fsPath);
+        if (!javaPath) {
             console.log('[XmlParameterDefinitionProvider] No Java mapping found');
             return null;
         }
 
-        const javaPath = mapping.javaPath;
         console.log(`[XmlParameterDefinitionProvider] Java file: ${javaPath}`);
 
         // Try to find parameter in Java method parameters first (@Param annotation)
