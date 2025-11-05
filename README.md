@@ -10,7 +10,7 @@ High-performance bidirectional navigation between MyBatis mapper interfaces (Jav
 - **F12 or Ctrl+Click** on Java **interface name** → XML `<mapper>` tag
 - **F12 or Ctrl+Click** on Java **method name** → XML SQL statement
 - **F12 or Ctrl+Click** on XML **namespace** attribute → Java interface
-- **F12 or Ctrl+Click** on XML **statement ID** → Java method
+- **F12 or Ctrl+Click** on XML **statement ID** (e.g., `id="findById"`) → Java method
 
 **XML SQL Fragment References:**
 - **F12 or Ctrl+Click** on `<include refid="xxx">` → `<sql id="xxx">` definition
@@ -82,8 +82,9 @@ public interface UserMapper {
 **4. XML Statement ID → Java Method:**
 ```xml
 <select id="findById" resultType="com.example.User">
-  <!--      ^^^^^^^^ Ctrl+Click to jump to Java method -->
+  <!--      ^^^^^^^^ Ctrl+Click on the id value to jump to Java method -->
   SELECT * FROM users WHERE id = #{id}
+  <!--    ⚠️ Note: Navigation only works when cursor is on "findById", not on the SQL content -->
 </select>
 ```
 
@@ -273,7 +274,12 @@ MIT
 
 ## Changelog
 
-### 0.0.1 (Current)
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
+### Unreleased
+- 🐛 **FIXED**: Navigation precision - XML statement to Java method navigation now only works when cursor is specifically on the `id="methodName"` attribute. Previously, clicking anywhere inside the statement block would trigger navigation.
+
+### 0.0.1 (Initial Release)
 - ✨ **9 types of Go-to-Definition navigation** (F12/Ctrl+Click):
   1. Java interface name → XML `<mapper>` tag
   2. Java method name → XML SQL statement
@@ -282,9 +288,9 @@ MIT
   5. Java class references in XML → Java class definition
   6. `<include refid>` → `<sql id>` fragment definition
   7. `<sql id>` → All `<include>` references (shows all usages)
-  8. **NEW**: `<result property>` → Java class field definition
-  9. **NEW**: `resultMap` reference ↔ `<resultMap>` definition (bidirectional)
-- ✨ **NEW**: Visual binding indicators - gutter icons show Java methods ↔ XML statement bindings
+  8. `<result property>` → Java class field definition
+  9. `resultMap` reference ↔ `<resultMap>` definition (bidirectional)
+- ✨ Visual binding indicators - gutter icons show Java methods ↔ XML statement bindings
 - ✨ LRU cache with configurable size (default: 5000 entries)
 - ✨ Automatic cache invalidation on file changes
 - ✨ File system watchers for incremental updates
