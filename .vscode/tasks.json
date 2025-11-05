@@ -59,6 +59,18 @@
 				"npm: watch-tests"
 			],
 			"problemMatcher": []
+		},
+		{
+			"type": "shell",
+			"command": "pnpm run compile",
+			"problemMatcher": "$tsc",
+			"label": "pnpm: compile",
+			"detail": "Compile extension before launch",
+			"presentation": {
+				"reveal": "silent",
+				"panel": "shared",
+				"clear": true
+			}
 		}
 	]
 }
