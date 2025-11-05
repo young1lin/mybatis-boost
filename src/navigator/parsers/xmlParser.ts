@@ -6,6 +6,20 @@ import { XmlStatement } from '../../types';
 import { readFirstLines, readFile } from '../../utils/fileUtils';
 
 /**
+ * Remove XML comments from content
+ * Removes all <!-- ... --> comment blocks while preserving line numbers
+ */
+function removeXmlComments(content: string): string {
+    // Remove XML comments (<!-- ... -->)
+    // Replace comment content with newlines to preserve line numbers
+    return content.replace(/<!--[\s\S]*?-->/g, (match) => {
+        // Count newlines in the comment and preserve them
+        const newlineCount = (match.match(/\n/g) || []).length;
+        return '\n'.repeat(newlineCount);
+    });
+}
+
+/**
  * Extract namespace from XML mapper file
  * Only reads first 30 lines for performance
  */
@@ -22,7 +36,9 @@ export async function extractXmlNamespace(filePath: string): Promise<string | nu
  */
 export async function extractXmlStatements(filePath: string): Promise<XmlStatement[]> {
     const content = await readFile(filePath);
-    const lines = content.split('\n');
+    // Remove XML comments before parsing to avoid matching commented-out statements
+    const contentWithoutComments = removeXmlComments(content);
+    const lines = contentWithoutComments.split('\n');
     const statements: XmlStatement[] = [];
 
     let currentStatement: { type: 'select' | 'insert' | 'update' | 'delete'; line: number } | null = null;
@@ -130,7 +146,9 @@ export async function extractStatementIdFromPosition(
     lineNumber: number
 ): Promise<string | null> {
     const content = await readFile(filePath);
-    const lines = content.split('\n');
+    // Remove XML comments before parsing
+    const contentWithoutComments = removeXmlComments(content);
+    const lines = contentWithoutComments.split('\n');
 
     // Search backward from cursor position to find statement tag start
     for (let i = lineNumber; i >= 0 && i >= lineNumber - 20; i--) {

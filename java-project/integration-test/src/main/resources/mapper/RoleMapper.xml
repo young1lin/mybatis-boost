@@ -15,9 +15,9 @@
         id, role_name, remark, create_time, update_time, version
     </sql>
 
-    <select id="listAll" resultMap="RoleResultMap">
+    <!-- <select id="listAll" resultMap="RoleResultMap">
         SELECT <include refid="BaseColumns" /> FROM `role`
-    </select>
+    </select> -->
 
     <select id="getById" resultMap="RoleResultMap">
         SELECT <include refid="BaseColumns" /> FROM `role` WHERE id = #{id}

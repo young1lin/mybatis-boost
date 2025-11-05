@@ -11,11 +11,11 @@ suite('Extension Test Suite', () => {
     vscode.window.showInformationMessage('Starting MyBatis Boost test suite...');
 
     test('Extension should be present', () => {
-        assert.ok(vscode.extensions.getExtension('mybatis-boost.mybatis-boost'));
+        assert.ok(vscode.extensions.getExtension('young1lin.mybatis-boost'));
     });
 
     test('Extension should activate', async () => {
-        const extension = vscode.extensions.getExtension('mybatis-boost.mybatis-boost');
+        const extension = vscode.extensions.getExtension('young1lin.mybatis-boost');
         assert.ok(extension);
 
         await extension.activate();

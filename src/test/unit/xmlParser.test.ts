@@ -259,6 +259,81 @@ describe('xmlParser Unit Tests', () => {
         });
     });
 
+    describe('extractXmlStatements - XML comments handling', () => {
+        it('should ignore commented-out statements', async () => {
+            const mockContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.mapper.UserMapper">
+    <select id="selectById" resultType="com.example.model.User">
+        SELECT * FROM users WHERE id = #{id}
+    </select>
+
+    <!-- <delete id="deleteById">
+        DELETE FROM users WHERE id = #{id}
+    </delete> -->
+
+    <update id="updateById">
+        UPDATE users SET name = #{name} WHERE id = #{id}
+    </update>
+</mapper>`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractXmlStatements('/fake/path/UserMapper.xml');
+            // Should only find selectById and updateById, not the commented deleteById
+            assert.strictEqual(result.length, 2);
+            assert.strictEqual(result[0].id, 'selectById');
+            assert.strictEqual(result[1].id, 'updateById');
+
+            // Ensure deleteById is not in results
+            const hasDeleteById = result.some(stmt => stmt.id === 'deleteById');
+            assert.strictEqual(hasDeleteById, false, 'Should not extract commented statement');
+        });
+
+        it('should handle inline comments correctly', async () => {
+            const mockContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.mapper.UserMapper">
+    <select id="selectById" resultType="com.example.model.User">
+        SELECT * FROM users WHERE id = #{id}
+    </select>
+
+    <!-- This is a comment --> <insert id="insert">
+        INSERT INTO users (name) VALUES (#{name})
+    </insert>
+</mapper>`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractXmlStatements('/fake/path/UserMapper.xml');
+            assert.strictEqual(result.length, 2);
+            assert.strictEqual(result[0].id, 'selectById');
+            assert.strictEqual(result[1].id, 'insert');
+        });
+
+        it('should preserve line numbers after removing comments', async () => {
+            const mockContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.mapper.UserMapper">
+    <select id="selectById" resultType="com.example.model.User">
+        SELECT * FROM users WHERE id = #{id}
+    </select>
+
+    <!-- Multi-line comment
+         spanning multiple lines
+         should preserve line numbers -->
+
+    <update id="updateById">
+        UPDATE users SET name = #{name} WHERE id = #{id}
+    </update>
+</mapper>`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractXmlStatements('/fake/path/UserMapper.xml');
+            assert.strictEqual(result.length, 2);
+
+            // Line numbers should be accurate (the update is on line 10, 0-indexed)
+            const updateStmt = result.find(s => s.id === 'updateById');
+            assert.ok(updateStmt);
+            assert.strictEqual(updateStmt.line, 10);
+        });
+    });
+
     describe('extractXmlStatements - column tracking', () => {
         it('should track column position for each statement', async () => {
             const mockContent = `<?xml version="1.0" encoding="UTF-8"?>

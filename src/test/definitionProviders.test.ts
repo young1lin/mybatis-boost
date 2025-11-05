@@ -183,7 +183,7 @@ suite('Definition Providers Test Suite', () => {
     });
 
     test('Definition providers should be registered', async () => {
-        const extension = vscode.extensions.getExtension('mybatis-boost.mybatis-boost');
+        const extension = vscode.extensions.getExtension('young1lin.mybatis-boost');
         assert.ok(extension);
         await extension.activate();
 

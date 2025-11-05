@@ -15,8 +15,10 @@ import {
     XmlResultMapPropertyDefinitionProvider,
     XmlResultMapDefinitionProvider
 } from './navigator';
+import { MybatisBindingDecorator } from './decorator';
 
 let fileMapper: FileMapper;
+let bindingDecorator: MybatisBindingDecorator;
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('[MyBatis Boost] Activating extension...');
@@ -83,11 +85,23 @@ export async function activate(context: vscode.ExtensionContext) {
 
     console.log('[MyBatis Boost] Definition providers registered');
 
+    // Initialize binding decorator if enabled
+    const showBindingIcons = config.get<boolean>('showBindingIcons', true);
+    if (showBindingIcons) {
+        bindingDecorator = new MybatisBindingDecorator(context, fileMapper);
+        console.log('[MyBatis Boost] Binding decorator initialized');
+    } else {
+        console.log('[MyBatis Boost] Binding decorator disabled by configuration');
+    }
+
     // Register dispose handler
     context.subscriptions.push({
         dispose: () => {
             if (fileMapper) {
                 fileMapper.dispose();
+            }
+            if (bindingDecorator) {
+                bindingDecorator.dispose();
             }
         }
     });
@@ -139,6 +153,9 @@ function registerCommands(context: vscode.ExtensionContext) {
             }
             fileMapper.clearCache();
             await fileMapper.initialize();
+            if (bindingDecorator) {
+                bindingDecorator.refresh();
+            }
             vscode.window.showInformationMessage('MyBatis Boost cache cleared and rebuilt');
         })
     );
@@ -157,6 +174,9 @@ function registerCommands(context: vscode.ExtensionContext) {
             }, async () => {
                 fileMapper.clearCache();
                 await fileMapper.initialize();
+                if (bindingDecorator) {
+                    bindingDecorator.refresh();
+                }
             });
             vscode.window.showInformationMessage('MyBatis mappings refreshed successfully');
         })
@@ -170,5 +190,8 @@ export function deactivate() {
 
     if (fileMapper) {
         fileMapper.dispose();
+    }
+    if (bindingDecorator) {
+        bindingDecorator.dispose();
     }
 }

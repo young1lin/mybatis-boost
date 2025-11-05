@@ -18,9 +18,9 @@ suite('FileMapper Integration Tests', () => {
         this.timeout(30000);
 
         // Get sample project paths
-        const extensionPath = vscode.extensions.getExtension('mybatis-boost.mybatis-boost')?.extensionPath;
+        const extensionPath = vscode.extensions.getExtension('young1lin.mybatis-boost')?.extensionPath;
         if (!extensionPath) {
-            throw new Error('Extension not found: mybatis-boost.mybatis-boost');
+            throw new Error('Extension not found: young1lin.mybatis-boost');
         }
 
         sampleProjectRoot = path.join(extensionPath, 'src', 'test', 'fixtures', 'sample-mybatis-project');

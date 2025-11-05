@@ -16,7 +16,7 @@ suite('FileMapper Test Suite', () => {
 
     suiteSetup(async () => {
         // Get extension context
-        const extension = vscode.extensions.getExtension('mybatis-boost.mybatis-boost');
+        const extension = vscode.extensions.getExtension('young1lin.mybatis-boost');
         assert.ok(extension);
         await extension.activate();
         context = extension.exports?.context;

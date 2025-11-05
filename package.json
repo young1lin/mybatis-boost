@@ -3,7 +3,7 @@
   "displayName": "MyBatis Boost",
   "description": "High-performance bidirectional navigation between MyBatis mapper interfaces and XML files with sub-100ms latency",
   "version": "0.0.1",
-  "publisher": "mybatis-boost",
+  "publisher": "young1lin",
   "license": "MIT",
   "icon": "images/icons/MyBatis-Navigator.png",
   "repository": {
@@ -67,6 +67,11 @@
           "minimum": 20,
           "maximum": 200,
           "description": "Number of lines to read from Java files for namespace extraction"
+        },
+        "mybatis-boost.showBindingIcons": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show gutter icons for MyBatis bindings between Java methods and XML statements"
         }
       }
     }
