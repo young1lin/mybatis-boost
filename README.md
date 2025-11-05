@@ -4,7 +4,7 @@ High-performance bidirectional navigation between MyBatis mapper interfaces (Jav
 
 ## Features
 
-### 🚀 9 Types of Go-to-Definition Navigation
+### 🚀 10 Types of Go-to-Definition Navigation
 
 **Java ↔ XML:**
 - **F12 or Ctrl+Click** on Java **interface name** → XML `<mapper>` tag
@@ -20,10 +20,16 @@ High-performance bidirectional navigation between MyBatis mapper interfaces (Jav
 - **F12 or Ctrl+Click** on Java class names in XML attributes → class definitions
 - Supports `resultType`, `parameterType`, `type`, `ofType`, `javaType`
 
-**ResultMap Navigation (NEW):**
+**ResultMap Navigation:**
 - **F12 or Ctrl+Click** on `<result property="fieldName">` → Java class field definition
 - **F12 or Ctrl+Click** on `resultMap="xxx"` → `<resultMap id="xxx">` definition
 - **F12 or Ctrl+Click** on `<resultMap id="xxx">` → Shows all references to this resultMap
+
+**Parameter Navigation (NEW):**
+- **F12 or Ctrl+Click** on `#{paramName}` or `${paramName}` → Java field or @Param annotation
+- Supports navigation to `parameterType` class fields
+- Supports navigation to method parameters with `@Param` annotations
+- Works with `<select>`, `<insert>`, `<update>`, `<delete>` statements
 
 **Smart Features:**
 - Content-based MyBatis mapper detection (via `@Mapper` annotation or MyBatis imports)
@@ -35,11 +41,31 @@ High-performance bidirectional navigation between MyBatis mapper interfaces (Jav
 - **Incremental updates** via file system watchers
 - **Batch update processing** for optimal performance
 
-### 🎨 Visual Binding Indicators (NEW)
+### 🎨 Visual Binding Indicators
 - **Gutter icons** displayed next to Java methods and XML statements that are bound together
 - Quick visual feedback showing which methods have corresponding XML statements
 - Automatically updates when files change
 - Can be toggled via settings: `mybatis-boost.showBindingIcons`
+
+### ✅ Real-time Parameter Validation (NEW)
+- **Automatic validation** of `#{paramName}` and `${paramName}` references in XML
+- **Red underlines** for undefined parameters with helpful error messages
+- Validates against:
+  - Fields in `parameterType` classes
+  - Method parameters with `@Param` annotations
+  - Handles nested properties (e.g., `#{user.name}` validates `user`)
+- Works across `<select>`, `<insert>`, `<update>`, `<delete>` statements
+- Helps catch typos and missing parameters before runtime
+
+**Example:**
+```xml
+<update id="updateById" parameterType="com.example.Role">
+    UPDATE role
+    SET role_name = #{roleName},  <!-- ✅ Valid: Role has this field -->
+        invalid = #{wrongField}    <!-- ❌ Error: Role doesn't have this field -->
+    WHERE id = #{id}
+</update>
+```
 
 ## Installation
 

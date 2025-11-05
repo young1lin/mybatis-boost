@@ -6,8 +6,21 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+### Added
+- ✨ **Parameter Validation**: Real-time validation of `#{param}` and `${param}` references in XML mapper files
+  - Validates against `parameterType` class fields
+  - Validates against method parameters with `@Param` annotations
+  - Shows error diagnostics for undefined parameters
+  - Supports nested properties (e.g., `#{user.name}`)
+  - Works across `<select>`, `<insert>`, `<update>`, `<delete>` statements
+- ✨ **Parameter Navigation**: Go-to-Definition (F12) from XML parameters to Java
+  - Navigate from `#{paramName}` to Java class field
+  - Navigate from `#{paramName}` to `@Param` annotation in method
+  - Type 10 of navigation support added
+
 ### Fixed
 - **Navigation Precision**: XML statement to Java method navigation now only works when cursor is specifically on the `id="methodName"` attribute. Previously, clicking anywhere inside the statement block would trigger navigation, which was too permissive and could cause unintended navigation.
+- **API Usage**: Fixed incorrect usage of `getByXmlPath()` - now correctly uses `getJavaPath()` API method
 
 ## [0.0.1] - Initial Release
 
