@@ -165,5 +165,83 @@ public interface UserMapper {
             const result = await extractMethodParameters('/fake/path/UserMapper.java', 'nonExistentMethod');
             assert.strictEqual(result.length, 0);
         });
+
+        it('should handle multi-line parameters with @Nonnull and @Param annotations', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+import javax.annotation.Nonnull;
+
+public interface RoleMapper {
+    int deleteById(
+        @Nonnull @Param("id") Long id,
+        @Nonnull @Param("version") Integer version);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/RoleMapper.java', 'deleteById');
+            assert.strictEqual(result.length, 2, 'Should extract 2 parameters');
+            assert.strictEqual(result[0].name, 'id', 'First parameter should be "id"');
+            assert.strictEqual(result[0].paramType, 'Long');
+            assert.strictEqual(result[0].hasParamAnnotation, true);
+            assert.strictEqual(result[1].name, 'version', 'Second parameter should be "version"');
+            assert.strictEqual(result[1].paramType, 'Integer');
+            assert.strictEqual(result[1].hasParamAnnotation, true);
+        });
+
+        it('should handle single-line parameters with @Nonnull and @Param annotations', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+import javax.annotation.Nonnull;
+
+public interface RoleMapper {
+    Role getById(@Nonnull @Param("id") Long id);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/RoleMapper.java', 'getById');
+            assert.strictEqual(result.length, 1, 'Should extract 1 parameter');
+            assert.strictEqual(result[0].name, 'id', 'Parameter should be "id"');
+            assert.strictEqual(result[0].paramType, 'Long');
+            assert.strictEqual(result[0].hasParamAnnotation, true);
+        });
+
+        it('should handle method with many lines before parameters', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+import javax.annotation.Nonnull;
+
+public interface RoleMapper {
+    /**
+     * Javadoc comment
+     * Line 2
+     * Line 3
+     * Line 4
+     */
+    @Deprecated
+    int deleteById(
+        @Nonnull
+        @Param("id")
+        Long id,
+        @Nonnull
+        @Param("version")
+        Integer version
+    );
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/RoleMapper.java', 'deleteById');
+            assert.strictEqual(result.length, 2, 'Should extract 2 parameters even with many preceding lines');
+            assert.strictEqual(result[0].name, 'id', 'First parameter should be "id"');
+            assert.strictEqual(result[1].name, 'version', 'Second parameter should be "version"');
+        });
     });
 });

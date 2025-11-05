@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.RoleMapper">
+
+    <resultMap id="RoleResultMap" type="com.example.model.Role">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        id, name, version
+    </sql>
+
+    <delete id="deleteById">
+        DELETE FROM `role`
+        WHERE id = #{id} AND version = #{version}
+    </delete>
+
+    <select id="getById" resultMap="RoleResultMap">
+        SELECT <include refid="BaseColumns" />
+        FROM role
+        WHERE id = #{id}
+    </select>
+
+</mapper>

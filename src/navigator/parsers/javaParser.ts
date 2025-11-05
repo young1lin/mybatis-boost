@@ -224,8 +224,27 @@ export async function extractMethodParameters(
                 foundMethod = true;
                 methodStartLine = i;
                 // Start accumulating from a few lines before to capture annotations
+                // but stop at any line that looks like the end of another method/statement
                 methodDeclaration = '';
-                for (let j = Math.max(0, i - 5); j <= i; j++) {
+                let startLine = Math.max(0, i - 10); // Look back up to 10 lines
+
+                // Find the actual start by looking for the last closing brace, semicolon, or interface declaration
+                for (let j = i - 1; j >= startLine; j--) {
+                    const prevLine = lines[j].trim();
+                    // Stop if we hit the end of a previous statement or method
+                    if (prevLine.endsWith(';') || prevLine.endsWith('}')) {
+                        startLine = j + 1;
+                        break;
+                    }
+                    // Stop if we hit the interface declaration
+                    if (prevLine.includes('interface')) {
+                        startLine = j + 1;
+                        break;
+                    }
+                }
+
+                // Accumulate from the determined start line to current line
+                for (let j = startLine; j <= i; j++) {
                     methodDeclaration += lines[j] + '\n';
                 }
             }
