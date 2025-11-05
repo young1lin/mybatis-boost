@@ -5,7 +5,6 @@
 import * as vscode from 'vscode';
 import { FileMapper } from '../core/FileMapper';
 import { findJavaMethodPosition } from '../parsers/javaParser';
-import { extractStatementIdFromPosition } from '../parsers/xmlParser';
 
 /**
  * Provides go-to-definition for:
@@ -57,12 +56,7 @@ export class XmlToJavaDefinitionProvider implements vscode.DefinitionProvider {
             }
         }
 
-        // If cursor is inside a statement tag (not on id attribute), try to find the statement ID
-        const statementId = await extractStatementIdFromPosition(document.uri.fsPath, position.line);
-        if (statementId) {
-            return this.navigateToJavaMethod(document.uri.fsPath, statementId, document, position);
-        }
-
+        // Navigation only works when cursor is on id attribute, not anywhere in the statement
         return null;
     }
 
