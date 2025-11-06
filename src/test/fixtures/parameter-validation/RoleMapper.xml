@@ -24,4 +24,11 @@
         WHERE id = #{id}
     </select>
 
+    <select id="listAllByIds" resultType="com.young1lin.mybatis.boost.integration.test.domain.User">
+        SELECT <include refid="BaseColumns" /> FROM `user` WHERE id IN
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+
 </mapper>

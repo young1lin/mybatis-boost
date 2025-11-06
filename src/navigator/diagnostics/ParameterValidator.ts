@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 import { FileMapper } from '../core/FileMapper';
-import { extractParameterReferences, extractStatementParameterInfo } from '../parsers/parameterParser';
+import { extractParameterReferences, extractStatementParameterInfo, extractLocalVariables, extractAttributeReferences } from '../parsers/parameterParser';
 import { extractXmlStatements } from '../parsers/xmlParser';
 import { extractMethodParameters } from '../parsers/javaParser';
 import { extractJavaFields } from '../parsers/javaFieldParser';
@@ -105,8 +105,24 @@ export class ParameterValidator {
         const diagnostics: vscode.Diagnostic[] = [];
 
         try {
-            // Extract parameters from the statement
+            // Extract parameters from the statement (#{...} and ${...})
             const parameters = await extractParameterReferences(xmlPath, statement as any);
+
+            // Also extract parameters referenced in attributes (e.g., collection="ids")
+            const attrReferences = await extractAttributeReferences(xmlPath, statement as any);
+
+            // Combine both types of references
+            const allReferences = [...parameters];
+            attrReferences.forEach(attrRef => {
+                // Convert attribute references to ParameterReference format for validation
+                allReferences.push({
+                    name: attrRef,
+                    line: statement.line,
+                    startColumn: 0,
+                    endColumn: 0,
+                    type: 'prepared' as const
+                });
+            });
 
             // Get parameter info from the statement tag
             const paramInfo = await extractStatementParameterInfo(xmlPath, statement as any);
@@ -134,10 +150,21 @@ export class ParameterValidator {
                 }
             }
 
-            // 3. TODO: Add parameters from parameterMap (future enhancement)
+            // 3. Add local variables from dynamic SQL tags (foreach, bind)
+            try {
+                const localVars = await extractLocalVariables(xmlPath, statement as any);
+                localVars.forEach(v => validParams.add(v));
+                if (localVars.size > 0) {
+                    console.log(`[ParameterValidator] Statement ${statement.id} has local variables: ${Array.from(localVars).join(', ')}`);
+                }
+            } catch (error) {
+                console.error(`[ParameterValidator] Error extracting local variables:`, error);
+            }
+
+            // 4. TODO: Add parameters from parameterMap (future enhancement)
 
             // Validate each parameter reference
-            for (const param of parameters) {
+            for (const param of allReferences) {
                 if (!validParams.has(param.name)) {
                     // Parameter not found - create diagnostic
                     const range = new vscode.Range(

@@ -3,6 +3,7 @@ package com.example.mapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import javax.annotation.Nonnull;
+import java.util.List;
 
 @Mapper
 public interface RoleMapper {
@@ -17,4 +18,9 @@ public interface RoleMapper {
      * Get role by id
      */
     Role getById(@Nonnull @Param("id") Long id);
+
+    /**
+     * List all users by ids using foreach
+     */
+    List<User> listAllByIds(@Param("ids") List<Long> ids);
 }
