@@ -71,6 +71,47 @@ High-performance VS Code extension providing comprehensive bidirectional navigat
 </update>
 ```
 
+### 🔍 SQL Composition and Hover Preview
+- **Hover on XML statement IDs**: See the complete composed SQL when hovering over statement `id` attributes
+- **Hover on Java mapper methods**: See the complete composed SQL when hovering over method names
+- **Automatic `<include>` resolution**: Recursively resolves all `<include refid="xxx">` references
+- **Nested includes support**: Handles SQL fragments containing other includes
+- **Circular reference detection**: Prevents infinite loops with helpful error messages
+- **Missing fragment handling**: Shows clear "Fragment not found" messages
+- **All statement types**: Works with `<select>`, `<insert>`, `<update>`, `<delete>`
+- **Dynamic SQL preserved**: Keeps MyBatis tags (`<if>`, `<where>`, `<trim>`, etc.) for context
+- **Non-invasive UI**: Uses hover tooltips, no CodeLens or decorations
+- **Real-time composition**: Composes SQL on-demand with no performance impact
+
+**Example:**
+```xml
+<sql id="Base_Column_List">
+    id, account_cfg_id, symbol_cfg_id, profit
+</sql>
+
+<sql id="where_condition">
+    <trim prefix="WHERE" prefixOverrides="AND | OR">
+        <if test="accountCfgId != null">
+            AND t.account_cfg_id = #{accountCfgId}
+        </if>
+    </trim>
+</sql>
+
+<select id="selectByCondition" resultMap="BaseResultMap">
+    <!-- Hover over "selectByCondition" to see the complete SQL -->
+    select
+    <include refid="Base_Column_List"/>
+    from t_bo_account_symbol_cfg t
+    <include refid="where_condition"/>
+</select>
+```
+
+**In Java mapper:**
+```java
+// Hover over method name to see the complete composed SQL
+List<AccountSymbolCfg> selectByCondition(AccountSymbolCfgQuery query);
+```
+
 ### 🔄 Flexible Navigation Modes
 Choose between two navigation modes based on your workflow:
 

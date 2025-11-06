@@ -21,6 +21,18 @@
   9. `resultMap` 引用 ↔ `<resultMap>` 定义（双向）
   10. XML 参数（`#{paramName}`、`${paramName}`）→ Java 字段或 `@Param` 注解
 
+- ✨ **SQL 组合与悬停预览**：自动解析 `<include>` 并预览完整 SQL
+  - **在 XML 语句 ID 上悬停**：鼠标悬停在 statement 的 `id` 属性值上时，查看完整拼接后的 SQL
+  - **在 Java 映射器方法上悬停**：鼠标悬停在方法名上时，查看对应的完整 SQL
+  - **自动解析 `<include>`**：递归解析所有 `<include refid="xxx">` 引用
+  - **支持嵌套 include**：处理 SQL 片段中包含其他 include 的情况
+  - **循环引用检测**：防止无限循环，并显示有用的错误消息
+  - **缺失片段处理**：显示清晰的"Fragment not found"消息
+  - **所有语句类型**：支持 `<select>`、`<insert>`、`<update>`、`<delete>`
+  - **保留动态 SQL**：保留 MyBatis 标签（`<if>`、`<where>`、`<trim>` 等）以提供上下文
+  - **非侵入式 UI**：使用悬停提示，无 CodeLens 或装饰器
+  - **实时组合**：按需组合 SQL，无性能影响
+
 - ✨ **参数验证**：对 XML 映射器文件中的 `#{param}` 和 `${param}` 引用进行实时验证
   - 针对 `parameterType` 类字段进行验证
   - 针对带有 `@Param` 注解的方法参数进行验证

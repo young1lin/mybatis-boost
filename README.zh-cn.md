@@ -74,6 +74,48 @@ MyBatis 映射器接口（Java）与 XML 映射文件之间的高性能双向导
 </update>
 ```
 
+### 🔍 SQL 组合与悬停预览
+
+- **在 XML 语句 ID 上悬停**：鼠标悬停在 statement 的 `id` 属性值上时，查看完整拼接后的 SQL
+- **在 Java 映射器方法上悬停**：鼠标悬停在方法名上时，查看对应的完整 SQL
+- **自动解析 `<include>`**：递归解析所有 `<include refid="xxx">` 引用
+- **支持嵌套 include**：处理 SQL 片段中包含其他 include 的情况
+- **循环引用检测**：防止无限循环，并显示有用的错误消息
+- **缺失片段处理**：显示清晰的 "Fragment not found" 消息
+- **所有语句类型**：支持 `<select>`、`<insert>`、`<update>`、`<delete>`
+- **保留动态 SQL**：保留 MyBatis 标签（`<if>`、`<where>`、`<trim>` 等）以提供上下文
+- **非侵入式 UI**：使用悬停提示，无 CodeLens 或装饰器
+- **实时组合**：按需组合 SQL，无性能影响
+
+**示例：**
+```xml
+<sql id="Base_Column_List">
+    id, account_cfg_id, symbol_cfg_id, profit
+</sql>
+
+<sql id="where_condition">
+    <trim prefix="WHERE" prefixOverrides="AND | OR">
+        <if test="accountCfgId != null">
+            AND t.account_cfg_id = #{accountCfgId}
+        </if>
+    </trim>
+</sql>
+
+<select id="selectByCondition" resultMap="BaseResultMap">
+    <!-- 鼠标悬停在 "selectByCondition" 上查看完整 SQL -->
+    select
+    <include refid="Base_Column_List"/>
+    from t_bo_account_symbol_cfg t
+    <include refid="where_condition"/>
+</select>
+```
+
+**在 Java 映射器中：**
+```java
+// 鼠标悬停在方法名上查看完整拼接后的 SQL
+List<AccountSymbolCfg> selectByCondition(AccountSymbolCfgQuery query);
+```
+
 ### 🔄 灵活的导航模式
 
 根据您的工作流程在两种导航模式之间选择：

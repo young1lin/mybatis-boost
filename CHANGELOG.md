@@ -21,6 +21,18 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
   9. `resultMap` reference ↔ `<resultMap>` definition (bidirectional)
   10. XML parameters (`#{paramName}`, `${paramName}`) → Java field or `@Param` annotation
 
+- ✨ **SQL Composition and Hover Preview**: Complete SQL preview with automatic `<include>` resolution
+  - **Hover on XML statement IDs**: See complete composed SQL when hovering over statement `id` attributes
+  - **Hover on Java mapper methods**: See complete composed SQL when hovering over method names
+  - **Automatic `<include>` resolution**: Recursively resolves all `<include refid="xxx">` references
+  - **Nested includes support**: Handles SQL fragments containing other includes
+  - **Circular reference detection**: Prevents infinite loops with helpful error messages
+  - **Missing fragment handling**: Shows clear "Fragment not found" messages
+  - **All statement types**: Works with `<select>`, `<insert>`, `<update>`, `<delete>`
+  - **Dynamic SQL preserved**: Keeps MyBatis tags (`<if>`, `<where>`, `<trim>`, etc.) for context
+  - **Non-invasive UI**: Uses hover tooltips, no CodeLens or decorations
+  - **Real-time composition**: Composes SQL on-demand with no performance impact
+
 - ✨ **Parameter Validation**: Real-time validation of `#{param}` and `${param}` references in XML mapper files
   - Validates against `parameterType` class fields
   - Validates against method parameters with `@Param` annotations
