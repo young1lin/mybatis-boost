@@ -11,8 +11,12 @@
         <result property="version" column="version"/>
     </resultMap>
 
+    <sql id="BaseInsertColumns">
+        name, age, create_time, update_time, version
+    </sql>
+
     <sql id="BaseColumns">
-        id, name, age, create_time, update_time, version
+        id, <include refid="BaseInsertColumns" />
     </sql>
 
     <select id="listAllByIds" resultType="com.young1lin.mybatis.boost.integration.test.domain.User">
@@ -36,5 +40,31 @@
         WHERE id = #{id}
             AND version = #{version}
     </update>
+
+    <insert id="batchInsert" keyProperty="id" useGeneratedKeys="true"
+        parameterType="com.young1lin.mybatis.boost.integration.test.domain.User">
+        INSERT INTO `user` (<include refid="BaseInsertColumns" />)
+        VALUES
+        <foreach collection="users" item="user"
+        separator=",">
+            (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
+        </foreach>
+    </insert>
+
+    <insert id="batchInsertV2" keyProperty="id" useGeneratedKeys="true">
+        INSERT INTO `user` (<include refid="BaseInsertColumns" />)
+        VALUES
+        <foreach collection="users" item="user" separator=",">
+            (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
+        </foreach>
+    </insert>
+
+    <insert id="batchInsertV3" keyProperty="id" useGeneratedKeys="true">
+        INSERT INTO `user` (<include refid="BaseInsertColumns" />)
+        VALUES
+        <foreach collection="aUsers" item="user" separator=",">
+            (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
+        </foreach>
+    </insert>
 
 </mapper>

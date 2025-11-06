@@ -30,4 +30,10 @@ public interface UserMapper {
 
     int updateById(@Nonnull User user);
 
+    int batchInsert(List<User> users);
+
+    int batchInsertV2(@Param("users") List<User> users);
+
+    int batchInsertV3(@Param("aUsers") List<User> users);
+
 }

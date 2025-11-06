@@ -2,7 +2,7 @@ package com.young1lin.mybatis.boost.integration.test.mapper;
 
 import java.util.List;
 
-import org.springframework.data.repository.query.Param;
+import org.apache.ibatis.annotations.Param;
 
 import com.young1lin.mybatis.boost.integration.test.domain.Permission;
 

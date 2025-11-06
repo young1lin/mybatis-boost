@@ -3,7 +3,7 @@ DROP TABLE IF EXISTS `user`;
 CREATE TABLE `user` (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(255),
-    age VARCHAR(255),
+    age INTEGER,
     create_time TIMESTAMP,
     update_time TIMESTAMP,
     version INTEGER DEFAULT 0

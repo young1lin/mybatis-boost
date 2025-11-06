@@ -10,10 +10,10 @@ import lombok.Data;
 public class User implements Serializable {
 
     private Long id;
-    
+
     private String name;
 
-    private String age;
+    private Integer age;
 
     private Timestamp createTime;
 

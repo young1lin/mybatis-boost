@@ -1,8 +1,8 @@
 -- Insert test data for User table
 INSERT INTO `user` (`name`, age, create_time, update_time, version) VALUES
-('Liam', '25', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-('Ivy', '30', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
-('Bob', '28', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
+('Liam', 25, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+('Ivy', 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+('Bob', 28, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- Insert test data for Role table
 INSERT INTO `role` (`role_name`, `remark`, create_time, update_time, version) VALUES
