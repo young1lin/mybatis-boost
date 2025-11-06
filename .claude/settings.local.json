@@ -65,7 +65,8 @@
       "Bash(tree:*)",
       "Bash(clear:*)",
       "Bash(cls:*)",
-      "Bash($null)"
+      "Bash($null)",
+      "Bash(rm:*)"
     ],
     "deny": [
       "Bash(rm -rf /*)",
