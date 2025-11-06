@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import { FileMapper } from '../core/FileMapper';
+import { extractXmlStatements } from '../parsers/xmlParser';
 
 /**
  * Provides CodeLens for:
@@ -37,6 +38,10 @@ export class JavaToXmlCodeLensProvider implements vscode.CodeLensProvider {
         if (!xmlPath) {
             return codeLenses;
         }
+
+        // Extract all statement IDs from XML to check if methods exist
+        const xmlStatements = await extractXmlStatements(xmlPath);
+        const statementIds = new Set(xmlStatements.map(s => s.id));
 
         const text = document.getText();
         const lines = text.split('\n');
@@ -131,6 +136,11 @@ export class JavaToXmlCodeLensProvider implements vscode.CodeLensProvider {
                 }
 
                 if (foundEnd) {
+                    // Only show CodeLens if the statement exists in XML
+                    if (!statementIds.has(methodName)) {
+                        continue;
+                    }
+
                     const range = new vscode.Range(i, 0, i, line.length);
 
                     // Create CodeLens for method
