@@ -9,6 +9,7 @@ import * as path from 'path';
 import {
     FileMapper,
     JavaToXmlDefinitionProvider,
+    JavaToXmlCodeLensProvider,
     XmlToJavaDefinitionProvider,
     JavaClassDefinitionProvider,
     XmlSqlFragmentDefinitionProvider,
@@ -22,6 +23,10 @@ import { MybatisBindingDecorator } from './decorator';
 let fileMapper: FileMapper;
 let bindingDecorator: MybatisBindingDecorator;
 let parameterValidator: ParameterValidator;
+
+// Navigation providers (disposable based on configuration)
+let javaToXmlDefinitionProvider: vscode.Disposable | undefined;
+let javaToXmlCodeLensProvider: vscode.Disposable | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('[MyBatis Boost] Activating extension...');
@@ -47,52 +52,14 @@ export async function activate(context: vscode.ExtensionContext) {
     fileMapper = new FileMapper(context, cacheSize);
     await fileMapper.initialize();
 
-    // Register Definition providers
-    context.subscriptions.push(
-        // Java method -> XML statement navigation
-        vscode.languages.registerDefinitionProvider(
-            { language: 'java', pattern: '**/*.java' },
-            new JavaToXmlDefinitionProvider(fileMapper)
-        ),
+    // Register XML-related definition providers (always enabled)
+    registerXmlDefinitionProviders(context);
 
-        // XML statement -> Java method navigation
-        vscode.languages.registerDefinitionProvider(
-            { language: 'xml', pattern: '**/*.xml' },
-            new XmlToJavaDefinitionProvider(fileMapper)
-        ),
+    // Register Java-to-XML navigation providers based on configuration
+    const useDefinitionProvider = config.get<boolean>('useDefinitionProvider', false);
+    registerJavaToXmlNavigationProvider(context, useDefinitionProvider);
 
-        // Java class reference navigation in XML
-        vscode.languages.registerDefinitionProvider(
-            { language: 'xml', pattern: '**/*.xml' },
-            new JavaClassDefinitionProvider()
-        ),
-
-        // SQL fragment reference navigation within XML
-        vscode.languages.registerDefinitionProvider(
-            { language: 'xml', pattern: '**/*.xml' },
-            new XmlSqlFragmentDefinitionProvider()
-        ),
-
-        // ResultMap property -> Java field navigation
-        vscode.languages.registerDefinitionProvider(
-            { language: 'xml', pattern: '**/*.xml' },
-            new XmlResultMapPropertyDefinitionProvider()
-        ),
-
-        // ResultMap reference navigation within XML
-        vscode.languages.registerDefinitionProvider(
-            { language: 'xml', pattern: '**/*.xml' },
-            new XmlResultMapDefinitionProvider()
-        ),
-
-        // Parameter reference navigation in XML to Java
-        vscode.languages.registerDefinitionProvider(
-            { language: 'xml', pattern: '**/*.xml' },
-            new XmlParameterDefinitionProvider(fileMapper)
-        )
-    );
-
-    console.log('[MyBatis Boost] Definition providers registered');
+    console.log(`[MyBatis Boost] Navigation mode: ${useDefinitionProvider ? 'DefinitionProvider' : 'CodeLens'}`);
 
     // Initialize parameter validator
     parameterValidator = new ParameterValidator(context, fileMapper);
@@ -107,6 +74,29 @@ export async function activate(context: vscode.ExtensionContext) {
         console.log('[MyBatis Boost] Binding decorator disabled by configuration');
     }
 
+    // Listen for configuration changes
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration('mybatis-boost.useDefinitionProvider')) {
+                const newUseDefinitionProvider = vscode.workspace
+                    .getConfiguration('mybatis-boost')
+                    .get<boolean>('useDefinitionProvider', false);
+
+                console.log(`[MyBatis Boost] Configuration changed: useDefinitionProvider = ${newUseDefinitionProvider}`);
+
+                // Unregister old provider
+                unregisterJavaToXmlNavigationProvider();
+
+                // Register new provider
+                registerJavaToXmlNavigationProvider(context, newUseDefinitionProvider);
+
+                vscode.window.showInformationMessage(
+                    `MyBatis Boost: Switched to ${newUseDefinitionProvider ? 'DefinitionProvider' : 'CodeLens'} mode`
+                );
+            }
+        })
+    );
+
     // Register dispose handler
     context.subscriptions.push({
         dispose: () => {
@@ -119,6 +109,7 @@ export async function activate(context: vscode.ExtensionContext) {
             if (parameterValidator) {
                 parameterValidator.dispose();
             }
+            unregisterJavaToXmlNavigationProvider();
         }
     });
 
@@ -198,6 +189,47 @@ function registerCommands(context: vscode.ExtensionContext) {
         })
     );
 
+    // Jump to XML command (used by CodeLens)
+    // Automatically detects whether to jump to mapper namespace or statement
+    context.subscriptions.push(
+        vscode.commands.registerCommand('mybatis-boost.jumpToXml', async (javaUri: vscode.Uri, xmlPath: string, methodName?: string) => {
+            // Validate parameters
+            if (!xmlPath) {
+                vscode.window.showWarningMessage('MyBatis Boost: XML file path is required');
+                return;
+            }
+
+            const { findXmlMapperPosition, findXmlStatementPosition } = await import('./navigator/parsers/xmlParser.js');
+
+            // If methodName is provided, jump to statement; otherwise jump to mapper
+            if (methodName) {
+                // Jump to XML statement
+                const statementPosition = await findXmlStatementPosition(xmlPath, methodName);
+
+                if (statementPosition) {
+                    const xmlUri = vscode.Uri.file(xmlPath);
+                    const position = new vscode.Position(statementPosition.line, statementPosition.startColumn);
+                    await vscode.window.showTextDocument(xmlUri, { selection: new vscode.Range(position, position) });
+                } else {
+                    vscode.window.showWarningMessage(`MyBatis statement "${methodName}" not found in XML`);
+                }
+            } else {
+                // Jump to XML mapper namespace
+                const position = await findXmlMapperPosition(xmlPath);
+
+                if (position) {
+                    const xmlUri = vscode.Uri.file(xmlPath);
+                    const vscodePosition = new vscode.Position(position.line, position.column);
+                    await vscode.window.showTextDocument(xmlUri, { selection: new vscode.Range(vscodePosition, vscodePosition) });
+                } else {
+                    // Fallback: open at first line
+                    const xmlUri = vscode.Uri.file(xmlPath);
+                    await vscode.window.showTextDocument(xmlUri);
+                }
+            }
+        })
+    );
+
     console.log('[MyBatis Boost] Commands registered');
 }
 
@@ -212,5 +244,93 @@ export function deactivate() {
     }
     if (parameterValidator) {
         parameterValidator.dispose();
+    }
+    unregisterJavaToXmlNavigationProvider();
+}
+
+/**
+ * Register XML-related definition providers (always enabled)
+ */
+function registerXmlDefinitionProviders(context: vscode.ExtensionContext) {
+    context.subscriptions.push(
+        // XML statement -> Java method navigation
+        vscode.languages.registerDefinitionProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            new XmlToJavaDefinitionProvider(fileMapper)
+        ),
+
+        // Java class reference navigation in XML
+        vscode.languages.registerDefinitionProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            new JavaClassDefinitionProvider()
+        ),
+
+        // SQL fragment reference navigation within XML
+        vscode.languages.registerDefinitionProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            new XmlSqlFragmentDefinitionProvider()
+        ),
+
+        // ResultMap property -> Java field navigation
+        vscode.languages.registerDefinitionProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            new XmlResultMapPropertyDefinitionProvider()
+        ),
+
+        // ResultMap reference navigation within XML
+        vscode.languages.registerDefinitionProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            new XmlResultMapDefinitionProvider()
+        ),
+
+        // Parameter reference navigation in XML to Java
+        vscode.languages.registerDefinitionProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            new XmlParameterDefinitionProvider(fileMapper)
+        )
+    );
+
+    console.log('[MyBatis Boost] XML definition providers registered');
+}
+
+/**
+ * Register Java-to-XML navigation provider based on configuration
+ * @param context Extension context
+ * @param useDefinitionProvider Whether to use DefinitionProvider (true) or CodeLens (false)
+ */
+function registerJavaToXmlNavigationProvider(context: vscode.ExtensionContext, useDefinitionProvider: boolean) {
+    if (useDefinitionProvider) {
+        // Use DefinitionProvider mode (F12 jumps to XML)
+        javaToXmlDefinitionProvider = vscode.languages.registerDefinitionProvider(
+            { language: 'java', pattern: '**/*.java' },
+            new JavaToXmlDefinitionProvider(fileMapper)
+        );
+        context.subscriptions.push(javaToXmlDefinitionProvider);
+        console.log('[MyBatis Boost] Java-to-XML DefinitionProvider registered');
+    } else {
+        // Use CodeLens mode (non-invasive, preserves native Java behavior)
+        const codeLensProvider = new JavaToXmlCodeLensProvider(fileMapper);
+        javaToXmlCodeLensProvider = vscode.languages.registerCodeLensProvider(
+            { language: 'java', pattern: '**/*.java' },
+            codeLensProvider
+        );
+        context.subscriptions.push(javaToXmlCodeLensProvider);
+        console.log('[MyBatis Boost] Java-to-XML CodeLensProvider registered');
+    }
+}
+
+/**
+ * Unregister Java-to-XML navigation provider
+ */
+function unregisterJavaToXmlNavigationProvider() {
+    if (javaToXmlDefinitionProvider) {
+        javaToXmlDefinitionProvider.dispose();
+        javaToXmlDefinitionProvider = undefined;
+        console.log('[MyBatis Boost] Java-to-XML DefinitionProvider unregistered');
+    }
+    if (javaToXmlCodeLensProvider) {
+        javaToXmlCodeLensProvider.dispose();
+        javaToXmlCodeLensProvider = undefined;
+        console.log('[MyBatis Boost] Java-to-XML CodeLensProvider unregistered');
     }
 }
