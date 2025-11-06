@@ -2,11 +2,11 @@
   "name": "mybatis-boost",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "young1lin",
   "license": "MIT",
   "packageManager": "pnpm@10.19.0",
-  "icon": "images/icons/MyBatis-Navigator.png",
+  "icon": "images/icons/MyBatis.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/young1lin/mybatis-boost.git"
@@ -15,10 +15,8 @@
     "vscode": "^1.99.3"
   },
   "categories": [
-    "Programming Languages",
     "Java",
-    "MyBatis",
-    "Other"
+    "MyBatis"
   ],
   "keywords": [
     "mybatis",
@@ -26,8 +24,7 @@
     "xml",
     "java",
     "navigation",
-    "sql",
-    "database"
+    "sql"
   ],
   "activationEvents": [
     "workspaceContains:**/pom.xml",
