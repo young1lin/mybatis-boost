@@ -231,6 +231,16 @@ export async function extractMethodParameters(
                 // Find the actual start by looking for the last closing brace, semicolon, or interface declaration
                 for (let j = i - 1; j >= startLine; j--) {
                     const prevLine = lines[j].trim();
+                    // Stop if we hit an import statement (shouldn't be part of method declaration)
+                    if (prevLine.startsWith('import ')) {
+                        startLine = j + 1;
+                        break;
+                    }
+                    // Stop if we hit a package declaration
+                    if (prevLine.startsWith('package ')) {
+                        startLine = j + 1;
+                        break;
+                    }
                     // Stop if we hit the end of a previous statement or method
                     if (prevLine.endsWith(';') || prevLine.endsWith('}')) {
                         startLine = j + 1;
@@ -334,10 +344,11 @@ function parseMethodParameters(
 
         // Match type and parameter name
         // Handle generic types like List<String> but extract only root type
-        const typeParamMatch = withoutAnnotations.match(/(\w+)(?:<[^>]+>)?\s+(\w+)/);
+        // Support fully qualified class names (e.g., com.example.query.UserQuery)
+        const typeParamMatch = withoutAnnotations.match(/([\w.]+)(?:<[^>]+>)?\s+(\w+)/);
 
         if (typeParamMatch) {
-            const paramType = typeParamMatch[1]; // Only root type (List, not List<String>)
+            const paramType = typeParamMatch[1]; // Can be simple (List) or fully qualified (com.example.UserQuery)
             const paramName = typeParamMatch[2];
 
             // Use annotation value if present, otherwise use parameter name

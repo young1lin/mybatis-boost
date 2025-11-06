@@ -325,6 +325,12 @@ export class ParameterValidator {
      */
     private async resolveFullyQualifiedType(javaPath: string, simpleTypeName: string): Promise<string | null> {
         try {
+            // If the type name already contains dots, it's already fully qualified
+            if (simpleTypeName.includes('.')) {
+                console.log(`[ParameterValidator] ${simpleTypeName} is already fully qualified`);
+                return simpleTypeName;
+            }
+
             const fs = await import('fs');
             const content = await fs.promises.readFile(javaPath, 'utf-8');
             const lines = content.split('\n');
