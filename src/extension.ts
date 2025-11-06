@@ -189,14 +189,87 @@ function registerCommands(context: vscode.ExtensionContext) {
         })
     );
 
-    // Jump to XML command (used by CodeLens)
-    // Automatically detects whether to jump to mapper namespace or statement
+    // Jump to XML command (used by CodeLens and manual invocation)
+    // Automatically detects whether to jump to mapper namespace or statement based on cursor position
     context.subscriptions.push(
-        vscode.commands.registerCommand('mybatis-boost.jumpToXml', async (javaUri: vscode.Uri, xmlPath: string, methodName?: string) => {
-            // Validate parameters
-            if (!xmlPath) {
-                vscode.window.showWarningMessage('MyBatis Boost: XML file path is required');
-                return;
+        vscode.commands.registerCommand('mybatis-boost.jumpToXml', async (javaUri?: vscode.Uri, xmlPath?: string, methodName?: string) => {
+            // If called without arguments (manual invocation), detect cursor position
+            if (!javaUri || !xmlPath) {
+                const editor = vscode.window.activeTextEditor;
+                if (!editor) {
+                    vscode.window.showWarningMessage('MyBatis Boost: No active editor');
+                    return;
+                }
+
+                if (!fileMapper) {
+                    vscode.window.showWarningMessage('MyBatis Boost is not active. Open a Java project to use this feature.');
+                    return;
+                }
+
+                const document = editor.document;
+                const position = editor.selection.active;
+
+                // Get the word at cursor position
+                const wordRange = document.getWordRangeAtPosition(position);
+                if (!wordRange) {
+                    vscode.window.showWarningMessage('MyBatis Boost: No word found at cursor position');
+                    return;
+                }
+
+                const word = document.getText(wordRange);
+                const line = document.lineAt(position.line).text;
+
+                // Get corresponding XML file
+                const javaPath = document.uri.fsPath;
+                const detectedXmlPath = await fileMapper.getXmlPath(javaPath);
+
+                if (!detectedXmlPath) {
+                    vscode.window.showWarningMessage('MyBatis Boost: No corresponding XML file found');
+                    return;
+                }
+
+                // Set the detected values
+                javaUri = document.uri;
+                xmlPath = detectedXmlPath;
+
+                // Check if this is an interface declaration
+                const interfacePattern = /(?:public\s+)?interface\s+\w+/;
+                if (interfacePattern.test(line) && line.includes(word)) {
+                    // Jump to mapper namespace (no methodName)
+                    methodName = undefined;
+                } else {
+                    // Check if this looks like a method declaration
+                    const currentLineHasMethodName = /\w+\s+\w+\s*\(/.test(line);
+                    const wordFollowedByParen = line.includes(`${word}(`);
+
+                    if (currentLineHasMethodName || wordFollowedByParen) {
+                        // Verify this is actually a method by checking if it has a closing ';' within next few lines
+                        let hasMethodEnd = line.includes(';') || line.includes(')');
+
+                        if (!hasMethodEnd) {
+                            // Look ahead up to 10 lines
+                            const text = document.getText();
+                            const lines = text.split('\n');
+                            for (let i = position.line + 1; i < Math.min(position.line + 10, lines.length); i++) {
+                                if (lines[i].includes(';') || lines[i].includes('}')) {
+                                    hasMethodEnd = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (hasMethodEnd) {
+                            // Jump to XML statement
+                            methodName = word;
+                        } else {
+                            vscode.window.showWarningMessage('MyBatis Boost: Cursor is not on a method or interface');
+                            return;
+                        }
+                    } else {
+                        vscode.window.showWarningMessage('MyBatis Boost: Cursor is not on a method or interface');
+                        return;
+                    }
+                }
             }
 
             const { findXmlMapperPosition, findXmlStatementPosition } = await import('./navigator/parsers/xmlParser.js');
