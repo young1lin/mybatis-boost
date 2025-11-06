@@ -129,16 +129,50 @@ Choose between two navigation modes based on your workflow:
 
 ## Installation
 
+### Prerequisites
+
+**Package Manager Version Management**
+
+This project uses **Corepack** to pin the pnpm version, ensuring consistent package manager versions across all environments (similar to Python's `uv`).
+
+**First-time setup (one-time only):**
+```bash
+# Enable Corepack (built into Node.js 16.9+)
+corepack enable
+```
+
+After enabling Corepack, it will automatically:
+- Detect the `packageManager` field in `package.json`
+- Download and cache the specified pnpm version (10.19.0)
+- Use the correct version transparently for all `pnpm` commands
+
+**Benefits:**
+- ✅ Guarantees the same pnpm version for all team members
+- ✅ Auto-downloads the correct version in new environments
+- ✅ Prevents "works on my machine" issues caused by version mismatches
+- ✅ No need to manually install specific pnpm versions
+
+**Compatibility:**
+- Node.js 16.9+ (includes Corepack by default)
+- Works in CI/CD environments
+- Supports pnpm, yarn, and npm version pinning
+
+### Build and Run
+
 1. Clone this repository
-2. Install dependencies:
+2. Enable Corepack (first-time only):
+   ```bash
+   corepack enable
+   ```
+3. Install dependencies:
    ```bash
    pnpm install
    ```
-3. Build the extension:
+4. Build the extension:
    ```bash
    pnpm run compile
    ```
-4. Press F5 to launch Extension Development Host
+5. Press F5 to launch Extension Development Host
 
 ## Usage
 

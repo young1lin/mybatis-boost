@@ -134,16 +134,50 @@ List<AccountSymbolCfg> selectByCondition(AccountSymbolCfgQuery query);
 
 ## 安装
 
+### 前置要求
+
+**包管理器版本管理**
+
+本项目使用 **Corepack** 来固定 pnpm 版本，确保所有环境使用一致的包管理器版本（类似 Python 的 `uv`）。
+
+**首次设置（仅需一次）：**
+```bash
+# 启用 Corepack（Node.js 16.9+ 内置）
+corepack enable
+```
+
+启用 Corepack 后，它会自动：
+- 检测 `package.json` 中的 `packageManager` 字段
+- 下载并缓存指定的 pnpm 版本（10.19.0）
+- 对所有 `pnpm` 命令透明地使用正确的版本
+
+**优势：**
+- ✅ 保证所有团队成员使用相同的 pnpm 版本
+- ✅ 在新环境中自动下载正确的版本
+- ✅ 防止因版本不匹配导致的"在我机器上能运行"问题
+- ✅ 无需手动安装特定的 pnpm 版本
+
+**兼容性：**
+- Node.js 16.9+（默认包含 Corepack）
+- 可在 CI/CD 环境中使用
+- 支持 pnpm、yarn 和 npm 版本固定
+
+### 构建和运行
+
 1. 克隆此仓库
-2. 安装依赖：
+2. 启用 Corepack（仅首次需要）：
+   ```bash
+   corepack enable
+   ```
+3. 安装依赖：
    ```bash
    pnpm install
    ```
-3. 构建扩展：
+4. 构建扩展：
    ```bash
    pnpm run compile
    ```
-4. 按 F5 启动扩展开发主机
+5. 按 F5 启动扩展开发主机
 
 ## 使用方法
 

@@ -5,6 +5,7 @@
   "version": "0.0.1",
   "publisher": "young1lin",
   "license": "MIT",
+  "packageManager": "pnpm@10.19.0",
   "icon": "images/icons/MyBatis-Navigator.png",
   "repository": {
     "type": "git",
