@@ -1,0 +1,32 @@
+{
+  "extension.activating": "正在激活扩展...",
+  "extension.notJavaProject": "不是 Java 项目，导航功能已禁用",
+  "extension.javaProjectDetected": "检测到 Java 项目，正在初始化...",
+  "extension.navigationMode": "导航模式：{0}",
+  "extension.parameterValidatorInitialized": "参数验证器已初始化",
+  "extension.bindingDecoratorInitialized": "绑定装饰器已初始化",
+  "extension.bindingDecoratorDisabled": "绑定装饰器已被配置禁用",
+  "extension.configChanged": "配置已更改：useDefinitionProvider = {0}",
+  "extension.switchedMode": "MyBatis Boost：已切换到 {0} 模式",
+  "extension.activated": "扩展已在 {0} 毫秒内激活",
+  "extension.deactivating": "正在停用扩展...",
+  "extension.commandsRegistered": "命令已注册",
+  "extension.xmlDefinitionProvidersRegistered": "XML 定义提供程序已注册",
+  "extension.javaToXmlDefinitionProviderRegistered": "Java 到 XML 定义提供程序已注册",
+  "extension.javaToXmlCodeLensProviderRegistered": "Java 到 XML CodeLens 提供程序已注册",
+  "extension.javaToXmlDefinitionProviderUnregistered": "Java 到 XML 定义提供程序已注销",
+  "extension.javaToXmlCodeLensProviderUnregistered": "Java 到 XML CodeLens 提供程序已注销",
+
+  "command.notActive": "MyBatis Boost 未激活。请打开 Java 项目以使用此功能。",
+  "command.cacheCleared": "MyBatis Boost 缓存已清除并重建",
+  "command.refreshingMappings": "正在刷新 MyBatis 映射...",
+  "command.mappingsRefreshed": "MyBatis 映射已成功刷新",
+  "command.noActiveEditor": "MyBatis Boost：没有活动的编辑器",
+  "command.noWordAtCursor": "MyBatis Boost：光标位置未找到单词",
+  "command.noXmlFound": "MyBatis Boost：未找到对应的 XML 文件",
+  "command.notOnMethodOrInterface": "MyBatis Boost：光标不在方法或接口上",
+  "command.statementNotFound": "MyBatis 语句 \"{0}\" 在 XML 中未找到",
+
+  "mode.definitionProvider": "定义提供程序",
+  "mode.codeLens": "CodeLens"
+}

@@ -29,7 +29,7 @@ let javaToXmlDefinitionProvider: vscode.Disposable | undefined;
 let javaToXmlCodeLensProvider: vscode.Disposable | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
-    console.log('[MyBatis Boost] Activating extension...');
+    console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.activating')}`);
     const activationStart = Date.now();
 
     // Register commands first (always available)
@@ -38,11 +38,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // Quick check if this is a Java project
     const isJava = await isJavaProject();
     if (!isJava) {
-        console.log('[MyBatis Boost] Not a Java project, navigation features disabled');
+        console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.notJavaProject')}`);
         return;
     }
 
-    console.log('[MyBatis Boost] Java project detected, initializing...');
+    console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.javaProjectDetected')}`);
 
     // Get configuration
     const config = vscode.workspace.getConfiguration('mybatis-boost');
@@ -59,19 +59,20 @@ export async function activate(context: vscode.ExtensionContext) {
     const useDefinitionProvider = config.get<boolean>('useDefinitionProvider', false);
     registerJavaToXmlNavigationProvider(context, useDefinitionProvider);
 
-    console.log(`[MyBatis Boost] Navigation mode: ${useDefinitionProvider ? 'DefinitionProvider' : 'CodeLens'}`);
+    const mode = useDefinitionProvider ? vscode.l10n.t('mode.definitionProvider') : vscode.l10n.t('mode.codeLens');
+    console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.navigationMode', mode)}`);
 
     // Initialize parameter validator
     parameterValidator = new ParameterValidator(context, fileMapper);
-    console.log('[MyBatis Boost] Parameter validator initialized');
+    console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.parameterValidatorInitialized')}`);
 
     // Initialize binding decorator if enabled
     const showBindingIcons = config.get<boolean>('showBindingIcons', true);
     if (showBindingIcons) {
         bindingDecorator = new MybatisBindingDecorator(context, fileMapper);
-        console.log('[MyBatis Boost] Binding decorator initialized');
+        console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.bindingDecoratorInitialized')}`);
     } else {
-        console.log('[MyBatis Boost] Binding decorator disabled by configuration');
+        console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.bindingDecoratorDisabled')}`);
     }
 
     // Listen for configuration changes
@@ -82,7 +83,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     .getConfiguration('mybatis-boost')
                     .get<boolean>('useDefinitionProvider', false);
 
-                console.log(`[MyBatis Boost] Configuration changed: useDefinitionProvider = ${newUseDefinitionProvider}`);
+                console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.configChanged', String(newUseDefinitionProvider))}`);
 
                 // Unregister old provider
                 unregisterJavaToXmlNavigationProvider();
@@ -90,8 +91,9 @@ export async function activate(context: vscode.ExtensionContext) {
                 // Register new provider
                 registerJavaToXmlNavigationProvider(context, newUseDefinitionProvider);
 
+                const newMode = newUseDefinitionProvider ? vscode.l10n.t('mode.definitionProvider') : vscode.l10n.t('mode.codeLens');
                 vscode.window.showInformationMessage(
-                    `MyBatis Boost: Switched to ${newUseDefinitionProvider ? 'DefinitionProvider' : 'CodeLens'} mode`
+                    vscode.l10n.t('extension.switchedMode', newMode)
                 );
             }
         })
@@ -114,7 +116,7 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     const activationTime = Date.now() - activationStart;
-    console.log(`[MyBatis Boost] Extension activated in ${activationTime}ms`);
+    console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.activated', String(activationTime))}`);
 }
 
 /**
@@ -155,7 +157,7 @@ function registerCommands(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('mybatis-boost.clearCache', async () => {
             if (!fileMapper) {
-                vscode.window.showWarningMessage('MyBatis Boost is not active. Open a Java project to use this feature.');
+                vscode.window.showWarningMessage(vscode.l10n.t('command.notActive'));
                 return;
             }
             fileMapper.clearCache();
@@ -163,7 +165,7 @@ function registerCommands(context: vscode.ExtensionContext) {
             if (bindingDecorator) {
                 bindingDecorator.refresh();
             }
-            vscode.window.showInformationMessage('MyBatis Boost cache cleared and rebuilt');
+            vscode.window.showInformationMessage(vscode.l10n.t('command.cacheCleared'));
         })
     );
 
@@ -171,12 +173,12 @@ function registerCommands(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('mybatis-boost.refreshMappings', async () => {
             if (!fileMapper) {
-                vscode.window.showWarningMessage('MyBatis Boost is not active. Open a Java project to use this feature.');
+                vscode.window.showWarningMessage(vscode.l10n.t('command.notActive'));
                 return;
             }
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Refreshing MyBatis mappings...',
+                title: vscode.l10n.t('command.refreshingMappings'),
                 cancellable: false
             }, async () => {
                 fileMapper.clearCache();
@@ -185,7 +187,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                     bindingDecorator.refresh();
                 }
             });
-            vscode.window.showInformationMessage('MyBatis mappings refreshed successfully');
+            vscode.window.showInformationMessage(vscode.l10n.t('command.mappingsRefreshed'));
         })
     );
 
@@ -197,12 +199,12 @@ function registerCommands(context: vscode.ExtensionContext) {
             if (!javaUri || !xmlPath) {
                 const editor = vscode.window.activeTextEditor;
                 if (!editor) {
-                    vscode.window.showWarningMessage('MyBatis Boost: No active editor');
+                    vscode.window.showWarningMessage(vscode.l10n.t('command.noActiveEditor'));
                     return;
                 }
 
                 if (!fileMapper) {
-                    vscode.window.showWarningMessage('MyBatis Boost is not active. Open a Java project to use this feature.');
+                    vscode.window.showWarningMessage(vscode.l10n.t('command.notActive'));
                     return;
                 }
 
@@ -212,7 +214,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 // Get the word at cursor position
                 const wordRange = document.getWordRangeAtPosition(position);
                 if (!wordRange) {
-                    vscode.window.showWarningMessage('MyBatis Boost: No word found at cursor position');
+                    vscode.window.showWarningMessage(vscode.l10n.t('command.noWordAtCursor'));
                     return;
                 }
 
@@ -224,7 +226,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                 const detectedXmlPath = await fileMapper.getXmlPath(javaPath);
 
                 if (!detectedXmlPath) {
-                    vscode.window.showWarningMessage('MyBatis Boost: No corresponding XML file found');
+                    vscode.window.showWarningMessage(vscode.l10n.t('command.noXmlFound'));
                     return;
                 }
 
@@ -262,11 +264,11 @@ function registerCommands(context: vscode.ExtensionContext) {
                             // Jump to XML statement
                             methodName = word;
                         } else {
-                            vscode.window.showWarningMessage('MyBatis Boost: Cursor is not on a method or interface');
+                            vscode.window.showWarningMessage(vscode.l10n.t('command.notOnMethodOrInterface'));
                             return;
                         }
                     } else {
-                        vscode.window.showWarningMessage('MyBatis Boost: Cursor is not on a method or interface');
+                        vscode.window.showWarningMessage(vscode.l10n.t('command.notOnMethodOrInterface'));
                         return;
                     }
                 }
@@ -284,7 +286,7 @@ function registerCommands(context: vscode.ExtensionContext) {
                     const position = new vscode.Position(statementPosition.line, statementPosition.startColumn);
                     await vscode.window.showTextDocument(xmlUri, { selection: new vscode.Range(position, position) });
                 } else {
-                    vscode.window.showWarningMessage(`MyBatis statement "${methodName}" not found in XML`);
+                    vscode.window.showWarningMessage(vscode.l10n.t('command.statementNotFound', methodName));
                 }
             } else {
                 // Jump to XML mapper namespace
@@ -303,11 +305,11 @@ function registerCommands(context: vscode.ExtensionContext) {
         })
     );
 
-    console.log('[MyBatis Boost] Commands registered');
+    console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.commandsRegistered')}`);
 }
 
 export function deactivate() {
-    console.log('[MyBatis Boost] Deactivating extension...');
+    console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.deactivating')}`);
 
     if (fileMapper) {
         fileMapper.dispose();
@@ -363,7 +365,7 @@ function registerXmlDefinitionProviders(context: vscode.ExtensionContext) {
         )
     );
 
-    console.log('[MyBatis Boost] XML definition providers registered');
+    console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.xmlDefinitionProvidersRegistered')}`);
 }
 
 /**
@@ -379,7 +381,7 @@ function registerJavaToXmlNavigationProvider(context: vscode.ExtensionContext, u
             new JavaToXmlDefinitionProvider(fileMapper)
         );
         context.subscriptions.push(javaToXmlDefinitionProvider);
-        console.log('[MyBatis Boost] Java-to-XML DefinitionProvider registered');
+        console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.javaToXmlDefinitionProviderRegistered')}`);
     } else {
         // Use CodeLens mode (non-invasive, preserves native Java behavior)
         const codeLensProvider = new JavaToXmlCodeLensProvider(fileMapper);
@@ -388,7 +390,7 @@ function registerJavaToXmlNavigationProvider(context: vscode.ExtensionContext, u
             codeLensProvider
         );
         context.subscriptions.push(javaToXmlCodeLensProvider);
-        console.log('[MyBatis Boost] Java-to-XML CodeLensProvider registered');
+        console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.javaToXmlCodeLensProviderRegistered')}`);
     }
 }
 
@@ -399,11 +401,11 @@ function unregisterJavaToXmlNavigationProvider() {
     if (javaToXmlDefinitionProvider) {
         javaToXmlDefinitionProvider.dispose();
         javaToXmlDefinitionProvider = undefined;
-        console.log('[MyBatis Boost] Java-to-XML DefinitionProvider unregistered');
+        console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.javaToXmlDefinitionProviderUnregistered')}`);
     }
     if (javaToXmlCodeLensProvider) {
         javaToXmlCodeLensProvider.dispose();
         javaToXmlCodeLensProvider = undefined;
-        console.log('[MyBatis Boost] Java-to-XML CodeLensProvider unregistered');
+        console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.javaToXmlCodeLensProviderUnregistered')}`);
     }
 }

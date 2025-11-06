@@ -1,7 +1,7 @@
 {
   "name": "mybatis-boost",
-  "displayName": "MyBatis Boost",
-  "description": "High-performance bidirectional navigation between MyBatis mapper interfaces and XML files with sub-100ms latency",
+  "displayName": "%displayName%",
+  "description": "%description%",
   "version": "0.0.1",
   "publisher": "young1lin",
   "license": "MIT",
@@ -36,26 +36,26 @@
     "commands": [
       {
         "command": "mybatis-boost.clearCache",
-        "title": "Clear Cache and Rebuild",
+        "title": "%command.clearCache%",
         "category": "MyBatis Boost"
       },
       {
         "command": "mybatis-boost.refreshMappings",
-        "title": "Refresh Mappings",
+        "title": "%command.refreshMappings%",
         "category": "MyBatis Boost"
       },
       {
         "command": "mybatis-boost.jumpToXml",
-        "title": "Jump to MyBatis XML"
+        "title": "%command.jumpToXml%"
       }
     ],
     "configuration": {
-      "title": "MyBatis Boost",
+      "title": "%config.title%",
       "properties": {
         "mybatis-boost.cacheSize": {
           "type": "number",
           "default": 5000,
-          "description": "Maximum number of mapper file pairs to cache in memory (LRU cache size)"
+          "description": "%config.cacheSize.description%"
         },
         "mybatis-boost.customXmlDirectories": {
           "type": "array",
@@ -63,24 +63,24 @@
             "type": "string"
           },
           "default": [],
-          "description": "Custom directories to search for XML mapper files, relative to workspace root"
+          "description": "%config.customXmlDirectories.description%"
         },
         "mybatis-boost.javaParseLines": {
           "type": "number",
           "default": 100,
           "minimum": 20,
           "maximum": 200,
-          "description": "Number of lines to read from Java files for namespace extraction"
+          "description": "%config.javaParseLines.description%"
         },
         "mybatis-boost.showBindingIcons": {
           "type": "boolean",
           "default": true,
-          "description": "Show gutter icons for MyBatis bindings between Java methods and XML statements"
+          "description": "%config.showBindingIcons.description%"
         },
         "mybatis-boost.useDefinitionProvider": {
           "type": "boolean",
           "default": false,
-          "description": "Enable Go-to-Definition (F12) for Java-to-XML navigation. When false (default), use CodeLens instead to preserve native Java definition behavior"
+          "description": "%config.useDefinitionProvider.description%"
         }
       }
     }

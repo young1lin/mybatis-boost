@@ -1,7 +1,7 @@
 # Product Requirements Document: MyBatis Boost VS Code Extension
 **Version:** 0.0.1
-**Last Updated:** 2025-11-03
-**Document Status:** Implementation-Ready
+**Last Updated:** 2025-11-06
+**Document Status:** Implemented
 **Author:** young1lin
 
 ---
@@ -20,14 +20,17 @@
 
 ## Executive Summary
 
-MyBatis Boost is a high-performance VS Code extension that provides seamless bidirectional navigation between MyBatis mapper interfaces (Java) and their corresponding XML mapping files. The extension achieves sub-100ms navigation latency through advanced caching strategies, incremental file watching, and optimized parsing algorithms.
+MyBatis Boost is a high-performance VS Code extension providing comprehensive bidirectional navigation between MyBatis mapper interfaces (Java) and XML mapping files. The extension features 10 types of Go-to-Definition navigation, real-time parameter validation, visual binding indicators, and flexible navigation modes. It achieves sub-100ms navigation latency through LRU caching, file watchers, and optimized parsing.
 
 ### Key Highlights
-- **Sub-100ms navigation latency** (P50 < 100ms, P95 < 200ms)
-- **Two navigation methods**: Commands (keyboard shortcuts) and Go-to-Definition
-- **Persistent caching** for instant activation without workspace re-scanning
-- **Scalable architecture** supporting 1,000+ mapper files
-- **Performance monitoring** with P50/P95/P99 metrics
+- ✅ **10 types of Go-to-Definition navigation** (F12/Ctrl+Click)
+- ✅ **Real-time parameter validation** with error diagnostics
+- ✅ **Visual binding indicators** (gutter icons)
+- ✅ **Flexible navigation modes**: CodeLens (default) or DefinitionProvider (optional)
+- ✅ **Sub-100ms navigation latency** (P50 < 100ms, P95 < 200ms)
+- ✅ **LRU caching** with configurable size (default: 5000 entries)
+- ✅ **Automatic cache invalidation** on file changes
+- ✅ **Scalable architecture** supporting 1,000+ mapper files
 
 ---
 
@@ -37,9 +40,13 @@ MyBatis Boost is a high-performance VS Code extension that provides seamless bid
 Developers working with MyBatis ORM frequently need to navigate between Java mapper interfaces and XML SQL mapping files. Manual navigation is time-consuming and error-prone, especially in large projects with hundreds of mappers.
 
 ### Solution
-MyBatis Boost provides instant, accurate bidirectional navigation with two interaction methods:
-1. **Keyboard shortcuts** (Alt+Shift+X/J) - Execute commands to jump between files
-2. **Go-to-Definition** (Ctrl+Click or F12) - Standard IDE navigation pattern
+MyBatis Boost provides instant, accurate bidirectional navigation with multiple interaction methods:
+1. **Go-to-Definition** (F12 or Ctrl+Click) - Standard IDE navigation for XML → Java
+2. **CodeLens** (default) - Clickable links above Java interfaces/methods
+3. **DefinitionProvider** (optional) - Direct F12 navigation for Java → XML
+4. **Manual Command** - `jumpToXml` command with context detection
+5. **Parameter Validation** - Real-time error diagnostics for undefined parameters
+6. **Visual Indicators** - Gutter icons showing method-statement bindings
 
 ### Target Users
 - Java developers using MyBatis framework
@@ -48,152 +55,227 @@ MyBatis Boost provides instant, accurate bidirectional navigation with two inter
 
 ---
 
-## Core Features
+## Core Features (Implementation Status)
 
-### 1. Bidirectional Navigation
+### 1. Bidirectional Navigation ✅ IMPLEMENTED
 
 #### 1.1 Java to XML Navigation
+**Implementation Status**: ✅ COMPLETED
+
 **Description**: Navigate from Java mapper interface methods to corresponding XML SQL statements.
 
-**Interaction Methods**:
-- **Command**: `MyBatis: Jump to XML` (Alt+Shift+X) - Execute from command palette or keyboard shortcut
-- **Go-to-Definition**: F12 or Ctrl+Click on method name jumps to XML statement
+**Interaction Methods** (All Implemented):
+- **CodeLens** (default): Clickable "jumpToXml" links above interfaces and methods
+  - Automatically detects interface name vs method name
+  - Hides for methods with SQL annotations
+  - Only shows when corresponding XML statements exist
+- **DefinitionProvider** (optional): F12 or Ctrl+Click on method name jumps to XML statement
+  - Enable via `mybatis-boost.useDefinitionProvider: true`
+  - Overwrites native Java definition behavior
+- **Manual Command**: `mybatis-boost.jumpToXml`
+  - Auto-detects cursor position (interface vs method)
+  - Can be invoked via command palette
 
-**Behavior**:
-- If cursor is on a method declaration, jump to the exact line of the matching SQL statement in XML
-- If method not found in XML, open XML file at the top and show warning message
-- If no XML mapping exists, show error message
+**Behavior** (As Implemented):
+- Cursor on interface name → jumps to XML `<mapper>` tag with namespace
+- Cursor on method name → jumps to exact line of matching SQL statement in XML
+- If method not found in XML, shows warning message
+- If no XML mapping exists, shows error message
+- Supports multi-line method declarations and generic types
 
 **Technical Details**:
-- Extracts method name from Java interface using regex parsing
+- Uses `JavaToXmlCodeLensProvider` for CodeLens mode (default)
+- Uses `JavaToXmlDefinitionProvider` for F12 mode (optional)
+- Extracts method names using regex parsing
 - Searches XML file for `<select|insert|update|delete id="methodName">`
 - Handles multi-line XML tags correctly
 - Uses LRU cache to avoid repeated file parsing
+- Position tracking for precise navigation
 
 #### 1.2 XML to Java Navigation
+**Implementation Status**: ✅ COMPLETED
+
 **Description**: Navigate from XML SQL statements to corresponding Java mapper interface methods.
 
-**Interaction Methods**:
-- **Command**: `MyBatis: Jump to Java` (Alt+Shift+J) - Execute from command palette or keyboard shortcut
+**Interaction Methods** (As Implemented):
 - **Go-to-Definition**: F12 or Ctrl+Click on `id` attribute value jumps to Java method
+- **Precise Navigation**: Only works when cursor is on the `id="methodName"` attribute (not anywhere in the statement body)
 
-**Behavior**:
-- If cursor is on a SQL statement tag, jump to the exact line of the matching method in Java interface
-- If method not found in Java, open Java file at the top and show warning message
-- If no Java interface exists, show error message
+**Behavior** (As Implemented):
+- Cursor on statement `id` attribute → jumps to exact line of matching method in Java interface
+- If method not found in Java, shows warning message
+- If no Java interface exists, shows error message
+- Navigation precision prevents accidental jumps
 
 **Technical Details**:
+- Uses `XmlToJavaDefinitionProvider`
 - Extracts statement ID from XML tag's `id` attribute
+- Precise cursor position detection (only on `id` attribute)
 - Searches Java interface for method with matching name
 - Handles method overloading by jumping to first match
-- Uses backward search if cursor is inside statement body
+- Uses FileMapper for reverse mapping (XML → Java)
 
 #### 1.3 Java Class Reference Navigation
+**Implementation Status**: ✅ COMPLETED
+
 **Description**: Navigate from Java class names in XML attributes to their definitions.
 
-**Interaction Methods**:
-- **Go-to-Definition**: Ctrl+Click or F12 on class name in XML
+**Interaction Methods** (As Implemented):
+- **Go-to-Definition**: F12 or Ctrl+Click on class name in XML
 
-**Supported Attributes**:
+**Supported Attributes** (All Implemented):
 - `resultType="com.example.User"`
 - `parameterType="com.example.UserQuery"`
 - `type="com.example.TypeHandler"`
 - `ofType="com.example.Item"`
 - `javaType="java.lang.String"`
 
-**Behavior**:
+**Behavior** (As Implemented):
 - Converts fully-qualified class name to file path
 - Searches workspace for matching `.java` file
 - Opens file at class/interface/enum declaration line
+- Skips built-in types (primitives, java.lang classes)
 
-### 2. High-Performance Caching System
+**Technical Details**:
+- Uses `JavaClassDefinitionProvider`
+- Converts class name to file pattern (e.g., `com.example.User` → `**/com/example/User.java`)
+- Uses `vscode.workspace.findFiles` for fast search
+- Excluded directories: node_modules, target, build, etc.
 
-#### 2.1 Multi-Tier Cache Architecture
-1. **Persistent Cache**: Saved to VS Code global state, restored on activation
-2. **LRU In-Memory Cache**: Default 1,000 entries, configurable via settings
-3. **Path Trie Index**: O(k) lookup for XML files by filename
+#### 1.4 Additional Navigation Types ✅ IMPLEMENTED
+
+**SQL Fragment References** (Type 5 & 6):
+- `<include refid="xxx">` → `<sql id="xxx">` definition
+- `<sql id="xxx">` → All `<include>` references
+- Uses `XmlSqlFragmentDefinitionProvider`
+
+**ResultMap Navigation** (Type 8 & 9):
+- `<result property="xxx">` → Java field in resultMap type class
+- `resultMap="xxx"` ↔ `<resultMap id="xxx">` (bidirectional)
+- Uses `XmlResultMapPropertyDefinitionProvider` and `XmlResultMapDefinitionProvider`
+
+**Parameter Navigation** (Type 10 - NEW):
+- `#{paramName}` or `${paramName}` → Java field or `@Param` annotation
+- Supports `parameterType` class fields
+- Supports method parameters with `@Param` annotations
+- Handles nested properties (e.g., `#{user.name}`)
+- Uses `XmlParameterDefinitionProvider`
+
+### 2. High-Performance Caching System ✅ IMPLEMENTED
+
+#### 2.1 LRU Cache Architecture
+**Implementation Status**: ✅ COMPLETED
+
+- **LRU In-Memory Cache**: Default 5,000 entries (configurable via `mybatis-boost.cacheSize`)
+- **Bidirectional Mapping**: Both `javaPath` and `xmlPath` keys point to same metadata
+- **Automatic Eviction**: Least recently used entries evicted when size limit reached
+- Generic `Map`-based implementation in `FileMapper.ts`
 
 #### 2.2 Cache Invalidation Strategy
+**Implementation Status**: ✅ COMPLETED
+
 - **File modification timestamps** (`mtimeMs`) tracked for each mapping
 - **Automatic invalidation** when file system watcher detects changes
-- **Manual refresh** via command: `MyBatis: Clear Cache and Rebuild`
+- **Manual refresh** via commands:
+  - `mybatis-boost.clearCache` - Clear and rebuild
+  - `mybatis-boost.refreshMappings` - Refresh with progress notification
 
 #### 2.3 Incremental Updates
-- **File watchers** for `**/*Mapper.java` and `**/*Mapper.xml`
-- **Batch processing** with 500ms debounce to avoid redundant updates
-- **Partial updates** only re-parse changed files
+**Implementation Status**: ✅ COMPLETED
 
-### 3. Definition Providers
+- **File watchers** for `**/*.java` and `**/*.xml` (all files, not just *Mapper)
+- **Automatic updates** on create/change/delete events
+- **Partial updates**: Only re-parse changed files
+- Content-based mapper detection (requires `@Mapper` annotation or MyBatis imports)
 
-#### 3.1 Java Method Definition Provider
-**Description**: Enables Go-to-Definition (F12) from Java mapper methods to XML statements.
+### 3. Definition Providers ✅ IMPLEMENTED
 
-**Activation**:
-- Cursor on method name in Java mapper interface
-- F12 or Ctrl+Click triggers navigation
+All 8 definition providers have been implemented and tested:
 
-**Implementation**:
-- Detects cursor position on method identifier
-- Extracts method name from AST or regex parsing
-- Looks up corresponding XML file via cache
-- Finds XML statement by `id` attribute matching method name
-- Returns `vscode.Location` with file path and line number
+#### 3.1 Java Method Definition Provider (Optional)
+**Implementation Status**: ✅ COMPLETED (Optional Feature)
+
+- **Provider**: `JavaToXmlDefinitionProvider`
+- **Configuration**: `mybatis-boost.useDefinitionProvider` (default: false)
+- **When enabled**: F12 on Java methods jumps to XML statements
+- **Performance**: < 100ms response time
+- **Note**: Disabled by default to preserve native Java navigation
+
+#### 3.2 Java CodeLens Provider (Default)
+**Implementation Status**: ✅ COMPLETED
+
+- **Provider**: `JavaToXmlCodeLensProvider`
+- **Default Mode**: Shows clickable "jumpToXml" links
+- **Features**:
+  - Detects interface declarations and method declarations
+  - Hides for methods with SQL annotations
+  - Only shows when XML statements exist
+  - Supports multi-line method signatures and generics
+
+#### 3.3 XML Statement Definition Provider
+**Implementation Status**: ✅ COMPLETED
+
+- **Provider**: `XmlToJavaDefinitionProvider`
+- **Precise Navigation**: Only works on `id` attribute
+- **Performance**: < 100ms response time
+- **Uses**: FileMapper reverse mapping (XML → Java)
+
+#### 3.4 Additional Definition Providers (All Completed)
+
+1. **JavaClassDefinitionProvider**: XML class references → Java class
+2. **XmlSqlFragmentDefinitionProvider**: SQL fragment references
+3. **XmlResultMapPropertyDefinitionProvider**: ResultMap property → Java field
+4. **XmlResultMapDefinitionProvider**: ResultMap references
+5. **XmlParameterDefinitionProvider**: Parameter references → Java field/@Param
+
+### 4. Parameter Validation ✅ NEW FEATURE
+
+**Implementation Status**: ✅ COMPLETED
+
+**Location**: `src/navigator/diagnostics/ParameterValidator.ts`
+
+**Features**:
+- Real-time validation of `#{param}` and `${param}` references
+- Error diagnostics (red underlines) for undefined parameters
+- Validates against:
+  - Method parameters with `@Param` annotations
+  - Fields in `parameterType` class
+  - Local variables from `foreach`, `bind` tags
+- Supports nested properties (e.g., `#{user.name}`)
+- Automatic validation on file open, change, and save
 
 **Performance**:
-- Uses LRU cache for file mappings
-- Lazy parsing - only parses when definition requested
-- Target: < 100ms response time
+- Lazy validation (only validates visible documents)
+- Efficient field/parameter extraction
+- No impact on navigation performance
 
-#### 3.2 XML Statement Definition Provider
-**Description**: Enables Go-to-Definition (F12) from XML statement IDs to Java methods.
+### 5. Visual Binding Indicators ✅ NEW FEATURE
 
-**Activation**:
-- Cursor on `id` attribute value in XML statement tag
-- F12 or Ctrl+Click triggers navigation
+**Implementation Status**: ✅ COMPLETED
 
-**Implementation**:
-- Detects cursor within `id="methodName"` attribute
-- Extracts method name from attribute value
-- Looks up corresponding Java file via reverse mapping
-- Finds method declaration by name
-- Returns `vscode.Location` with file path and line number
+**Location**: `src/decorator/MybatisBindingDecorator.ts`
+
+**Features**:
+- Gutter icons next to Java methods with corresponding XML statements
+- Icons appear in both Java and XML files
+- Automatically updates when files change
+- Configurable via `mybatis-boost.showBindingIcons` (default: true)
 
 **Performance**:
-- Uses reverse mapping cache (XML → Java)
-- Fast attribute value extraction
-- Target: < 100ms response time
+- Efficient decoration updates
+- No impact on navigation performance
 
-#### 3.3 Java Class Definition Provider
-**Description**: Navigate from Java class names in XML attributes to their definitions.
+### 6. Configuration Options ✅ IMPLEMENTED
 
-**Supported Attributes**:
-- `resultType`, `parameterType`, `type`, `ofType`, `javaType`
+All configuration options have been implemented in `package.json`:
 
-**Implementation**: Already implemented (see src/extension.ts:330-421)
-
-### 4. Performance Monitoring
-
-#### 4.1 Operation Tracking
-**Tracked Operations**:
-- `navigateToXml`: Java → XML navigation
-- `navigateToJava`: XML → Java navigation
-- `command.jumpToXml`: Command invocation
-- `command.jumpToJava`: Command invocation
-- `definition.javaMethod`: Java method → XML definition lookup
-- `definition.xmlStatement`: XML statement → Java definition lookup
-- `definition.javaClass`: Java class definition lookup
-
-#### 4.2 Metrics Collection
-For each operation type:
-- **Count**: Total number of operations
-- **Duration**: Min, max, average
-- **Percentiles**: P50, P95, P99
-- **Success Rate**: Percentage of successful operations
-
-#### 4.3 Statistics Display
-**Command**: `MyBatis: Show Performance Statistics`
-
-**Output**: Markdown document with detailed breakdown per operation
+| Setting | Type | Default | Status |
+|---------|------|---------|--------|
+| `mybatis-boost.cacheSize` | number | 5000 | ✅ |
+| `mybatis-boost.customXmlDirectories` | array | [] | ✅ |
+| `mybatis-boost.javaParseLines` | number | 100 | ✅ |
+| `mybatis-boost.showBindingIcons` | boolean | true | ✅ |
+| `mybatis-boost.useDefinitionProvider` | boolean | false | ✅ |
 
 ---
 
@@ -446,103 +528,74 @@ interface MappingMetadata {
 
 ---
 
-## Configuration Options
+## Implemented Configuration Options
 
-### `mybatis-boost.scanInterval`
-- **Type**: Number (milliseconds)
-- **Default**: 5000
-- **Description**: Interval for scanning workspace changes (currently unused, replaced by file watchers)
-
-### `mybatis-boost.scanTimeoutMs`
-- **Type**: Number (milliseconds)
-- **Default**: 30000
-- **Description**: Timeout for file scanning operations
-
-### `mybatis-boost.jumpThrottleMs`
-- **Type**: Number (milliseconds)
-- **Default**: 300
-- **Description**: Throttle time for jump operations to prevent rapid repeated jumps
-
-### `mybatis-boost.cacheSize`
+### ✅ `mybatis-boost.cacheSize`
 - **Type**: Number
-- **Default**: 1000
+- **Default**: 5000
 - **Description**: Maximum number of mapper file pairs to cache in memory (LRU cache size)
+- **Status**: IMPLEMENTED
 
-### `mybatis-boost.fileOpenMode`
-- **Type**: Enum
-- **Options**: `newTab`, `useExisting`, `preview`
-- **Default**: `useExisting`
-- **Description**: How to open files when navigating
-  - `newTab`: Open in new editor tab
-  - `useExisting`: Reuse existing editor if file is already open
-  - `preview`: Open in preview mode (single-click behavior)
-
-### `mybatis-boost.enablePerformanceMonitoring`
-- **Type**: Boolean
-- **Default**: true
-- **Description**: Enable performance monitoring and statistics collection
-
-### `mybatis-boost.enableCodeLens`
-- **Type**: Boolean
-- **Default**: true
-- **Description**: Show CodeLens navigation links above methods and SQL statements
-
-### `mybatis-boost.enableGoToDefinition`
-- **Type**: Boolean
-- **Default**: true
-- **Description**: Enable go-to-definition for Java class references in XML files
-
-### `mybatis-boost.customXmlDirectories`
+### ✅ `mybatis-boost.customXmlDirectories`
 - **Type**: Array of strings
 - **Default**: `[]` (empty array)
 - **Description**: Custom directories to search for XML mapper files, relative to workspace root. These directories are checked with **Priority 1** in the XML matching strategy.
+- **Status**: IMPLEMENTED
 - **Example**:
   ```json
   {
     "mybatis-boost.customXmlDirectories": [
       "src/main/resources/mybatis/mappers",
-      "config/xml",
-      "custom/mapper-configs"
+      "config/xml"
     ]
   }
   ```
 
-### `mybatis-boost.java.parseLines`
+### ✅ `mybatis-boost.javaParseLines`
 - **Type**: Number
 - **Default**: 100
-- **Description**: Number of lines to read from Java files for namespace extraction. Lower values improve performance but may fail on files with many imports/comments at the top.
 - **Range**: 20-200
+- **Description**: Number of lines to read from Java files for namespace extraction. Lower values improve performance but may fail on files with many imports/comments at the top.
+- **Status**: IMPLEMENTED
+
+### ✅ `mybatis-boost.showBindingIcons`
+- **Type**: Boolean
+- **Default**: true
+- **Description**: Show gutter icons for MyBatis bindings between Java methods and XML statements
+- **Status**: IMPLEMENTED
+
+### ✅ `mybatis-boost.useDefinitionProvider`
+- **Type**: Boolean
+- **Default**: false
+- **Description**: Enable DefinitionProvider mode for Java-to-XML navigation. When false (default), uses CodeLens mode which preserves native Java F12 behavior.
+- **Status**: IMPLEMENTED
 
 ---
 
 ## Future Enhancements
 
-### High Priority
+### ✅ Completed in Current Version
 
-#### 1. Method-Level Definition Providers
-**Description**: Enable F12 (Go to Definition) on Java method names and XML statement IDs for bidirectional navigation.
+1. **Method-Level Definition Providers** - ✅ IMPLEMENTED
+   - Both Java → XML and XML → Java navigation
+   - CodeLens and DefinitionProvider modes
+   - See Core Features section
 
-**Requirements**:
-- **Java → XML**:
-  - Register `DefinitionProvider` for Java language
-  - Detect when cursor is on method name
-  - Return XML file location and statement line
-- **XML → Java**:
-  - Register `DefinitionProvider` for XML language
-  - Detect when cursor is on `id` attribute value
-  - Return Java file location and method line
+2. **Parameter Validation** - ✅ IMPLEMENTED
+   - Real-time diagnostics for undefined parameters
+   - Validates against multiple sources
+   - See Parameter Validation section
 
-**Benefits**:
-- Standard VS Code interaction pattern (F12)
-- Works with "Peek Definition" (Alt+F12)
-- Consistent with other language servers
+3. **Visual Binding Indicators** - ✅ IMPLEMENTED
+   - Gutter icons for method-statement bindings
+   - See Visual Binding Indicators section
 
-**Implementation Complexity**: Medium (2-3 days)
+### High Priority (Future Work)
 
-#### 2. Java Extension Integration
+#### 1. Java Extension Integration
 **Description**: Leverage Red Hat's "Language Support for Java" extension for advanced parsing capabilities.
 
-**Current Status**: Designed but not yet implemented. See [Technical Architecture > Java Extension Integration](#5-java-extension-integration-optional-enhancement) for detailed design.
+**Current Status**: Planned (not yet implemented)
 
 **Requirements**:
 - Detect Java extension installation: `vscode.extensions.getExtension('redhat.java')`
@@ -558,16 +611,7 @@ interface MappingMetadata {
 
 **Implementation Complexity**: Medium (3-4 days)
 
-**Acceptance Criteria**:
-- Extension detects Java LSP availability at activation
-- Uses LSP for method metadata when available
-- Falls back to regex parsing seamlessly
-- No breaking changes for users without Java extension
-- Performance remains sub-100ms for navigation
-
-### Medium Priority
-
-#### 3. Rename Refactoring Support
+#### 2. Rename Refactoring Support
 **Description**: Automatically update XML statement IDs when Java method is renamed.
 
 **Requirements**:
@@ -578,43 +622,31 @@ interface MappingMetadata {
 
 **Implementation Complexity**: High (1 week)
 
-#### 4. Validation and Diagnostics
-**Description**: Show warnings/errors for mismatched methods and statements.
+### Medium Priority (Future Work)
+
+#### 3. Enhanced Validation
+**Description**: Additional validation and diagnostics beyond parameter validation.
 
 **Examples**:
-- Java method exists but no XML statement
-- XML statement exists but no Java method
-- Parameter count mismatch
-- Return type mismatch
+- Java method exists but no XML statement (warning)
+- XML statement exists but no Java method (warning)
+- Return type mismatch between Java and XML
+- Method overloading detection
 
-**Implementation Complexity**: High (1-2 weeks)
+**Implementation Complexity**: Medium (3-5 days)
 
-### Low Priority
+### Low Priority (Future Work)
 
-#### 5. Multi-Workspace Support
+#### 4. Multi-Workspace Support
 **Description**: Support projects with multiple workspace folders.
 
 **Requirements**:
 - Maintain separate caches per workspace folder
 - Handle cross-workspace navigation
-- Aggregate performance statistics
 
 **Implementation Complexity**: Medium (3-4 days)
 
-#### 6. Custom Mapper Patterns
-**Description**: Allow users to configure custom file name patterns beyond `*Mapper.java` and `*Mapper.xml`.
-
-**Configuration Example**:
-```json
-{
-  "mybatis-boost.mapperPatterns": {
-    "java": ["**/*Mapper.java", "**/*Dao.java"],
-    "xml": ["**/*Mapper.xml", "**/*-mapper.xml"]
-  }
-}
-```
-
-**Implementation Complexity**: Low (1-2 days)
+**Note**: Current implementation uses content-based detection (not file name patterns), so custom patterns are not needed. The extension automatically detects any Java interface with `@Mapper` annotation or MyBatis imports, regardless of file name.
 
 ---
 
@@ -670,12 +702,14 @@ For each detected Java mapper, search for corresponding XML file using **priorit
 - Always verify `<mapper namespace="...">` matches Java full class name
 - Fallback to file name match if namespace missing
 
-### Known Limitations
+### Known Limitations (Current Implementation)
 1. **Method Overloading**: Only jumps to first matching method (does not distinguish by parameter types)
 2. **Inner Classes**: Not supported for navigation
 3. **Kotlin Mappers**: Not supported (Java only)
 4. **Annotation-Based Mappers**: Detected but no XML navigation (by design, annotation mappers don't need XML files)
-5. **Multiple XML Files**: If multiple XML files have matching namespaces, first found is used (shows warning)
+5. **Multiple XML Files**: If multiple XML files have matching namespaces, first found is used
+6. **Parameter Validation**: Does not support `parameterMap` references (future enhancement)
+7. **CodeLens Performance**: May be slow on very large mapper interfaces (100+ methods)
 
 ---
 

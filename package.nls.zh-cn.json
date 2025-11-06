@@ -1,0 +1,15 @@
+{
+  "displayName": "MyBatis Boost",
+  "description": "MyBatis 映射器接口与 XML 文件之间的高性能双向导航，延迟低于 100 毫秒",
+
+  "command.clearCache": "清除缓存并重建",
+  "command.refreshMappings": "刷新映射",
+  "command.jumpToXml": "跳转到 MyBatis XML",
+
+  "config.title": "MyBatis Boost",
+  "config.cacheSize.description": "内存中缓存的映射器文件对的最大数量（LRU 缓存大小）",
+  "config.customXmlDirectories.description": "搜索 XML 映射器文件的自定义目录，相对于工作区根目录",
+  "config.javaParseLines.description": "从 Java 文件中读取以提取命名空间的行数",
+  "config.showBindingIcons.description": "在 Java 方法和 XML 语句之间显示 MyBatis 绑定的装订线图标",
+  "config.useDefinitionProvider.description": "启用 Java 到 XML 导航的跳转到定义（F12）功能。当设为 false（默认）时，使用 CodeLens 以保留原生 Java 定义行为"
+}

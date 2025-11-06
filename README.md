@@ -1,6 +1,8 @@
 # MyBatis Boost
 
-High-performance bidirectional navigation between MyBatis mapper interfaces (Java) and their corresponding XML mapping files. Achieve sub-100ms navigation latency through LRU caching, file watchers, and optimized parsing.
+English | [简体中文](README.zh-cn.md)
+
+High-performance VS Code extension providing comprehensive bidirectional navigation between MyBatis mapper interfaces (Java) and XML mapping files. Features 10 types of Go-to-Definition navigation, real-time parameter validation, visual binding indicators, and flexible navigation modes. Achieve sub-100ms navigation latency through LRU caching, file watchers, and optimized parsing.
 
 ## Features
 
@@ -25,13 +27,14 @@ High-performance bidirectional navigation between MyBatis mapper interfaces (Jav
 - **F12 or Ctrl+Click** on `resultMap="xxx"` → `<resultMap id="xxx">` definition
 - **F12 or Ctrl+Click** on `<resultMap id="xxx">` → Shows all references to this resultMap
 
-**Parameter Navigation (NEW):**
+**Parameter Navigation:**
 - **F12 or Ctrl+Click** on `#{paramName}` or `${paramName}` → Java field or @Param annotation
 - Supports navigation to `parameterType` class fields
 - Supports navigation to method parameters with `@Param` annotations
 - Works with `<select>`, `<insert>`, `<update>`, `<delete>` statements
 
 **Smart Features:**
+- **Two navigation modes**: CodeLens (default, non-invasive) or DefinitionProvider (optional, F12)
 - Content-based MyBatis mapper detection (via `@Mapper` annotation or MyBatis imports)
 - Intelligent XML file matching with 5-tier priority strategy
 
@@ -47,13 +50,14 @@ High-performance bidirectional navigation between MyBatis mapper interfaces (Jav
 - Automatically updates when files change
 - Can be toggled via settings: `mybatis-boost.showBindingIcons`
 
-### ✅ Real-time Parameter Validation (NEW)
+### ✅ Real-time Parameter Validation
 - **Automatic validation** of `#{paramName}` and `${paramName}` references in XML
 - **Red underlines** for undefined parameters with helpful error messages
 - Validates against:
   - Fields in `parameterType` classes
   - Method parameters with `@Param` annotations
-  - Handles nested properties (e.g., `#{user.name}` validates `user`)
+  - Local variables from dynamic SQL tags (`foreach`, `bind`)
+  - Handles nested properties (e.g., `#{user.name}` validates base object `user`)
 - Works across `<select>`, `<insert>`, `<update>`, `<delete>` statements
 - Helps catch typos and missing parameters before runtime
 
@@ -66,6 +70,21 @@ High-performance bidirectional navigation between MyBatis mapper interfaces (Jav
     WHERE id = #{id}
 </update>
 ```
+
+### 🔄 Flexible Navigation Modes
+Choose between two navigation modes based on your workflow:
+
+**CodeLens Mode (Default - Recommended)**
+- Non-invasive: Preserves native Java definition behavior
+- F12 on Java classes still jumps to class definitions
+- Shows clickable "jumpToXml" links above interfaces and methods
+- Automatically hides for methods with SQL annotations
+
+**DefinitionProvider Mode (Optional)**
+- F12 on Java methods jumps directly to XML statements
+- More direct but overwrites native Java navigation
+- Enable via `mybatis-boost.useDefinitionProvider: true`
+- Changes take effect immediately
 
 ## Installation
 
@@ -179,6 +198,7 @@ Open VS Code settings and search for "MyBatis Boost":
 | `mybatis-boost.customXmlDirectories` | array | [] | Custom directories to search for XML files (Priority 1 in matching strategy) |
 | `mybatis-boost.javaParseLines` | number | 100 | Number of lines to read for namespace extraction |
 | `mybatis-boost.showBindingIcons` | boolean | true | Show gutter icons for MyBatis bindings between Java methods and XML statements |
+| `mybatis-boost.useDefinitionProvider` | boolean | false | Enable DefinitionProvider mode for Java-to-XML navigation (when false, uses CodeLens mode) |
 
 ## Architecture
 
@@ -270,6 +290,20 @@ pnpm run lint
 2. Check that Java method names match XML statement IDs exactly
 3. Try reopening the file or refreshing mappings
 
+### CodeLens Not Showing
+
+1. Ensure `mybatis-boost.useDefinitionProvider` is set to `false` (default)
+2. Check that the Java file has a corresponding XML mapper
+3. Verify that the Java interface has `@Mapper` annotation or MyBatis imports
+4. CodeLens automatically hides for methods with SQL annotations (`@Select`, etc.)
+
+### Parameter Validation Not Working
+
+1. Ensure the XML file has a valid `namespace` attribute
+2. Check that the statement has a matching Java method
+3. Verify `parameterType` attribute is a valid fully-qualified class name
+4. For nested properties, ensure the base object exists (e.g., for `#{user.name}`, validate `user` exists)
+
 ### Extension Not Activating
 
 1. Ensure workspace contains a Java project:
@@ -284,6 +318,22 @@ pnpm run lint
 - VS Code 1.99.3 or higher
 - Java project with MyBatis mappers
 - Node.js 22.x or higher (for development)
+
+## Internationalization
+
+The extension supports multiple languages:
+
+- **English** (default)
+- **简体中文** (Simplified Chinese)
+
+The extension automatically uses your VS Code display language. To change the language:
+
+1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
+2. Type "Configure Display Language"
+3. Select your preferred language
+4. Restart VS Code
+
+For more details, see [docs/i18n.md](docs/i18n.md).
 
 ## Contributing
 
@@ -301,27 +351,3 @@ MIT
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
-
-### Unreleased
-- 🐛 **FIXED**: Navigation precision - XML statement to Java method navigation now only works when cursor is specifically on the `id="methodName"` attribute. Previously, clicking anywhere inside the statement block would trigger navigation.
-
-### 0.0.1 (Initial Release)
-- ✨ **9 types of Go-to-Definition navigation** (F12/Ctrl+Click):
-  1. Java interface name → XML `<mapper>` tag
-  2. Java method name → XML SQL statement
-  3. XML namespace attribute → Java interface
-  4. XML statement ID → Java method
-  5. Java class references in XML → Java class definition
-  6. `<include refid>` → `<sql id>` fragment definition
-  7. `<sql id>` → All `<include>` references (shows all usages)
-  8. `<result property>` → Java class field definition
-  9. `resultMap` reference ↔ `<resultMap>` definition (bidirectional)
-- ✨ Visual binding indicators - gutter icons show Java methods ↔ XML statement bindings
-- ✨ LRU cache with configurable size (default: 5000 entries)
-- ✨ Automatic cache invalidation on file changes
-- ✨ File system watchers for incremental updates
-- ✨ Smart MyBatis mapper detection (content-based, not just filename)
-- ✨ 5-tier intelligent XML file matching strategy
-- ✨ Custom XML directories support (Priority 1 in matching)
-- ✨ Multi-line tag parsing support
-- ✨ Configurable settings

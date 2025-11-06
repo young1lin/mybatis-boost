@@ -1,0 +1,32 @@
+{
+  "extension.activating": "Activating extension...",
+  "extension.notJavaProject": "Not a Java project, navigation features disabled",
+  "extension.javaProjectDetected": "Java project detected, initializing...",
+  "extension.navigationMode": "Navigation mode: {0}",
+  "extension.parameterValidatorInitialized": "Parameter validator initialized",
+  "extension.bindingDecoratorInitialized": "Binding decorator initialized",
+  "extension.bindingDecoratorDisabled": "Binding decorator disabled by configuration",
+  "extension.configChanged": "Configuration changed: useDefinitionProvider = {0}",
+  "extension.switchedMode": "MyBatis Boost: Switched to {0} mode",
+  "extension.activated": "Extension activated in {0}ms",
+  "extension.deactivating": "Deactivating extension...",
+  "extension.commandsRegistered": "Commands registered",
+  "extension.xmlDefinitionProvidersRegistered": "XML definition providers registered",
+  "extension.javaToXmlDefinitionProviderRegistered": "Java-to-XML DefinitionProvider registered",
+  "extension.javaToXmlCodeLensProviderRegistered": "Java-to-XML CodeLensProvider registered",
+  "extension.javaToXmlDefinitionProviderUnregistered": "Java-to-XML DefinitionProvider unregistered",
+  "extension.javaToXmlCodeLensProviderUnregistered": "Java-to-XML CodeLensProvider unregistered",
+
+  "command.notActive": "MyBatis Boost is not active. Open a Java project to use this feature.",
+  "command.cacheCleared": "MyBatis Boost cache cleared and rebuilt",
+  "command.refreshingMappings": "Refreshing MyBatis mappings...",
+  "command.mappingsRefreshed": "MyBatis mappings refreshed successfully",
+  "command.noActiveEditor": "MyBatis Boost: No active editor",
+  "command.noWordAtCursor": "MyBatis Boost: No word found at cursor position",
+  "command.noXmlFound": "MyBatis Boost: No corresponding XML file found",
+  "command.notOnMethodOrInterface": "MyBatis Boost: Cursor is not on a method or interface",
+  "command.statementNotFound": "MyBatis statement \"{0}\" not found in XML",
+
+  "mode.definitionProvider": "DefinitionProvider",
+  "mode.codeLens": "CodeLens"
+}

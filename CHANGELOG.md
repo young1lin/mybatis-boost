@@ -1,5 +1,7 @@
 # Change Log
 
+English | [简体中文](CHANGELOG.zh-cn.md)
+
 All notable changes to the "mybatis-boost" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
@@ -10,17 +12,49 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - ✨ **Parameter Validation**: Real-time validation of `#{param}` and `${param}` references in XML mapper files
   - Validates against `parameterType` class fields
   - Validates against method parameters with `@Param` annotations
-  - Shows error diagnostics for undefined parameters
-  - Supports nested properties (e.g., `#{user.name}`)
+  - Validates against local variables from dynamic SQL tags (`foreach`, `bind`)
+  - Shows error diagnostics (red underlines) for undefined parameters with helpful error messages
+  - Supports nested properties (e.g., `#{user.name}` validates base object `user`)
   - Works across `<select>`, `<insert>`, `<update>`, `<delete>` statements
-- ✨ **Parameter Navigation**: Go-to-Definition (F12) from XML parameters to Java
-  - Navigate from `#{paramName}` to Java class field
-  - Navigate from `#{paramName}` to `@Param` annotation in method
-  - Type 10 of navigation support added
+  - Automatic validation on file open, change, and save
+
+- ✨ **Parameter Navigation**: Go-to-Definition (F12) from XML parameters to Java (Type 10)
+  - Navigate from `#{paramName}` to Java class field in `parameterType` class
+  - Navigate from `#{paramName}` to `@Param` annotation in method parameters
+  - Supports nested properties navigation
+  - Full parameter parser implementation
+
+- ✨ **Flexible Navigation Modes**: Choose between CodeLens or DefinitionProvider
+  - **CodeLens Mode** (default, recommended): Non-invasive, preserves native Java F12 behavior
+  - **DefinitionProvider Mode** (optional): Direct F12 navigation to XML statements
+  - Toggle via `mybatis-boost.useDefinitionProvider` setting
+  - Changes take effect immediately without restart
+
+- ✨ **CodeLens Provider**: Smart clickable navigation links
+  - Shows "jumpToXml" above Java mapper interfaces and methods
+  - Automatically hides for methods with SQL annotations (`@Select`, `@Insert`, etc.)
+  - Only shows when corresponding XML statements exist
+  - Supports multi-line method declarations and generic types
+
+- ✨ **Manual Jump Command**: `mybatis-boost.jumpToXml` command
+  - Automatically detects context: interface name vs method name
+  - Jump to mapper namespace or specific statement based on cursor position
+  - Can be invoked via command palette or CodeLens
+
+- ✨ **Enhanced Parsers**: 4 specialized parsers
+  - `javaParser.ts`: Method parameters, `@Param` annotations, return types
+  - `javaFieldParser.ts`: Field extraction from Java classes
+  - `xmlParser.ts`: Multi-line tags, precise position tracking
+  - `parameterParser.ts`: Parameter references, local variables, nested properties
 
 ### Fixed
-- **Navigation Precision**: XML statement to Java method navigation now only works when cursor is specifically on the `id="methodName"` attribute. Previously, clicking anywhere inside the statement block would trigger navigation, which was too permissive and could cause unintended navigation.
-- **API Usage**: Fixed incorrect usage of `getByXmlPath()` - now correctly uses `getJavaPath()` API method
+- 🐛 **Navigation Precision**: XML statement to Java method navigation now only works when cursor is specifically on the `id="methodName"` attribute. Previously, clicking anywhere inside the statement block would trigger navigation, which was too permissive and could cause unintended navigation.
+- 🐛 **API Usage**: Fixed incorrect usage of `getByXmlPath()` - now correctly uses `getJavaPath()` API method
+- 🐛 **Command Invocation**: Fixed `jumpToXml` command to work with both CodeLens and manual invocation, with proper cursor position detection
+
+### Changed
+- 📝 **Default Navigation Mode**: Changed default from DefinitionProvider to CodeLens to preserve native Java navigation behavior
+- ⚡ **Performance**: Improved parser performance with better caching and lazy loading
 
 ## [0.0.1] - Initial Release
 

@@ -1,0 +1,15 @@
+{
+  "displayName": "MyBatis Boost",
+  "description": "High-performance bidirectional navigation between MyBatis mapper interfaces and XML files with sub-100ms latency",
+
+  "command.clearCache": "Clear Cache and Rebuild",
+  "command.refreshMappings": "Refresh Mappings",
+  "command.jumpToXml": "Jump to MyBatis XML",
+
+  "config.title": "MyBatis Boost",
+  "config.cacheSize.description": "Maximum number of mapper file pairs to cache in memory (LRU cache size)",
+  "config.customXmlDirectories.description": "Custom directories to search for XML mapper files, relative to workspace root",
+  "config.javaParseLines.description": "Number of lines to read from Java files for namespace extraction",
+  "config.showBindingIcons.description": "Show gutter icons for MyBatis bindings between Java methods and XML statements",
+  "config.useDefinitionProvider.description": "Enable Go-to-Definition (F12) for Java-to-XML navigation. When false (default), use CodeLens instead to preserve native Java definition behavior"
+}

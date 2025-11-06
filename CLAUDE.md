@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MyBatis Boost is a high-performance VS Code extension for bidirectional navigation between MyBatis mapper interfaces (Java) and XML mapping files. It achieves sub-100ms navigation latency through LRU caching, file watchers, and optimized parsing.
+MyBatis Boost is a high-performance VS Code extension providing comprehensive bidirectional navigation between MyBatis mapper interfaces (Java) and XML mapping files. It features 10 types of Go-to-Definition navigation, real-time parameter validation, visual binding indicators, and flexible navigation modes (CodeLens or DefinitionProvider). The extension achieves sub-100ms navigation latency through LRU caching, file watchers, and optimized parsing.
 
 ## Essential Commands
 
@@ -53,8 +53,10 @@ pnpm exec mocha --require ts-node/register src/test/unit/FileMapper.test.ts
 
 **Modular Structure**: All navigation logic is encapsulated in `src/navigator/` module:
 - `core/FileMapper.ts`: Java-XML mapping with LRU cache (default 5000 entries)
-- `parsers/`: Lightweight parsing (Java: first 100 lines, XML: first 30 lines)
-- `providers/`: 5 DefinitionProviders for different navigation scenarios
+- `parsers/`: 4 specialized parsers (javaParser, javaFieldParser, xmlParser, parameterParser)
+- `providers/`: 8 DefinitionProviders + 1 CodeLensProvider for different navigation scenarios
+- `diagnostics/`: ParameterValidator for real-time parameter validation
+- Decorator: MybatisBindingDecorator for visual binding indicators
 
 **Performance Strategy**:
 - **LRU Cache**: Stores MappingMetadata with modification timestamps for staleness detection
@@ -68,15 +70,28 @@ pnpm exec mocha --require ts-node/register src/test/unit/FileMapper.test.ts
 
 ### Navigation Capabilities
 
-The extension provides **7 types of Go-to-Definition navigation**:
+The extension provides **10 types of Go-to-Definition navigation**:
+
+**Java ↔ XML Bidirectional:**
 1. Java interface name → XML `<mapper>` tag
 2. Java method name → XML SQL statement (`<select>`, `<insert>`, etc.)
 3. XML `namespace` attribute → Java interface
 4. XML statement `id` attribute → Java method
-5. XML class references (`resultType`, `parameterType`) → Java class
-6. XML `<include refid="xxx">` → `<sql id="xxx">` fragment
-7. XML `<sql id="xxx">` → All `<include>` references
+
+**XML Internal References:**
+5. XML `<include refid="xxx">` → `<sql id="xxx">` fragment definition
+6. XML `<sql id="xxx">` → All `<include>` references (shows all usages)
+
+**Java Class & Field References:**
+7. XML class references (`resultType`, `parameterType`, `type`, `ofType`, `javaType`) → Java class
 8. XML `<result property="xxx">` → Java field in resultMap type class
+9. XML `resultMap="xxx"` reference ↔ `<resultMap id="xxx">` definition (bidirectional)
+
+**Parameter Navigation (NEW):**
+10. XML `#{paramName}` or `${paramName}` → Java field or `@Param` annotation
+    - Supports navigation to `parameterType` class fields
+    - Supports navigation to method parameters with `@Param` annotations
+    - Works with nested properties (e.g., `#{user.name}` validates base object `user`)
 
 ### XML File Matching Strategy (Priority Order)
 
@@ -112,6 +127,8 @@ Settings in `package.json` that affect behavior:
 - `mybatis-boost.cacheSize` (default: 5000): LRU cache size
 - `mybatis-boost.customXmlDirectories` (default: []): Custom XML search paths (Priority 1)
 - `mybatis-boost.javaParseLines` (default: 100): Lines to read for namespace extraction
+- `mybatis-boost.showBindingIcons` (default: true): Show gutter icons for Java-XML bindings
+- `mybatis-boost.useDefinitionProvider` (default: false): Use DefinitionProvider for Java→XML (when false, uses CodeLens instead)
 
 ### Extension Activation
 
@@ -125,11 +142,65 @@ Settings in `package.json` that affect behavior:
 2. Initialize FileMapper with configured cache size
 3. Setup file watchers for `**/*.java` and `**/*.xml`
 4. Scan workspace for MyBatis mappers (content-based detection)
-5. Register 5 DefinitionProviders for Java and XML
+5. Register 8 XML DefinitionProviders (always enabled)
+6. Register Java→XML navigation provider based on configuration:
+   - CodeLensProvider (default, non-invasive)
+   - OR JavaToXmlDefinitionProvider (optional, F12 navigation)
+7. Initialize ParameterValidator for real-time parameter validation
+8. Initialize MybatisBindingDecorator if enabled (default: true)
 
 ### Excluded Directories
 
 File searches automatically skip: `node_modules`, `target`, `.git`, `.vscode`, `.claude`, `.idea`, `.settings`, `build`, `dist`, `out`, `bin`
+
+## Key Features Implementation
+
+### Parameter Validation (Real-time Diagnostics)
+
+**Location**: `src/navigator/diagnostics/ParameterValidator.ts`
+
+**Functionality**:
+- Validates `#{paramName}` and `${paramName}` references in XML SQL statements
+- Checks against valid parameter sources:
+  1. Method parameters with `@Param` annotations
+  2. Fields in `parameterType` class
+  3. Local variables from dynamic SQL tags (`foreach`, `bind`)
+- Shows error diagnostics (red underlines) for undefined parameters
+- Automatically validates on file open, change, and save
+
+**Example**:
+```xml
+<update id="updateById" parameterType="com.example.Role">
+    UPDATE role
+    SET role_name = #{roleName},  <!-- ✅ Valid -->
+        invalid = #{wrongField}    <!-- ❌ Error: not found -->
+    WHERE id = #{id}
+</update>
+```
+
+### Navigation Modes (Configurable)
+
+**Default Mode: CodeLens** (`useDefinitionProvider: false`)
+- Non-invasive: Preserves native Java definition behavior (F12 jumps to Java class)
+- Shows clickable "jumpToXml" links above interfaces and methods
+- Automatically hides CodeLens for methods with SQL annotations
+
+**Alternative Mode: DefinitionProvider** (`useDefinitionProvider: true`)
+- F12 on Java methods jumps directly to XML statements
+- Overwrites native Java definition behavior
+- More direct navigation but less flexible
+
+**Configuration**: Can be toggled via VS Code settings - changes take effect immediately
+
+### Visual Binding Indicators
+
+**Location**: `src/decorator/MybatisBindingDecorator.ts`
+
+**Functionality**:
+- Shows gutter icons next to Java methods that have corresponding XML statements
+- Icons appear in both Java and XML files
+- Automatically updates when files change
+- Can be disabled via `mybatis-boost.showBindingIcons` setting
 
 ## Development Guidelines
 
@@ -142,12 +213,28 @@ File searches automatically skip: `node_modules`, `target`, `.git`, `.vscode`, `
 
 ### Parser Modifications
 
-- **Java Parser**: Modify `src/navigator/parsers/javaParser.ts`
-  - Keep namespace extraction lightweight (first 100 lines)
-  - Full method parsing is on-demand only
-- **XML Parser**: Modify `src/navigator/parsers/xmlParser.ts`
-  - Namespace extraction reads first 30 lines
-  - Statement extraction processes entire file
+- **Java Parser** (`src/navigator/parsers/javaParser.ts`):
+  - Namespace extraction: lightweight, reads first 100 lines
+  - Full method parsing: on-demand only
+  - Extracts method names, return types, parameters
+  - Handles `@Param` annotations for parameter mapping
+
+- **Java Field Parser** (`src/navigator/parsers/javaFieldParser.ts`):
+  - Extracts field declarations from Java classes
+  - Used by parameter validation and resultMap navigation
+  - Handles visibility modifiers and field types
+
+- **XML Parser** (`src/navigator/parsers/xmlParser.ts`):
+  - Namespace extraction: reads first 30 lines
+  - Statement extraction: processes entire file
+  - Supports multi-line tags
+  - Extracts `resultType`, `parameterType` attributes
+
+- **Parameter Parser** (`src/navigator/parsers/parameterParser.ts`):
+  - Extracts `#{...}` and `${...}` parameter references
+  - Handles nested properties (e.g., `#{user.name}`)
+  - Extracts local variables from `foreach`, `bind` tags
+  - Supports multi-line SQL statements
 
 ### Performance Requirements
 
@@ -168,9 +255,23 @@ Maintain these targets:
 - **Mocha** for unit tests (fast, no VS Code API)
 - **@vscode/test-electron** for integration tests (requires VS Code API)
 
+## Commands
+
+| Command | Keybinding | Description |
+|---------|-----------|-------------|
+| `mybatis-boost.clearCache` | - | Clear cache and rebuild all mappings |
+| `mybatis-boost.refreshMappings` | - | Refresh mappings with progress notification |
+| `mybatis-boost.jumpToXml` | - | Jump from Java method to XML statement (used by CodeLens and manual invocation) |
+
+**Note**: The `jumpToXml` command automatically detects context:
+- On interface name → jumps to XML `<mapper>` tag
+- On method name → jumps to XML statement with matching `id`
+
 ## Known Limitations
 
 1. **Method Overloading**: Jumps to first matching method (no parameter type distinction)
 2. **Inner Classes**: Not supported for navigation
-3. **Kotlin Mappers**: Java only
+3. **Kotlin Mappers**: Java only (Kotlin support not yet implemented)
 4. **Multiple XML Files**: First found with matching namespace is used
+5. **Parameter Validation**: Does not support `parameterMap` references (future enhancement)
+6. **CodeLens Performance**: May be slow on very large mapper interfaces (100+ methods)
