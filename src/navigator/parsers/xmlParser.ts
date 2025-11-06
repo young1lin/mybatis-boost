@@ -175,3 +175,30 @@ export async function extractStatementIdFromPosition(
 
     return null;
 }
+
+/**
+ * Find the position of the <mapper> tag in XML file
+ * Returns the position for navigation purposes
+ */
+export async function findXmlMapperPosition(filePath: string): Promise<{ line: number; column: number } | null> {
+    try {
+        const content = await readFile(filePath);
+        const lines = content.split('\n');
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            // Match <mapper> tag with namespace
+            if (/<mapper[^>]*namespace/.test(line)) {
+                const mapperMatch = line.match(/<mapper/);
+                if (mapperMatch && mapperMatch.index !== undefined) {
+                    return { line: i, column: mapperMatch.index + 1 };
+                }
+                return { line: i, column: 0 };
+            }
+        }
+    } catch (error) {
+        console.error('[xmlParser] Error finding mapper position:', error);
+    }
+
+    return null;
+}

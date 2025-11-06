@@ -43,6 +43,14 @@
         "command": "mybatis-boost.refreshMappings",
         "title": "Refresh Mappings",
         "category": "MyBatis Boost"
+      },
+      {
+        "command": "mybatis-boost.goToXmlMapper",
+        "title": "Go to MyBatis XML Mapper"
+      },
+      {
+        "command": "mybatis-boost.goToXmlStatement",
+        "title": "Go to MyBatis XML Statement"
       }
     ],
     "configuration": {
@@ -72,6 +80,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show gutter icons for MyBatis bindings between Java methods and XML statements"
+        },
+        "mybatis-boost.useDefinitionProvider": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Go-to-Definition (F12) for Java-to-XML navigation. When false (default), use CodeLens instead to preserve native Java definition behavior"
         }
       }
     }

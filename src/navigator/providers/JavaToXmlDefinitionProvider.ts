@@ -78,7 +78,7 @@ export class JavaToXmlDefinitionProvider implements vscode.DefinitionProvider {
 
     /**
      * Navigate to XML mapper tag (namespace)
-     * Returns an array with both Java interface location and XML mapper location
+     * Finds and returns the location of the <mapper> tag in the corresponding XML file
      */
     private async navigateToXmlMapper(
         xmlPath: string,
@@ -127,8 +127,8 @@ export class JavaToXmlDefinitionProvider implements vscode.DefinitionProvider {
 
     /**
      * Navigate to XML statement from Java method
-     * Maps cursor position proportionally from Java method name to XML id
-     * Returns an array with both Java method location and XML statement location
+     * Finds the XML statement (select/insert/update/delete) with matching id attribute
+     * Maps cursor position proportionally from Java method name to XML id for precise positioning
      */
     private async navigateToXmlStatement(
         xmlPath: string,

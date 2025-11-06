@@ -14,11 +14,14 @@ export { XmlResultMapPropertyDefinitionProvider } from './providers/XmlResultMap
 export { XmlResultMapDefinitionProvider } from './providers/XmlResultMapDefinitionProvider';
 export { XmlParameterDefinitionProvider } from './providers/XmlParameterDefinitionProvider';
 
+// Export CodeLens providers
+export { JavaToXmlCodeLensProvider } from './providers/JavaToXmlCodeLensProvider';
+
 // Export diagnostics
 export { ParameterValidator } from './diagnostics/ParameterValidator';
 
 // Export parsers (if needed externally)
 export { extractJavaNamespace, isMyBatisMapper, extractJavaMethods, findJavaMethodLine, findJavaMethodPosition, extractMethodParameters } from './parsers/javaParser';
-export { extractXmlNamespace, extractXmlStatements, findXmlStatementLine, findXmlStatementPosition, extractStatementIdFromPosition } from './parsers/xmlParser';
+export { extractXmlNamespace, extractXmlStatements, findXmlStatementLine, findXmlStatementPosition, extractStatementIdFromPosition, findXmlMapperPosition } from './parsers/xmlParser';
 export { extractParameterReferences, extractStatementParameterInfo, getParameterAtPosition } from './parsers/parameterParser';
 export { extractJavaFields, findJavaField, findJavaFieldPosition } from './parsers/javaFieldParser';
