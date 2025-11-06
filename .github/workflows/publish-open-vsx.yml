@@ -1,0 +1,64 @@
+name: Publish to Open VSX Registry
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers when pushing a tag starting with 'v', e.g., v1.0.0
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Compile project
+        run: pnpm run compile
+
+      - name: Install vsce
+        run: pnpm add -g @vscode/vsce
+
+      - name: Package extension as VSIX file
+        run: vsce package
+
+      - name: Get VSIX filename
+        id: get_vsix
+        run: |
+          VSIX_FILE=$(ls *.vsix | head -n 1)
+          echo "vsix_file=$VSIX_FILE" >> $GITHUB_OUTPUT
+          echo "Found VSIX file: $VSIX_FILE"
+
+      - name: Install ovsx (Open VSX CLI)
+        run: pnpm add -g ovsx
+
+      - name: Create namespace if not exists
+        run: |
+          # Try to create namespace, ignore error if already exists
+          ovsx create-namespace young1lin -p ${{ secrets.OPEN_VSX_TOKEN }} || true
+        env:
+          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
+
+      - name: Publish to Open VSX Registry
+        run: ovsx publish ${{ steps.get_vsix.outputs.vsix_file }} -p ${{ secrets.OPEN_VSX_TOKEN }}
+        env:
+          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
+        # Note: Extensions will show as "unverified" until namespace ownership is claimed
+        # Claim ownership at: https://github.com/EclipseFdn/open-vsx.org/issues

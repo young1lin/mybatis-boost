@@ -67,7 +67,8 @@
       "Bash(cls:*)",
       "Bash($null)",
       "Bash(rm:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [
       "Bash(rm -rf /*)",
