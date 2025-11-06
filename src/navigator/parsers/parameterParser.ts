@@ -217,6 +217,200 @@ export function getParameterAtPosition(
 }
 
 /**
+ * Extract local variables defined by dynamic SQL tags (foreach, bind)
+ *
+ * @param filePath - Path to XML file
+ * @param statement - XML statement metadata
+ * @returns Set of local variable names
+ */
+export async function extractLocalVariables(
+    filePath: string,
+    statement: XmlStatement
+): Promise<Set<string>> {
+    const content = await readFile(filePath);
+    const lines = content.split('\n');
+    const localVars = new Set<string>();
+
+    // Find the statement in the file and accumulate its content
+    let inStatement = false;
+    let braceLevel = 0;
+    let statementStartLine = -1;
+    let statementContent = '';
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Check if we're entering the statement
+        if (!inStatement) {
+            const statementTagRegex = new RegExp(
+                `<${statement.type}[^>]*\\bid\\s*=\\s*["']${escapeRegex(statement.id)}["']`
+            );
+            if (statementTagRegex.test(line)) {
+                inStatement = true;
+                statementStartLine = i;
+            }
+        }
+
+        if (inStatement) {
+            // Accumulate statement content (join lines with space to preserve attributes)
+            statementContent += line + ' ';
+
+            // Track opening tags
+            const openTags = (line.match(new RegExp(`<${statement.type}(?:\\s|>)`, 'g')) || []).length;
+            braceLevel += openTags;
+
+            // Track closing tags
+            const closeTags = (line.match(new RegExp(`</${statement.type}>`, 'g')) || []).length;
+            braceLevel -= closeTags;
+
+            // Check if we've exited the statement
+            if (braceLevel === 0 && i > statementStartLine) {
+                break;
+            }
+        }
+    }
+
+    // Extract local variables from the complete statement content
+    if (statementContent) {
+        extractLocalVariablesFromContent(statementContent, localVars);
+    }
+
+    return localVars;
+}
+
+/**
+ * Extract attribute references from XML tags
+ * This includes collection attributes in foreach, etc.
+ *
+ * @param filePath - Path to XML file
+ * @param statement - XML statement metadata
+ * @returns Set of parameter names referenced in attributes
+ */
+export async function extractAttributeReferences(
+    filePath: string,
+    statement: XmlStatement
+): Promise<Set<string>> {
+    const content = await readFile(filePath);
+    const lines = content.split('\n');
+    const attrRefs = new Set<string>();
+
+    // Find the statement in the file and accumulate its content
+    let inStatement = false;
+    let braceLevel = 0;
+    let statementStartLine = -1;
+    let statementContent = '';
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Check if we're entering the statement
+        if (!inStatement) {
+            const statementTagRegex = new RegExp(
+                `<${statement.type}[^>]*\\bid\\s*=\\s*["']${escapeRegex(statement.id)}["']`
+            );
+            if (statementTagRegex.test(line)) {
+                inStatement = true;
+                statementStartLine = i;
+            }
+        }
+
+        if (inStatement) {
+            // Accumulate statement content (join lines with space to preserve attributes)
+            statementContent += line + ' ';
+
+            // Track opening tags
+            const openTags = (line.match(new RegExp(`<${statement.type}(?:\\s|>)`, 'g')) || []).length;
+            braceLevel += openTags;
+
+            // Track closing tags
+            const closeTags = (line.match(new RegExp(`</${statement.type}>`, 'g')) || []).length;
+            braceLevel -= closeTags;
+
+            // Check if we've exited the statement
+            if (braceLevel === 0 && i > statementStartLine) {
+                break;
+            }
+        }
+    }
+
+    // Extract attribute references from the complete statement content
+    if (statementContent) {
+        extractAttributeReferencesFromContent(statementContent, attrRefs);
+    }
+
+    return attrRefs;
+}
+
+/**
+ * Extract attribute references from statement content
+ *
+ * @param content - Statement content (potentially multi-line tags joined with spaces)
+ * @param attrRefs - Set to accumulate attribute reference names
+ */
+function extractAttributeReferencesFromContent(content: string, attrRefs: Set<string>): void {
+    // Extract from <foreach> tag - collection attribute
+    // <foreach collection="ids" item="id" index="index">
+    const foreachRegex = /<foreach[^>]*>/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = foreachRegex.exec(content)) !== null) {
+        const foreachTag = match[0];
+
+        // Extract 'collection' attribute
+        const collectionMatch = foreachTag.match(/\bcollection\s*=\s*["']([^"']+)["']/);
+        if (collectionMatch) {
+            // Handle property paths (e.g., filter.values -> filter)
+            const rootParam = collectionMatch[1].split('.')[0];
+            attrRefs.add(rootParam);
+        }
+    }
+}
+
+/**
+ * Extract local variables from statement content
+ * Handles <foreach> and <bind> tags
+ *
+ * @param content - Statement content (potentially multi-line tags joined with spaces)
+ * @param localVars - Set to accumulate local variable names
+ */
+function extractLocalVariablesFromContent(content: string, localVars: Set<string>): void {
+    // Extract from <foreach> tag
+    // <foreach collection="ids" item="id" index="index">
+    const foreachRegex = /<foreach[^>]*>/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = foreachRegex.exec(content)) !== null) {
+        const foreachTag = match[0];
+
+        // Extract 'item' attribute
+        const itemMatch = foreachTag.match(/\bitem\s*=\s*["']([^"']+)["']/);
+        if (itemMatch) {
+            localVars.add(itemMatch[1]);
+        }
+
+        // Extract 'index' attribute
+        const indexMatch = foreachTag.match(/\bindex\s*=\s*["']([^"']+)["']/);
+        if (indexMatch) {
+            localVars.add(indexMatch[1]);
+        }
+    }
+
+    // Extract from <bind> tag
+    // <bind name="pattern" value="'%' + _parameter.getName() + '%'" />
+    const bindRegex = /<bind[^>]*>/g;
+
+    while ((match = bindRegex.exec(content)) !== null) {
+        const bindTag = match[0];
+
+        // Extract 'name' attribute
+        const nameMatch = bindTag.match(/\bname\s*=\s*["']([^"']+)["']/);
+        if (nameMatch) {
+            localVars.add(nameMatch[1]);
+        }
+    }
+}
+
+/**
  * Escape special regex characters
  */
 function escapeRegex(str: string): string {

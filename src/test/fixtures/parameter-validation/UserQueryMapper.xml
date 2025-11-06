@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.UserQueryMapper">
+
+    <!-- Scenario 1: parameterType without @Param - direct field access -->
+    <select id="findByQuery" parameterType="com.example.model.UserQuery" resultType="User">
+        SELECT * FROM user
+        WHERE 1=1
+        <if test="name != null">
+            AND name LIKE #{name}
+        </if>
+        <if test="minAge != null">
+            AND age &gt;= #{minAge}
+        </if>
+        <if test="maxAge != null">
+            AND age &lt;= #{maxAge}
+        </if>
+        <if test="ids != null">
+            AND id IN
+            <foreach collection="ids" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+    <!-- Scenario 2: parameterType with @Param - prefixed field access -->
+    <select id="findByQueryWithParam" parameterType="com.example.model.UserQuery" resultType="User">
+        SELECT * FROM user
+        WHERE 1=1
+        <if test="query.name != null">
+            AND name LIKE #{query.name}
+        </if>
+        <if test="query.minAge != null">
+            AND age &gt;= #{query.minAge}
+        </if>
+        <if test="query.ids != null">
+            AND id IN
+            <foreach collection="query.ids" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+    <!-- Scenario 3: Multiple parameters including complex object -->
+    <select id="findByQueryAndStatus" resultType="User">
+        SELECT * FROM user
+        WHERE status = #{status}
+        <if test="query.name != null">
+            AND name LIKE #{query.name}
+        </if>
+        <if test="query.ids != null">
+            AND id IN
+            <foreach collection="query.ids" item="id" separator="," open="(" close=")">
+                #{id}
+            </foreach>
+        </if>
+    </select>
+
+</mapper>
