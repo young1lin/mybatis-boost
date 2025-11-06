@@ -62,3 +62,11 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
+      - name: Install ovsx (Open VSX CLI)
+        run: pnpm add -g ovsx
+
+      - name: Publish to Open VSX Registry
+        run: ovsx publish ${{ steps.get_vsix.outputs.vsix_file }} -p ${{ secrets.OPEN_VSX_TOKEN }}
+        env:
+          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
+
