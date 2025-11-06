@@ -317,6 +317,22 @@ pnpm run lint
 - Java project with MyBatis mappers
 - Node.js 22.x or higher (for development)
 
+## Internationalization
+
+The extension supports multiple languages:
+
+- **English** (default)
+- **简体中文** (Simplified Chinese)
+
+The extension automatically uses your VS Code display language. To change the language:
+
+1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
+2. Type "Configure Display Language"
+3. Select your preferred language
+4. Restart VS Code
+
+For more details, see [docs/i18n.md](docs/i18n.md).
+
 ## Contributing
 
 Contributions are welcome! Please ensure:
