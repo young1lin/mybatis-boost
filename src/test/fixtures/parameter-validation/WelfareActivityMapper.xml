@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.WelfareActivityMapper">
+
+    <sql id="Base_Column_List">
+        id, name, status, create_time
+    </sql>
+
+    <sql id="where_condition">
+        <where>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="userId != null">
+                AND user_id = #{userId}
+            </if>
+        </where>
+    </sql>
+
+    <!--
+        MyBatis 3.x+ single object parameter auto-mapping scenario
+        - No @Param annotation on method parameter
+        - No parameterType attribute in XML
+        - MyBatis automatically maps fields: order, size, status, userId
+        This should NOT show parameter validation errors
+    -->
+    <select id="selectByCondition" resultType="WelfareActivity">
+        select
+        <include refid="Base_Column_List"/>
+        from t_welfare_activity
+        <include refid="where_condition"/>
+        <trim prefix="ORDER BY ">
+            <if test="order != null ">
+                ${order}
+            </if>
+        </trim>
+        <if test="size != null ">
+            limit ${size}
+        </if>
+    </select>
+
+    <!--
+        Multiple parameters with @Param
+        Should validate against userId and newCode
+    -->
+    <select id="selectTargetTime" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM t_welfare_activity
+        WHERE user_id = #{userId}
+        AND new_code = #{newCode}
+    </select>
+
+    <!--
+        Single String parameter - primitive type
+        Should NOT auto-map fields, status should be the parameter name
+    -->
+    <select id="selectByStatus" resultType="WelfareActivity">
+        SELECT * FROM t_welfare_activity
+        WHERE status = #{status}
+    </select>
+
+    <!--
+        Single Long parameter - wrapper of primitive type
+        Should NOT auto-map fields, id should be the parameter name
+    -->
+    <select id="selectById" resultType="WelfareActivity">
+        SELECT * FROM t_welfare_activity
+        WHERE id = #{id}
+    </select>
+
+</mapper>
