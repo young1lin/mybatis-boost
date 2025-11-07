@@ -100,7 +100,7 @@
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "pnpm exec mocha",
     "test:integration": "vscode-test",
-    "release": "git tag -a v$(node -p \"require('./package.json').version\") -m \"Release $(node -p \"require('./package.json').version\")\" && git push && git push --tags"
+    "release": "node -e \"const v = require('./package.json').version; require('child_process').execSync(`git tag -a v${v} -m \\\"Release ${v}\\\" && git push && git push --tags`, {stdio: 'inherit'})\""
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
