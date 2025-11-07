@@ -16,6 +16,8 @@ import { extractJavaFields } from '../parsers/javaFieldParser';
 export class ParameterValidator {
     private diagnosticCollection: vscode.DiagnosticCollection;
     private disposables: vscode.Disposable[] = [];
+    private validationTimers: Map<string, NodeJS.Timeout> = new Map();
+    private readonly DEBOUNCE_DELAY = 500; // 500ms debounce for text changes
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -25,7 +27,7 @@ export class ParameterValidator {
         this.diagnosticCollection = vscode.languages.createDiagnosticCollection('mybatis-parameters');
         this.context.subscriptions.push(this.diagnosticCollection);
 
-        // Validate on file open
+        // Validate on file open (immediate)
         this.disposables.push(
             vscode.workspace.onDidOpenTextDocument(doc => {
                 if (doc.languageId === 'xml') {
@@ -34,19 +36,26 @@ export class ParameterValidator {
             })
         );
 
-        // Validate on file change
+        // Validate on file change (debounced for performance)
         this.disposables.push(
             vscode.workspace.onDidChangeTextDocument(event => {
                 if (event.document.languageId === 'xml') {
-                    this.validateDocument(event.document);
+                    this.debouncedValidateDocument(event.document);
                 }
             })
         );
 
-        // Validate on file save
+        // Validate on file save (immediate to ensure validation is up-to-date)
         this.disposables.push(
             vscode.workspace.onDidSaveTextDocument(doc => {
                 if (doc.languageId === 'xml') {
+                    // Cancel any pending debounced validation
+                    const timer = this.validationTimers.get(doc.uri.toString());
+                    if (timer) {
+                        clearTimeout(timer);
+                        this.validationTimers.delete(doc.uri.toString());
+                    }
+                    // Validate immediately on save
                     this.validateDocument(doc);
                 }
             })
@@ -58,6 +67,27 @@ export class ParameterValidator {
                 this.validateDocument(doc);
             }
         });
+    }
+
+    /**
+     * Debounced validation to avoid performance issues during rapid typing
+     */
+    private debouncedValidateDocument(document: vscode.TextDocument): void {
+        const documentUri = document.uri.toString();
+
+        // Clear existing timer for this document
+        const existingTimer = this.validationTimers.get(documentUri);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+
+        // Set new timer
+        const timer = setTimeout(() => {
+            this.validationTimers.delete(documentUri);
+            this.validateDocument(document);
+        }, this.DEBOUNCE_DELAY);
+
+        this.validationTimers.set(documentUri, timer);
     }
 
     /**
@@ -399,6 +429,10 @@ export class ParameterValidator {
      * Dispose of resources
      */
     public dispose(): void {
+        // Clear all pending validation timers
+        this.validationTimers.forEach(timer => clearTimeout(timer));
+        this.validationTimers.clear();
+
         this.diagnosticCollection.dispose();
         this.disposables.forEach(d => d.dispose());
     }

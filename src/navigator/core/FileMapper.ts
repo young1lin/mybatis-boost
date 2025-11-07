@@ -67,6 +67,8 @@ export class FileMapper {
     private cache: LRUCache<string, MappingMetadata>;
     private context: vscode.ExtensionContext;
     private watchers: vscode.FileSystemWatcher[] = [];
+    private fileChangeTimers: Map<string, NodeJS.Timeout> = new Map();
+    private readonly FILE_CHANGE_DEBOUNCE_DELAY = 300; // 300ms debounce for file changes
 
     constructor(context: vscode.ExtensionContext, cacheSize: number = 1000) {
         this.context = context;
@@ -306,15 +308,36 @@ export class FileMapper {
     private setupFileWatchers(): void {
         // Watch Java files
         const javaWatcher = vscode.workspace.createFileSystemWatcher('**/*.java');
-        javaWatcher.onDidChange(uri => this.handleFileChange(uri.fsPath));
+        javaWatcher.onDidChange(uri => this.debouncedHandleFileChange(uri.fsPath));
         javaWatcher.onDidDelete(uri => this.handleFileDelete(uri.fsPath));
         this.watchers.push(javaWatcher);
 
         // Watch XML files
         const xmlWatcher = vscode.workspace.createFileSystemWatcher('**/*.xml');
-        xmlWatcher.onDidChange(uri => this.handleFileChange(uri.fsPath));
+        xmlWatcher.onDidChange(uri => this.debouncedHandleFileChange(uri.fsPath));
         xmlWatcher.onDidDelete(uri => this.handleFileDelete(uri.fsPath));
         this.watchers.push(xmlWatcher);
+    }
+
+    /**
+     * Debounced file change handler to avoid performance issues during rapid file changes
+     */
+    private debouncedHandleFileChange(filePath: string): void {
+        const normalizedPath = normalizePath(filePath);
+
+        // Clear existing timer for this file
+        const existingTimer = this.fileChangeTimers.get(normalizedPath);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+
+        // Set new timer
+        const timer = setTimeout(() => {
+            this.fileChangeTimers.delete(normalizedPath);
+            this.handleFileChange(filePath);
+        }, this.FILE_CHANGE_DEBOUNCE_DELAY);
+
+        this.fileChangeTimers.set(normalizedPath, timer);
     }
 
     /**
@@ -386,6 +409,10 @@ export class FileMapper {
      * Dispose resources
      */
     dispose(): void {
+        // Clear all pending file change timers
+        this.fileChangeTimers.forEach(timer => clearTimeout(timer));
+        this.fileChangeTimers.clear();
+
         this.watchers.forEach(watcher => watcher.dispose());
         this.cache.clear();
     }
