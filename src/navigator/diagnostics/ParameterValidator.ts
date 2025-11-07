@@ -11,11 +11,67 @@ import { extractMethodParameters } from '../parsers/javaParser';
 import { extractJavaFields } from '../parsers/javaFieldParser';
 
 /**
+ * LRU Cache for storing class fields
+ */
+class FieldCache {
+    private cache: Map<string, string[]> = new Map();
+    private maxSize: number;
+
+    constructor(maxSize: number = 200) {
+        this.maxSize = maxSize;
+    }
+
+    get(className: string): string[] | undefined {
+        const value = this.cache.get(className);
+        if (value !== undefined) {
+            // Move to end (most recently used)
+            this.cache.delete(className);
+            this.cache.set(className, value);
+        }
+        return value;
+    }
+
+    set(className: string, fields: string[]): void {
+        // Remove if exists (to update position)
+        if (this.cache.has(className)) {
+            this.cache.delete(className);
+        } else if (this.cache.size >= this.maxSize) {
+            // Remove least recently used (first item)
+            const firstKey = this.cache.keys().next().value;
+            if (firstKey !== undefined) {
+                this.cache.delete(firstKey);
+            }
+        }
+        this.cache.set(className, fields);
+    }
+
+    has(className: string): boolean {
+        return this.cache.has(className);
+    }
+
+    delete(className: string): void {
+        this.cache.delete(className);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+
+    size(): number {
+        return this.cache.size;
+    }
+}
+
+/**
  * Validates parameters in XML mapper files
  */
 export class ParameterValidator {
     private diagnosticCollection: vscode.DiagnosticCollection;
     private disposables: vscode.Disposable[] = [];
+    private validationTimers: Map<string, NodeJS.Timeout> = new Map();
+    private fieldCache: FieldCache;
+    private readonly DEBOUNCE_DELAY = 500; // 500ms debounce for text changes
+    private readonly FIELD_CACHE_SIZE = 200; // Cache up to 200 classes
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -25,7 +81,10 @@ export class ParameterValidator {
         this.diagnosticCollection = vscode.languages.createDiagnosticCollection('mybatis-parameters');
         this.context.subscriptions.push(this.diagnosticCollection);
 
-        // Validate on file open
+        // Initialize field cache
+        this.fieldCache = new FieldCache(this.FIELD_CACHE_SIZE);
+
+        // Validate on file open (immediate)
         this.disposables.push(
             vscode.workspace.onDidOpenTextDocument(doc => {
                 if (doc.languageId === 'xml') {
@@ -34,20 +93,45 @@ export class ParameterValidator {
             })
         );
 
-        // Validate on file change
+        // Validate on file change (debounced for performance)
         this.disposables.push(
             vscode.workspace.onDidChangeTextDocument(event => {
                 if (event.document.languageId === 'xml') {
-                    this.validateDocument(event.document);
+                    this.debouncedValidateDocument(event.document);
                 }
             })
         );
 
-        // Validate on file save
+        // Validate on file save (immediate to ensure validation is up-to-date)
         this.disposables.push(
             vscode.workspace.onDidSaveTextDocument(doc => {
                 if (doc.languageId === 'xml') {
+                    // Cancel any pending debounced validation
+                    const timer = this.validationTimers.get(doc.uri.toString());
+                    if (timer) {
+                        clearTimeout(timer);
+                        this.validationTimers.delete(doc.uri.toString());
+                    }
+                    // Validate immediately on save
                     this.validateDocument(doc);
+                }
+            })
+        );
+
+        // Invalidate field cache when Java files change
+        this.disposables.push(
+            vscode.workspace.onDidChangeTextDocument(event => {
+                if (event.document.languageId === 'java') {
+                    this.invalidateFieldCache(event.document.uri.fsPath);
+                }
+            })
+        );
+
+        // Invalidate field cache when Java files are saved (for external changes)
+        this.disposables.push(
+            vscode.workspace.onDidSaveTextDocument(doc => {
+                if (doc.languageId === 'java') {
+                    this.invalidateFieldCache(doc.uri.fsPath);
                 }
             })
         );
@@ -58,6 +142,27 @@ export class ParameterValidator {
                 this.validateDocument(doc);
             }
         });
+    }
+
+    /**
+     * Debounced validation to avoid performance issues during rapid typing
+     */
+    private debouncedValidateDocument(document: vscode.TextDocument): void {
+        const documentUri = document.uri.toString();
+
+        // Clear existing timer for this document
+        const existingTimer = this.validationTimers.get(documentUri);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+
+        // Set new timer
+        const timer = setTimeout(() => {
+            this.validationTimers.delete(documentUri);
+            this.validateDocument(document);
+        }, this.DEBOUNCE_DELAY);
+
+        this.validationTimers.set(documentUri, timer);
     }
 
     /**
@@ -221,9 +326,19 @@ export class ParameterValidator {
     }
 
     /**
-     * Get field names from a Java class
+     * Get field names from a Java class (with caching)
      */
     private async getClassFields(className: string): Promise<string[]> {
+        // 1. Check cache first
+        const cached = this.fieldCache.get(className);
+        if (cached !== undefined) {
+            console.log(`[ParameterValidator] Cache hit for class: ${className} (${cached.length} fields)`);
+            return cached;
+        }
+
+        // 2. Cache miss - search and parse
+        console.log(`[ParameterValidator] Cache miss for class: ${className}, searching...`);
+
         // Convert fully-qualified class name to file path
         const pathPattern = className.replace(/\./g, '/') + '.java';
         const searchPattern = `**/${pathPattern}`;
@@ -237,15 +352,88 @@ export class ParameterValidator {
 
             if (files.length === 0) {
                 console.log(`[ParameterValidator] Class not found: ${className}`);
+                // Cache empty result to avoid repeated searches
+                this.fieldCache.set(className, []);
                 return [];
             }
 
             const fields = await extractJavaFields(files[0].fsPath);
-            return fields.map(f => f.name);
+            const fieldNames = fields.map(f => f.name);
+
+            // 3. Store in cache
+            this.fieldCache.set(className, fieldNames);
+            console.log(`[ParameterValidator] Cached fields for ${className}: ${fieldNames.join(', ')}`);
+
+            return fieldNames;
 
         } catch (error) {
             console.error(`[ParameterValidator] Error getting class fields:`, error);
             return [];
+        }
+    }
+
+    /**
+     * Invalidate field cache for a specific Java file
+     */
+    private invalidateFieldCache(javaPath: string): void {
+        try {
+            // Extract class name from file path
+            // Example: /path/to/src/main/java/com/example/User.java → com.example.User
+            const className = this.getClassNameFromPath(javaPath);
+            if (className) {
+                this.fieldCache.delete(className);
+                console.log(`[ParameterValidator] Invalidated field cache for: ${className}`);
+            }
+        } catch (error) {
+            console.error(`[ParameterValidator] Error invalidating field cache:`, error);
+        }
+    }
+
+    /**
+     * Extract fully-qualified class name from Java file path
+     */
+    private getClassNameFromPath(javaPath: string): string | null {
+        try {
+            // Find the Java source root (src/main/java, src/test/java, etc.)
+            const normalizedPath = javaPath.replace(/\\/g, '/');
+
+            // Common Java source roots
+            const sourceRoots = [
+                '/src/main/java/',
+                '/src/test/java/',
+                '/src/java/',
+                '/java/'
+            ];
+
+            for (const root of sourceRoots) {
+                const index = normalizedPath.indexOf(root);
+                if (index !== -1) {
+                    // Extract path after source root
+                    const relativePath = normalizedPath.substring(index + root.length);
+                    // Remove .java extension and convert / to .
+                    const className = relativePath
+                        .replace(/\.java$/, '')
+                        .replace(/\//g, '.');
+                    return className;
+                }
+            }
+
+            // Fallback: if no standard source root found, try to extract from last few segments
+            // This handles non-standard project structures
+            const segments = normalizedPath.split('/');
+            const javaIndex = segments.lastIndexOf('java');
+            if (javaIndex !== -1 && javaIndex < segments.length - 1) {
+                const relevantSegments = segments.slice(javaIndex + 1);
+                const className = relevantSegments
+                    .join('.')
+                    .replace(/\.java$/, '');
+                return className;
+            }
+
+            return null;
+        } catch (error) {
+            console.error(`[ParameterValidator] Error extracting class name from path:`, error);
+            return null;
         }
     }
 
@@ -399,6 +587,13 @@ export class ParameterValidator {
      * Dispose of resources
      */
     public dispose(): void {
+        // Clear all pending validation timers
+        this.validationTimers.forEach(timer => clearTimeout(timer));
+        this.validationTimers.clear();
+
+        // Clear field cache
+        this.fieldCache.clear();
+
         this.diagnosticCollection.dispose();
         this.disposables.forEach(d => d.dispose());
     }
