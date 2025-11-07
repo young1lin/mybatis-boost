@@ -119,5 +119,8 @@
     "sinon": "^19.0.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "sql-ddl-to-json-schema": "6.0.0"
   }
 }
