@@ -202,9 +202,12 @@ describe('projectDetector Unit Tests', () => {
             assert.strictEqual(checkedPaths.length, 4);
 
             // Verify it doesn't check parent directories
+            // Normalize paths for cross-platform comparison
+            const normalizedTestPath = path.normalize(testPath);
             checkedPaths.forEach(checkedPath => {
+                const normalizedCheckedPath = path.normalize(checkedPath);
                 assert.ok(
-                    checkedPath.startsWith(testPath),
+                    normalizedCheckedPath.startsWith(normalizedTestPath),
                     `Should only check within ${testPath}, but checked ${checkedPath}`
                 );
             });
