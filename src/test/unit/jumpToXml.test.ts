@@ -3,6 +3,8 @@
  */
 
 import * as assert from 'assert';
+import * as os from 'os';
+import * as path from 'path';
 import { findXmlMapperPosition, findXmlStatementPosition } from '../../navigator/parsers/xmlParser';
 
 describe('jumpToXml Command Tests', () => {
@@ -18,7 +20,7 @@ describe('jumpToXml Command Tests', () => {
 
             // Write mock file
             const fs = require('fs').promises;
-            const tmpFile = '/tmp/test-mapper-' + Date.now() + '.xml';
+            const tmpFile = path.join(os.tmpdir(), 'test-mapper-' + Date.now() + '.xml');
             await fs.writeFile(tmpFile, mockXml);
 
             try {
@@ -39,7 +41,7 @@ describe('jumpToXml Command Tests', () => {
 </root>`;
 
             const fs = require('fs').promises;
-            const tmpFile = '/tmp/test-no-mapper-' + Date.now() + '.xml';
+            const tmpFile = path.join(os.tmpdir(), 'test-no-mapper-' + Date.now() + '.xml');
             await fs.writeFile(tmpFile, mockXml);
 
             try {
@@ -64,7 +66,7 @@ describe('jumpToXml Command Tests', () => {
 </mapper>`;
 
             const fs = require('fs').promises;
-            const tmpFile = '/tmp/test-statement-' + Date.now() + '.xml';
+            const tmpFile = path.join(os.tmpdir(), 'test-statement-' + Date.now() + '.xml');
             await fs.writeFile(tmpFile, mockXml);
 
             try {
@@ -88,7 +90,7 @@ describe('jumpToXml Command Tests', () => {
 </mapper>`;
 
             const fs = require('fs').promises;
-            const tmpFile = '/tmp/test-no-statement-' + Date.now() + '.xml';
+            const tmpFile = path.join(os.tmpdir(), 'test-no-statement-' + Date.now() + '.xml');
             await fs.writeFile(tmpFile, mockXml);
 
             try {
@@ -110,7 +112,7 @@ describe('jumpToXml Command Tests', () => {
 </mapper>`;
 
             const fs = require('fs').promises;
-            const tmpFile = '/tmp/test-multiline-' + Date.now() + '.xml';
+            const tmpFile = path.join(os.tmpdir(), 'test-multiline-' + Date.now() + '.xml');
             await fs.writeFile(tmpFile, mockXml);
 
             try {

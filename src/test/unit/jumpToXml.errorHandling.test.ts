@@ -3,13 +3,15 @@
  */
 
 import * as assert from 'assert';
+import * as os from 'os';
+import * as path from 'path';
 import { extractXmlStatements } from '../../navigator/parsers/xmlParser';
 
 describe('jumpToXml Error Handling Tests', () => {
     describe('removeXmlComments with edge cases', () => {
         it('should handle empty file gracefully', async () => {
             const fs = require('fs').promises;
-            const tmpFile = '/tmp/test-empty-' + Date.now() + '.xml';
+            const tmpFile = path.join(os.tmpdir(), 'test-empty-' + Date.now() + '.xml');
             await fs.writeFile(tmpFile, '');
 
             try {
@@ -25,7 +27,7 @@ describe('jumpToXml Error Handling Tests', () => {
         it('should handle invalid XML gracefully', async () => {
             const invalidXml = 'This is not XML at all!';
             const fs = require('fs').promises;
-            const tmpFile = '/tmp/test-invalid-' + Date.now() + '.xml';
+            const tmpFile = path.join(os.tmpdir(), 'test-invalid-' + Date.now() + '.xml');
             await fs.writeFile(tmpFile, invalidXml);
 
             try {
@@ -45,7 +47,7 @@ describe('jumpToXml Error Handling Tests', () => {
 <!-- No actual mapper content -->`;
 
             const fs = require('fs').promises;
-            const tmpFile = '/tmp/test-comments-' + Date.now() + '.xml';
+            const tmpFile = path.join(os.tmpdir(), 'test-comments-' + Date.now() + '.xml');
             await fs.writeFile(tmpFile, commentsOnlyXml);
 
             try {
@@ -58,7 +60,7 @@ describe('jumpToXml Error Handling Tests', () => {
         });
 
         it('should handle non-existent file gracefully', async () => {
-            const nonExistentFile = '/tmp/this-file-does-not-exist-' + Date.now() + '.xml';
+            const nonExistentFile = path.join(os.tmpdir(), 'this-file-does-not-exist-' + Date.now() + '.xml');
 
             // Should not throw error, readFile returns empty string on error
             const statements = await extractXmlStatements(nonExistentFile);

@@ -11,5 +11,6 @@
   "config.customXmlDirectories.description": "搜索 XML 映射器文件的自定义目录，相对于工作区根目录",
   "config.javaParseLines.description": "从 Java 文件中读取以提取命名空间的行数",
   "config.showBindingIcons.description": "在 Java 方法和 XML 语句之间显示 MyBatis 绑定的装订线图标",
-  "config.useDefinitionProvider.description": "启用 Java 到 XML 导航的跳转到定义（F12）功能。当设为 false（默认）时，使用 CodeLens 以保留原生 Java 定义行为"
+  "config.useDefinitionProvider.description": "启用 Java 到 XML 导航的跳转到定义（F12）功能。当设为 false（默认）时，使用 CodeLens 以保留原生 Java 定义行为",
+  "config.generator.datetime.description": "解析 DDL 语句时用于 SQL DATETIME/TIMESTAMP 列的 Java 类型（DATE 始终映射为 LocalDate，TIME 始终映射为 LocalTime）"
 }

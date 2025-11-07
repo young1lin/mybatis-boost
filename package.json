@@ -81,6 +81,16 @@
           "type": "boolean",
           "default": false,
           "description": "%config.useDefinitionProvider.description%"
+        },
+        "mybatis-boost.generator.datetime": {
+          "type": "string",
+          "enum": [
+            "Date",
+            "LocalDateTime",
+            "Instant"
+          ],
+          "default": "LocalDateTime",
+          "description": "%config.generator.datetime.description%"
         }
       }
     }
@@ -98,7 +108,7 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "test": "pnpm run test:unit && pnpm run test:integration",
-    "test:unit": "pnpm exec mocha",
+    "test:unit": "pnpm exec mocha src/test/unit/**/*.test.ts",
     "test:integration": "vscode-test",
     "release": "node -e \"const v = require('./package.json').version; require('child_process').execSync(`git tag -a v${v} -m \\\"Release ${v}\\\" && git push && git push --tags`, {stdio: 'inherit'})\""
   },
@@ -119,5 +129,8 @@
     "sinon": "^19.0.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "sql-ddl-to-json-schema": "6.0.0"
   }
 }
