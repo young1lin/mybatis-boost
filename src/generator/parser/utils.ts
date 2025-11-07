@@ -91,19 +91,20 @@ const TIME_SQL_TYPES = new Set([
 
 /**
  * Simple type name to fully qualified name mapping
+ * Note: java.lang types return empty string (no import needed)
  */
 const SIMPLE_TO_QUALIFIED_TYPE_MAP: Map<string, string> = new Map([
-  // java.lang (implicitly imported, but can be explicit)
-  ['String', 'java.lang.String'],
-  ['Integer', 'java.lang.Integer'],
-  ['Long', 'java.lang.Long'],
-  ['Boolean', 'java.lang.Boolean'],
-  ['Double', 'java.lang.Double'],
-  ['Float', 'java.lang.Float'],
-  ['Byte', 'java.lang.Byte'],
-  ['Short', 'java.lang.Short'],
-  ['Character', 'java.lang.Character'],
-  ['Object', 'java.lang.Object'],
+  // java.lang (no import needed - return empty string)
+  ['String', ''],
+  ['Integer', ''],
+  ['Long', ''],
+  ['Boolean', ''],
+  ['Double', ''],
+  ['Float', ''],
+  ['Byte', ''],
+  ['Short', ''],
+  ['Character', ''],
+  ['Object', ''],
 
   // java.math
   ['BigDecimal', 'java.math.BigDecimal'],
@@ -187,26 +188,28 @@ export function mapSqlTypeToJavaType(
 
 /**
  * Convert simple Java type name to fully qualified name
- * @param simpleType - Simple type name (e.g., 'LocalDateTime', 'BigDecimal')
- * @returns Fully qualified type name (e.g., 'java.time.LocalDateTime', 'java.math.BigDecimal')
+ * @param simpleType - Simple type name (e.g., 'LocalDateTime', 'BigDecimal', 'String')
+ * @returns Fully qualified type name, or empty string for java.lang types (no import needed)
  * @example toFullyQualifiedType('LocalDateTime') => 'java.time.LocalDateTime'
+ * @example toFullyQualifiedType('BigDecimal') => 'java.math.BigDecimal'
+ * @example toFullyQualifiedType('String') => '' (java.lang types don't need import)
  */
 export function toFullyQualifiedType(simpleType: string): string {
   // Handle array types
   if (simpleType.endsWith('[]')) {
     const baseType = simpleType.slice(0, -2);
-    const qualifiedBase = SIMPLE_TO_QUALIFIED_TYPE_MAP.get(baseType);
-    if (qualifiedBase) {
-      return `${qualifiedBase}[]`;
+    if (SIMPLE_TO_QUALIFIED_TYPE_MAP.has(baseType)) {
+      const qualifiedBase = SIMPLE_TO_QUALIFIED_TYPE_MAP.get(baseType)!;
+      // For java.lang types (empty string), return empty for array too
+      return qualifiedBase ? `${qualifiedBase}[]` : '';
     }
     // For primitive arrays like byte[], return as-is
     return simpleType;
   }
 
-  // Lookup in mapping
-  const qualifiedType = SIMPLE_TO_QUALIFIED_TYPE_MAP.get(simpleType);
-  if (qualifiedType) {
-    return qualifiedType;
+  // Lookup in mapping (includes empty string for java.lang types)
+  if (SIMPLE_TO_QUALIFIED_TYPE_MAP.has(simpleType)) {
+    return SIMPLE_TO_QUALIFIED_TYPE_MAP.get(simpleType)!;
   }
 
   // If not found, assume it's already qualified or a custom type

@@ -3,7 +3,7 @@
  */
 
 import { ParsedSchema, ColumnInfo, DateTimeType } from '../type';
-import { snakeToPascal, snakeToCamel, mapSqlTypeToJavaType } from './utils';
+import { mapSqlTypeToJavaType, toFullyQualifiedType } from './utils';
 
 /**
  * Parse DDL using regex-based approach
@@ -92,7 +92,6 @@ export function parseWithRegex(
 
     const schema: ParsedSchema = {
       tableName,
-      className: snakeToPascal(tableName),
       columns,
       primaryKey,
       databaseType: dbType,
@@ -131,7 +130,6 @@ function parseColumnDefinition(
   }
 
   const columnName = columnNameMatch[1];
-  const fieldName = snakeToCamel(columnName);
 
   // Remove column name from line
   const remaining = line.substring(columnNameMatch[0].length).trim();
@@ -169,12 +167,13 @@ function parseColumnDefinition(
 
   // Map to Java type
   const javaType = mapSqlTypeToJavaType(sqlType, dateTimeType);
+  const javaTypeFullName = toFullyQualifiedType(javaType);
 
   return {
     columnName,
-    fieldName,
     sqlType,
     javaType,
+    javaTypeFullName,
     nullable,
     isPrimaryKey,
     comment,

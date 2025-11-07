@@ -148,11 +148,11 @@ describe('Utility Functions', () => {
   });
 
   describe('toFullyQualifiedType', () => {
-    it('should convert java.lang types', () => {
-      assert.strictEqual(toFullyQualifiedType('String'), 'java.lang.String');
-      assert.strictEqual(toFullyQualifiedType('Integer'), 'java.lang.Integer');
-      assert.strictEqual(toFullyQualifiedType('Long'), 'java.lang.Long');
-      assert.strictEqual(toFullyQualifiedType('Boolean'), 'java.lang.Boolean');
+    it('should return empty string for java.lang types (no import needed)', () => {
+      assert.strictEqual(toFullyQualifiedType('String'), '');
+      assert.strictEqual(toFullyQualifiedType('Integer'), '');
+      assert.strictEqual(toFullyQualifiedType('Long'), '');
+      assert.strictEqual(toFullyQualifiedType('Boolean'), '');
     });
 
     it('should convert java.math types', () => {
@@ -173,9 +173,9 @@ describe('Utility Functions', () => {
     });
 
     it('should handle array types', () => {
-      assert.strictEqual(toFullyQualifiedType('String[]'), 'java.lang.String[]');
-      assert.strictEqual(toFullyQualifiedType('Integer[]'), 'java.lang.Integer[]');
-      assert.strictEqual(toFullyQualifiedType('byte[]'), 'byte[]');
+      assert.strictEqual(toFullyQualifiedType('String[]'), ''); // java.lang array, no import needed
+      assert.strictEqual(toFullyQualifiedType('Integer[]'), ''); // java.lang array, no import needed
+      assert.strictEqual(toFullyQualifiedType('byte[]'), 'byte[]'); // primitive array
     });
 
     it('should return unknown types as-is', () => {

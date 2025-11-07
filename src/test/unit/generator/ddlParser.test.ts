@@ -23,7 +23,6 @@ describe('DDL Parser', () => {
       assert.strictEqual(result.success, true);
       assert.ok(result.data);
       assert.strictEqual(result.data.tableName, 'user_info');
-      assert.strictEqual(result.data.className, 'UserInfo');
       assert.strictEqual(result.data.databaseType, 'mysql');
       assert.strictEqual(result.data.columns.length, 4);
 
@@ -35,9 +34,9 @@ describe('DDL Parser', () => {
       // Check column details
       const userNameCol = result.data.columns.find(c => c.columnName === 'user_name');
       assert.ok(userNameCol);
-      assert.strictEqual(userNameCol.fieldName, 'userName');
       assert.strictEqual(userNameCol.nullable, false);
       assert.strictEqual(userNameCol.javaType, 'String');
+      assert.strictEqual(userNameCol.javaTypeFullName, ''); // java.lang types don't need import
     });
 
     it('should parse MySQL table with AUTO_INCREMENT', () => {
@@ -121,13 +120,13 @@ describe('DDL Parser', () => {
       assert.strictEqual(result.success, true);
       assert.ok(result.data);
       assert.strictEqual(result.data.tableName, 'user_accounts');
-      assert.strictEqual(result.data.className, 'UserAccounts');
       assert.strictEqual(result.data.databaseType, 'postgresql');
 
       // Check SERIAL type mapping
       const idCol = result.data.columns.find(c => c.columnName === 'id');
       assert.ok(idCol);
       assert.strictEqual(idCol.javaType, 'Long');
+      assert.strictEqual(idCol.javaTypeFullName, ''); // java.lang types don't need import
       assert.strictEqual(idCol.isPrimaryKey, true);
     });
 
@@ -503,45 +502,6 @@ describe('DDL Parser', () => {
     });
   });
 
-  describe('Naming conversion', () => {
-    it('should convert snake_case table names to PascalCase', () => {
-      const sql = `
-        CREATE TABLE user_order_details (
-          id INT PRIMARY KEY
-        )
-      `;
-
-      const result = parseDDL(sql, { dbType: 'mysql' });
-
-      assert.strictEqual(result.success, true);
-      assert.ok(result.data);
-      assert.strictEqual(result.data.className, 'UserOrderDetails');
-    });
-
-    it('should convert snake_case column names to camelCase', () => {
-      const sql = `
-        CREATE TABLE test (
-          id INT PRIMARY KEY,
-          first_name VARCHAR(50),
-          last_login_time DATETIME,
-          is_active BOOLEAN
-        )
-      `;
-
-      const result = parseDDL(sql, { dbType: 'mysql' });
-
-      assert.strictEqual(result.success, true);
-      assert.ok(result.data);
-
-      const firstName = result.data.columns.find(c => c.columnName === 'first_name');
-      assert.ok(firstName);
-      assert.strictEqual(firstName.fieldName, 'firstName');
-
-      const lastLoginTime = result.data.columns.find(c => c.columnName === 'last_login_time');
-      assert.ok(lastLoginTime);
-      assert.strictEqual(lastLoginTime.fieldName, 'lastLoginTime');
-    });
-  });
 
   describe('Date/Time type configuration', () => {
     it('should use LocalDateTime by default', () => {

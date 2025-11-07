@@ -4,7 +4,7 @@
 
 import { Parser } from 'sql-ddl-to-json-schema';
 import { ParsedSchema, ColumnInfo, DateTimeType } from '../type';
-import { snakeToPascal, snakeToCamel, mapSqlTypeToJavaType } from './utils';
+import { mapSqlTypeToJavaType, toFullyQualifiedType } from './utils';
 
 /**
  * Parse MySQL DDL using sql-ddl-to-json-schema library
@@ -59,7 +59,6 @@ export function parseWithLibrary(
     if (tableData.columns && Array.isArray(tableData.columns)) {
       for (const col of tableData.columns) {
         const columnName = col.name;
-        const fieldName = snakeToCamel(columnName);
         const isPrimaryKey = columnName === primaryKeyColumn;
 
         // Extract SQL type
@@ -75,6 +74,7 @@ export function parseWithLibrary(
 
         // Map to Java type
         const javaType = mapSqlTypeToJavaType(sqlType, dateTimeType);
+        const javaTypeFullName = toFullyQualifiedType(javaType);
 
         // Extract default value
         let defaultValue: string | undefined;
@@ -89,9 +89,9 @@ export function parseWithLibrary(
 
         const columnInfo: ColumnInfo = {
           columnName,
-          fieldName,
           sqlType,
           javaType,
+          javaTypeFullName,
           nullable,
           isPrimaryKey,
           comment: col.options?.comment,
@@ -108,7 +108,6 @@ export function parseWithLibrary(
 
     const schema: ParsedSchema = {
       tableName,
-      className: snakeToPascal(tableName),
       columns,
       primaryKey,
       databaseType: 'mysql',

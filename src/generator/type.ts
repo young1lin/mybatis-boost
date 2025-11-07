@@ -2,8 +2,7 @@
  * Represents the parsed database schema from DDL SQL statement
  */
 export interface ParsedSchema {
-  tableName: string;           // e.g., user_info
-  className: string;           // e.g., UserInfo
+  tableName: string;           // e.g., user_info (use snakeToPascal to get class name when needed)
   columns: ColumnInfo[];
   primaryKey?: ColumnInfo;     // Single primary key only (composite keys not supported)
   databaseType: 'mysql' | 'postgresql' | 'oracle';
@@ -13,10 +12,10 @@ export interface ParsedSchema {
  * Represents column metadata extracted from DDL
  */
 export interface ColumnInfo {
-  columnName: string;          // e.g., user_name
-  fieldName: string;           // e.g., userName
+  columnName: string;          // e.g., user_name (use snakeToCamel to get field name when needed)
   sqlType: string;             // e.g., VARCHAR(50)
-  javaType: string;            // e.g., String, Integer, Long
+  javaType: string;            // e.g., String, Integer, Long (simple type name)
+  javaTypeFullName: string;    // e.g., '', 'java.math.BigDecimal', 'java.time.LocalDateTime' (empty for java.lang types)
   nullable: boolean;
   comment?: string;
   isPrimaryKey: boolean;
