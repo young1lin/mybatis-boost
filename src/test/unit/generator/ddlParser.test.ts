@@ -102,6 +102,87 @@ describe('DDL Parser', () => {
       assert.ok(retryCol);
       assert.strictEqual(retryCol.defaultValue, '0');
     });
+
+    it('should extract MySQL table comment from table options', () => {
+      const tableComment = "User account table";
+      const sql = `
+        CREATE TABLE users (
+          id INT PRIMARY KEY,
+          username VARCHAR(50) NOT NULL,
+          email VARCHAR(100)
+        ) ENGINE=InnoDB COMMENT='${tableComment}'
+      `;
+
+      const result = parseDDL(sql, { dbType: 'mysql' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.tableName, 'users');
+      assert.strictEqual(result.data.comment, tableComment);
+    });
+
+    it('should extract MySQL table comment without ENGINE clause', () => {
+      const tableComment = "Product categories";
+      const sql = `
+        CREATE TABLE categories (
+          id INT PRIMARY KEY,
+          name VARCHAR(100)
+        ) COMMENT='${tableComment}'
+      `;
+
+      const result = parseDDL(sql, { dbType: 'mysql' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.comment, tableComment);
+    });
+
+    it('should extract MySQL table comment with COMMENT= syntax', () => {
+      const tableComment = "Application logs";
+      const sql = `
+        CREATE TABLE logs (
+          log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+          message TEXT,
+          created_at DATETIME
+        ) COMMENT='${tableComment}'
+      `;
+
+      const result = parseDDL(sql);
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.comment, tableComment);
+    });
+
+    it('should extract both MySQL table and column comments', () => {
+      const tableComment = "Order records";
+      const sql = `
+        CREATE TABLE orders (
+          order_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT 'Order identifier',
+          order_number VARCHAR(50) NOT NULL COMMENT 'Human-readable order number',
+          total_amount DECIMAL(10,2) COMMENT 'Total order amount',
+          created_at DATETIME COMMENT 'Order creation time'
+        ) ENGINE=InnoDB COMMENT='${tableComment}'
+      `;
+
+      const result = parseDDL(sql, { dbType: 'mysql' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.comment, tableComment);
+
+      const idCol = result.data.columns.find(c => c.columnName === 'order_id');
+      assert.ok(idCol);
+      assert.strictEqual(idCol.comment, 'Order identifier');
+
+      const numberCol = result.data.columns.find(c => c.columnName === 'order_number');
+      assert.ok(numberCol);
+      assert.strictEqual(numberCol.comment, 'Human-readable order number');
+
+      const amountCol = result.data.columns.find(c => c.columnName === 'total_amount');
+      assert.ok(amountCol);
+      assert.strictEqual(amountCol.comment, 'Total order amount');
+    });
   });
 
   describe('Basic PostgreSQL parsing', () => {
@@ -167,6 +248,82 @@ describe('DDL Parser', () => {
       assert.ok(dataCol);
       assert.strictEqual(dataCol.javaType, 'byte[]');
     });
+
+    it('should extract PostgreSQL table comment from inline COMMENT', () => {
+      const tableComment = "User session data";
+      const sql = `
+        CREATE TABLE sessions (
+          session_id SERIAL PRIMARY KEY,
+          user_id INT NOT NULL,
+          token VARCHAR(255),
+          expires_at TIMESTAMP
+        ) COMMENT='${tableComment}'
+      `;
+
+      const result = parseDDL(sql, { dbType: 'postgresql' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.tableName, 'sessions');
+      assert.strictEqual(result.data.comment, tableComment);
+    });
+
+    it('should extract PostgreSQL column comments', () => {
+      const sql = `
+        CREATE TABLE events (
+          event_id SERIAL PRIMARY KEY COMMENT 'Event identifier',
+          event_name VARCHAR(100) COMMENT 'Event name',
+          event_date TIMESTAMP COMMENT 'Event timestamp'
+        )
+      `;
+
+      const result = parseDDL(sql, { dbType: 'postgresql' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+
+      const idCol = result.data.columns.find(c => c.columnName === 'event_id');
+      assert.ok(idCol);
+      assert.strictEqual(idCol.comment, 'Event identifier');
+
+      const nameCol = result.data.columns.find(c => c.columnName === 'event_name');
+      assert.ok(nameCol);
+      assert.strictEqual(nameCol.comment, 'Event name');
+
+      const dateCol = result.data.columns.find(c => c.columnName === 'event_date');
+      assert.ok(dateCol);
+      assert.strictEqual(dateCol.comment, 'Event timestamp');
+    });
+
+    it('should extract both PostgreSQL table and column comments', () => {
+      const tableComment = "Product catalog";
+      const sql = `
+        CREATE TABLE products (
+          product_id BIGSERIAL PRIMARY KEY COMMENT 'Product ID',
+          product_name VARCHAR(200) NOT NULL COMMENT 'Product name',
+          price NUMERIC(10,2) COMMENT 'Product price',
+          created_at TIMESTAMP COMMENT 'Creation time'
+        ) COMMENT='${tableComment}'
+      `;
+
+      const result = parseDDL(sql, { dbType: 'postgresql' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.comment, tableComment);
+
+      const idCol = result.data.columns.find(c => c.columnName === 'product_id');
+      assert.ok(idCol);
+      assert.strictEqual(idCol.comment, 'Product ID');
+
+      const nameCol = result.data.columns.find(c => c.columnName === 'product_name');
+      assert.ok(nameCol);
+      assert.strictEqual(nameCol.comment, 'Product name');
+
+      const priceCol = result.data.columns.find(c => c.columnName === 'price');
+      assert.ok(priceCol);
+      assert.strictEqual(priceCol.comment, 'Product price');
+    });
   });
 
   describe('Oracle parsing', () => {
@@ -209,6 +366,187 @@ describe('DDL Parser', () => {
       const contentCol = result.data.columns.find(c => c.columnName === 'content');
       assert.ok(contentCol);
       assert.strictEqual(contentCol.javaType, 'String');
+    });
+
+    it('should extract Oracle table comment from COMMENT ON TABLE statement', () => {
+      const tableComment = "User information table";
+      const sql = `
+        CREATE TABLE user_info (
+          id NUMBER(10) PRIMARY KEY,
+          user_name VARCHAR2(50) NOT NULL,
+          email VARCHAR2(100)
+        );
+
+        COMMENT ON TABLE user_info IS '${tableComment}';
+      `;
+
+      const result = parseDDL(sql, { dbType: 'oracle' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.tableName, 'user_info');
+      assert.strictEqual(result.data.comment, tableComment);
+    });
+
+    it('should extract Oracle column comments from COMMENT ON COLUMN statements', () => {
+      const sql = `
+        CREATE TABLE products (
+          product_id NUMBER(10) PRIMARY KEY,
+          product_name VARCHAR2(100) NOT NULL,
+          price NUMBER(10,2),
+          created_date DATE
+        );
+
+        COMMENT ON COLUMN products.product_id IS 'Primary key';
+        COMMENT ON COLUMN products.product_name IS 'Product name';
+        COMMENT ON COLUMN products.price IS 'Product price in USD';
+        COMMENT ON COLUMN products.created_date IS 'Creation timestamp';
+      `;
+
+      const result = parseDDL(sql, { dbType: 'oracle' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+
+      const idCol = result.data.columns.find(c => c.columnName === 'product_id');
+      assert.ok(idCol);
+      assert.strictEqual(idCol.comment, 'Primary key');
+
+      const nameCol = result.data.columns.find(c => c.columnName === 'product_name');
+      assert.ok(nameCol);
+      assert.strictEqual(nameCol.comment, 'Product name');
+
+      const priceCol = result.data.columns.find(c => c.columnName === 'price');
+      assert.ok(priceCol);
+      assert.strictEqual(priceCol.comment, 'Product price in USD');
+
+      const dateCol = result.data.columns.find(c => c.columnName === 'created_date');
+      assert.ok(dateCol);
+      assert.strictEqual(dateCol.comment, 'Creation timestamp');
+    });
+
+    it('should extract both table and column comments for Oracle', () => {
+      const sql = `
+        CREATE TABLE orders (
+          order_id NUMBER(20) PRIMARY KEY,
+          order_number VARCHAR2(50),
+          total_amount NUMBER(10,2),
+          status VARCHAR2(20) DEFAULT 'PENDING'
+        );
+
+        COMMENT ON TABLE orders IS 'Order records table';
+        COMMENT ON COLUMN orders.order_id IS 'Unique order identifier';
+        COMMENT ON COLUMN orders.order_number IS 'Human-readable order number';
+        COMMENT ON COLUMN orders.total_amount IS 'Total order amount';
+        COMMENT ON COLUMN orders.status IS 'Order status';
+      `;
+
+      const result = parseDDL(sql, { dbType: 'oracle' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.tableName, 'orders');
+      assert.strictEqual(result.data.comment, 'Order records table');
+
+      const idCol = result.data.columns.find(c => c.columnName === 'order_id');
+      assert.ok(idCol);
+      assert.strictEqual(idCol.comment, 'Unique order identifier');
+
+      const numberCol = result.data.columns.find(c => c.columnName === 'order_number');
+      assert.ok(numberCol);
+      assert.strictEqual(numberCol.comment, 'Human-readable order number');
+
+      const amountCol = result.data.columns.find(c => c.columnName === 'total_amount');
+      assert.ok(amountCol);
+      assert.strictEqual(amountCol.comment, 'Total order amount');
+
+      const statusCol = result.data.columns.find(c => c.columnName === 'status');
+      assert.ok(statusCol);
+      assert.strictEqual(statusCol.comment, 'Order status');
+    });
+
+    it('should handle Oracle DDL with quoted identifiers in comments', () => {
+      const sql = `
+        CREATE TABLE "DEPT_INFO" (
+          "DEPT_ID" NUMBER(10) PRIMARY KEY,
+          "DEPT_NAME" VARCHAR2(50)
+        );
+
+        COMMENT ON TABLE "DEPT_INFO" IS 'Department information';
+        COMMENT ON COLUMN "DEPT_INFO"."DEPT_ID" IS 'Department ID';
+        COMMENT ON COLUMN "DEPT_INFO"."DEPT_NAME" IS 'Department name';
+      `;
+
+      const result = parseDDL(sql, { dbType: 'oracle' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.tableName, 'DEPT_INFO');
+      assert.strictEqual(result.data.comment, 'Department information');
+
+      const idCol = result.data.columns.find(c => c.columnName === 'DEPT_ID');
+      assert.ok(idCol);
+      assert.strictEqual(idCol.comment, 'Department ID');
+
+      const nameCol = result.data.columns.find(c => c.columnName === 'DEPT_NAME');
+      assert.ok(nameCol);
+      assert.strictEqual(nameCol.comment, 'Department name');
+    });
+
+    it('should merge inline comments with COMMENT ON COLUMN statements for Oracle', () => {
+      const sql = `
+        CREATE TABLE inventory (
+          item_id NUMBER(10) PRIMARY KEY COMMENT 'Item identifier',
+          item_name VARCHAR2(100),
+          quantity NUMBER(10)
+        );
+
+        COMMENT ON COLUMN inventory.item_name IS 'Item description';
+        COMMENT ON COLUMN inventory.quantity IS 'Stock quantity';
+      `;
+
+      const result = parseDDL(sql, { dbType: 'oracle' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+
+      // Inline comment should be preserved
+      const idCol = result.data.columns.find(c => c.columnName === 'item_id');
+      assert.ok(idCol);
+      assert.strictEqual(idCol.comment, 'Item identifier');
+
+      // COMMENT ON COLUMN should be applied
+      const nameCol = result.data.columns.find(c => c.columnName === 'item_name');
+      assert.ok(nameCol);
+      assert.strictEqual(nameCol.comment, 'Item description');
+
+      const qtyCol = result.data.columns.find(c => c.columnName === 'quantity');
+      assert.ok(qtyCol);
+      assert.strictEqual(qtyCol.comment, 'Stock quantity');
+    });
+
+    it('should handle Oracle DDL without any comments', () => {
+      const sql = `
+        CREATE TABLE simple_table (
+          id NUMBER(10) PRIMARY KEY,
+          name VARCHAR2(50)
+        )
+      `;
+
+      const result = parseDDL(sql, { dbType: 'oracle' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.tableName, 'simple_table');
+      assert.strictEqual(result.data.comment, undefined);
+
+      const idCol = result.data.columns.find(c => c.columnName === 'id');
+      assert.ok(idCol);
+      assert.strictEqual(idCol.comment, undefined);
+
+      const nameCol = result.data.columns.find(c => c.columnName === 'name');
+      assert.ok(nameCol);
+      assert.strictEqual(nameCol.comment, undefined);
     });
   });
 

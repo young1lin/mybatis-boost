@@ -19,8 +19,8 @@ export function parseWithRegex(
   dateTimeType: DateTimeType = 'LocalDateTime'
 ): ParsedSchema | null {
   try {
-    // Extract table name
-    const tableNameMatch = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:`)?(\w+)(?:`)?/i);
+    // Extract table name (supports unquoted, backticks `, and double quotes ")
+    const tableNameMatch = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[`"])?(\w+)(?:[`"])?/i);
     if (!tableNameMatch) {
       return null;
     }
@@ -90,11 +90,31 @@ export function parseWithRegex(
       }
     }
 
+    // Extract table-level comment based on database type
+    let tableComment: string | undefined;
+
+    if (dbType === 'oracle') {
+      // Oracle: Extract from COMMENT ON TABLE statement
+      const commentMetadata = extractOracleComments(sql, tableName);
+      tableComment = commentMetadata.tableComment;
+
+      // Merge Oracle COMMENT ON COLUMN statements with inline comments
+      for (const column of columns) {
+        if (!column.comment && commentMetadata.columnComments[column.columnName]) {
+          column.comment = commentMetadata.columnComments[column.columnName];
+        }
+      }
+    } else if (dbType === 'mysql' || dbType === 'postgresql') {
+      // MySQL/PostgreSQL: Extract table comment from table options
+      tableComment = extractTableComment(sql);
+    }
+
     const schema: ParsedSchema = {
       tableName,
       columns,
       primaryKey,
       databaseType: dbType,
+      comment: tableComment,
     };
 
     return schema;
@@ -214,4 +234,68 @@ function splitColumnDefinitions(columnsSection: string): string[] {
   }
 
   return lines;
+}
+
+/**
+ * Extract table comment from MySQL/PostgreSQL table options
+ * Handles formats like: COMMENT='table comment' or COMMENT 'table comment'
+ * @param sql - DDL SQL statement
+ * @returns Table comment or undefined
+ */
+function extractTableComment(sql: string): string | undefined {
+  // MySQL/PostgreSQL: COMMENT='...' or COMMENT '...' or COMMENT="..." at table level (after closing parenthesis)
+  // Must match COMMENT after the last closing parenthesis of column definitions
+  // Use greedy match to get to the last ) before COMMENT to avoid matching column comments
+  const commentMatch = sql.match(/\)[\s\S]*COMMENT\s*=?\s*['"]([^'"]+)['"]\s*$/i);
+  if (commentMatch) {
+    return commentMatch[1];
+  }
+  return undefined;
+}
+
+/**
+ * Extract Oracle COMMENT ON TABLE and COMMENT ON COLUMN statements
+ * @param sql - Full DDL SQL (may contain multiple statements)
+ * @param tableName - Table name to extract comments for
+ * @returns Object containing table comment and column comments
+ */
+function extractOracleComments(
+  sql: string,
+  tableName: string
+): { tableComment?: string; columnComments: Record<string, string> } {
+  const result: { tableComment?: string; columnComments: Record<string, string> } = {
+    columnComments: {},
+  };
+
+  // Escape table name for regex (handle special characters)
+  const escapedTableName = tableName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Extract COMMENT ON TABLE statement
+  // Pattern: COMMENT ON TABLE table_name IS 'comment text' or COMMENT ON TABLE "table_name" IS 'comment text';
+  const tableCommentRegex = new RegExp(
+    `COMMENT\\s+ON\\s+TABLE\\s+(?:${escapedTableName}|"${escapedTableName}")\\s+IS\\s+['"]([^'"]+)['"]`,
+    'i'
+  );
+  const tableCommentMatch = sql.match(tableCommentRegex);
+  if (tableCommentMatch) {
+    result.tableComment = tableCommentMatch[1];
+  }
+
+  // Extract COMMENT ON COLUMN statements
+  // Pattern: COMMENT ON COLUMN table_name.column_name IS 'comment text' or with quotes;
+  const columnCommentRegex = new RegExp(
+    `COMMENT\\s+ON\\s+COLUMN\\s+(?:${escapedTableName}|"${escapedTableName}")\\.(?:(\\w+)|"(\\w+)")\\s+IS\\s+['"]([^'"]+)['"]`,
+    'gi'
+  );
+
+  let match;
+  while ((match = columnCommentRegex.exec(sql)) !== null) {
+    const columnName = match[1] || match[2]; // Handle both quoted and unquoted column names
+    const comment = match[3];
+    if (columnName) {
+      result.columnComments[columnName] = comment;
+    }
+  }
+
+  return result;
 }
