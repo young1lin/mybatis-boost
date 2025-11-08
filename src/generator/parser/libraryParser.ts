@@ -111,6 +111,7 @@ export function parseWithLibrary(
       columns,
       primaryKey,
       databaseType: 'mysql',
+      comment: tableData.options?.comment,
     };
 
     return schema;

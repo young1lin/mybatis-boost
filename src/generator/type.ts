@@ -6,6 +6,7 @@ export interface ParsedSchema {
   columns: ColumnInfo[];
   primaryKey?: ColumnInfo;     // Single primary key only (composite keys not supported)
   databaseType: 'mysql' | 'postgresql' | 'oracle';
+  comment?: string;
 }
 
 /**
