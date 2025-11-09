@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{cspSource}}; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}';">
+    <title>MyBatis Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 100%;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--vscode-panel-border);
+        }
+
+        .header img {
+            width: 40px;
+            height: 40px;
+        }
+
+        .header-content h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header-content p {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .action-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+        }
+
+        button.secondary:hover {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        button.danger {
+            background-color: #d32f2f;
+            color: white;
+        }
+
+        button.danger:hover {
+            background-color: #c62828;
+        }
+
+        button.primary {
+            background-color: #007acc;
+            color: white;
+            font-weight: 600;
+        }
+
+        button.primary:hover {
+            background-color: #005a9e;
+        }
+
+        .history-section {
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            display: none;
+            background-color: var(--vscode-sideBar-background);
+        }
+
+        .history-section.visible {
+            display: block;
+        }
+
+        .history-item {
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-header {
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.15s;
+        }
+
+        .history-header:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .history-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .history-time {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 6px;
+        }
+
+        .history-ddl {
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: var(--vscode-editor-font-family);
+        }
+
+        .history-count {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 4px;
+        }
+
+        .history-toggle {
+            font-size: 18px;
+            color: var(--vscode-descriptionForeground);
+            margin-left: 12px;
+            user-select: none;
+        }
+
+        .history-content {
+            display: none;
+            padding: 12px 16px;
+            background-color: var(--vscode-editor-background);
+            border-top: 1px solid var(--vscode-panel-border);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-content.visible {
+            display: block;
+        }
+
+        .file-item {
+            margin-bottom: 12px;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .file-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .file-header {
+            padding: 8px 12px;
+            background-color: var(--vscode-editorGroupHeader-tabsBackground);
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .file-type {
+            font-size: 10px;
+            padding: 2px 6px;
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 3px;
+        }
+
+        .file-content {
+            padding: 12px;
+            background-color: var(--vscode-editor-background);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .file-content pre {
+            margin: 0;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        .input-section label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--vscode-foreground);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 220px;
+            padding: 12px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 13px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+
+        textarea:focus {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: -1px;
+        }
+
+        textarea::placeholder {
+            color: var(--vscode-input-placeholderForeground);
+        }
+
+        .generate-button {
+            width: 100%;
+            padding: 12px;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 24px;
+            color: var(--vscode-descriptionForeground);
+            font-size: 13px;
+        }
+
+        /* Preview Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--vscode-sideBar-background);
+        }
+
+        .modal-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--vscode-foreground);
+            padding: 0;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .modal-close:hover {
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .preview-file {
+            margin-bottom: 20px;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .preview-file:last-child {
+            margin-bottom: 0;
+        }
+
+        .preview-file-header {
+            padding: 12px 16px;
+            background-color: var(--vscode-editorGroupHeader-tabsBackground);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-file-title {
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .preview-file-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .preview-file-path {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            font-family: var(--vscode-editor-font-family);
+        }
+
+        .preview-file-content {
+            padding: 16px;
+            background-color: var(--vscode-editor-background);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .preview-file-content pre {
+            margin: 0;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--vscode-panel-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background-color: var(--vscode-sideBar-background);
+        }
+
+        .modal-footer button {
+            min-width: 100px;
+        }
+
+        /* Status Messages */
+        .status-message {
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-message.visible {
+            display: flex;
+        }
+
+        .status-message.success {
+            background-color: rgba(22, 163, 74, 0.15);
+            border: 1px solid rgba(22, 163, 74, 0.3);
+            color: #16a34a;
+        }
+
+        .status-message.error {
+            background-color: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .status-icon {
+            font-size: 16px;
+        }
+
+        .status-text {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        /* Settings Form Styles */
+        .form-section {
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .form-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--vscode-foreground);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--vscode-foreground);
+        }
+
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: var(--vscode-font-family);
+        }
+
+        .form-group input[type="text"]:focus {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: -1px;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: var(--vscode-font-family);
+            cursor: pointer;
+        }
+
+        .form-group select:focus {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: -1px;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-weight: normal;
+            margin-bottom: 4px;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .checkbox-label span {
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="{{iconUri}}" alt="MyBatis">
+            <div class="header-content">
+                <h1>MyBatis Code Generator</h1>
+                <p>Generate Entity, Mapper, XML, and Service files from DDL</p>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <button id="newBtn" class="secondary">
+                <span>➕</span>
+                <span>New</span>
+            </button>
+            <button id="historyBtn" class="secondary">
+                <span>🕐</span>
+                <span>History</span>
+            </button>
+            <button id="settingsBtn" class="secondary">
+                <span>⚙️</span>
+                <span>Settings</span>
+            </button>
+            <button id="clearHistoryBtn" class="danger">
+                <span>🗑️</span>
+                <span>Clear History</span>
+            </button>
+        </div>
+
+        <div id="historySection" class="history-section">
+            <div id="historyList"></div>
+        </div>
+
+        <div id="statusMessage" class="status-message">
+            <span class="status-icon" id="statusIcon"></span>
+            <span class="status-text" id="statusText"></span>
+        </div>
+
+        <div class="input-section">
+            <label for="ddlInput">📝 CREATE TABLE Statement (DDL)</label>
+            <textarea id="ddlInput" placeholder="Paste your CREATE TABLE statement here...
+
+Example:
+CREATE TABLE user_info (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT 'User ID',
+    user_name VARCHAR(100) NOT NULL COMMENT 'Username',
+    email VARCHAR(255) COMMENT 'Email address',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Creation time'
+) COMMENT='User information table';"></textarea>
+        </div>
+
+        <button id="generateBtn" class="generate-button primary">
+            <span>🔍</span>
+            <span>Preview Generated Code</span>
+        </button>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📄 Code Preview</h2>
+                <button class="modal-close" id="modalClose">✕</button>
+            </div>
+            <div class="modal-body" id="previewBody">
+                <!-- Preview content will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button id="cancelBtn" class="secondary">Cancel</button>
+                <button id="exportBtn" class="primary">
+                    <span>💾</span>
+                    <span>Export Files</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ Generator Settings</h2>
+                <button class="modal-close" id="settingsModalClose">✕</button>
+            </div>
+            <div class="modal-body" id="settingsBody">
+                <form id="settingsForm">
+                    <div class="form-section">
+                        <h3>Package Configuration</h3>
+                        <div class="form-group">
+                            <label for="basePackage">Base Package</label>
+                            <input type="text" id="basePackage" name="basePackage"
+                                   placeholder="com.example.mybatis" required>
+                            <small>Java package name for generated code</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="author">Author</label>
+                            <input type="text" id="author" name="author"
+                                   placeholder="Your Name" required>
+                            <small>Author name in generated file headers</small>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Class Suffix Configuration</h3>
+                        <div class="form-group">
+                            <label for="entitySuffix">Entity Suffix</label>
+                            <input type="text" id="entitySuffix" name="entitySuffix"
+                                   placeholder="PO" required>
+                            <small>Suffix for entity classes (e.g., UserPO)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="mapperSuffix">Mapper Suffix</label>
+                            <input type="text" id="mapperSuffix" name="mapperSuffix"
+                                   placeholder="Mapper" required>
+                            <small>Suffix for mapper interfaces (e.g., UserMapper)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="serviceSuffix">Service Suffix</label>
+                            <input type="text" id="serviceSuffix" name="serviceSuffix"
+                                   placeholder="Service" required>
+                            <small>Suffix for service interfaces (e.g., UserService)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="datetime">DateTime Type</label>
+                            <select id="datetime" name="datetime" required>
+                                <option value="Date">Date</option>
+                                <option value="LocalDateTime">LocalDateTime</option>
+                                <option value="Instant">Instant</option>
+                            </select>
+                            <small>Java type for TIMESTAMP/DATETIME columns</small>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Feature Options</h3>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="useLombok" name="useLombok">
+                                <span>Use Lombok</span>
+                            </label>
+                            <small>Generate @Data, @Builder annotations</small>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="useSwagger" name="useSwagger">
+                                <span>Use Swagger (v2)</span>
+                            </label>
+                            <small>Generate @ApiModel, @ApiModelProperty annotations</small>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="useSwaggerV3" name="useSwaggerV3">
+                                <span>Use Swagger (v3/OpenAPI)</span>
+                            </label>
+                            <small>Generate @Schema annotations</small>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="useMyBatisPlus" name="useMyBatisPlus">
+                                <span>Use MyBatis Plus</span>
+                            </label>
+                            <small>Generate MyBatis Plus annotations</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button id="settingsCancelBtn" class="secondary">Cancel</button>
+                <button id="settingsSaveBtn" class="primary">
+                    <span>💾</span>
+                    <span>Save Settings</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script nonce="{{nonce}}">
+        const vscode = acquireVsCodeApi();
+
+        // DOM elements
+        const newBtn = document.getElementById('newBtn');
+        const historyBtn = document.getElementById('historyBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const historySection = document.getElementById('historySection');
+        const historyList = document.getElementById('historyList');
+        const ddlInput = document.getElementById('ddlInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusText = document.getElementById('statusText');
+
+        // Preview Modal elements
+        const previewModal = document.getElementById('previewModal');
+        const previewBody = document.getElementById('previewBody');
+        const modalClose = document.getElementById('modalClose');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const exportBtn = document.getElementById('exportBtn');
+
+        // Settings Modal elements
+        const settingsModal = document.getElementById('settingsModal');
+        const settingsModalClose = document.getElementById('settingsModalClose');
+        const settingsForm = document.getElementById('settingsForm');
+        const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+        const settingsCancelBtn = document.getElementById('settingsCancelBtn');
+
+        let historyVisible = false;
+        let currentPreviewResults = null;
+        let currentSettings = null;
+
+        // New button - clear input and start new session
+        newBtn.addEventListener('click', () => {
+            ddlInput.value = '';
+            hideStatus();
+            ddlInput.focus();
+        });
+
+        // History button - toggle history section
+        historyBtn.addEventListener('click', () => {
+            historyVisible = !historyVisible;
+            if (historyVisible) {
+                historySection.classList.add('visible');
+                vscode.postMessage({ type: 'loadHistory' });
+            } else {
+                historySection.classList.remove('visible');
+            }
+        });
+
+        // Clear history button
+        clearHistoryBtn.addEventListener('click', () => {
+            vscode.postMessage({ type: 'clearHistory' });
+        });
+
+        // Settings button - open settings modal
+        settingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('visible');
+            vscode.postMessage({ type: 'loadSettings' });
+        });
+
+        // Settings modal close buttons
+        settingsModalClose.addEventListener('click', closeSettings);
+        settingsCancelBtn.addEventListener('click', closeSettings);
+
+        // Settings save button
+        settingsSaveBtn.addEventListener('click', () => {
+            const formData = new FormData(settingsForm);
+            const settings = {
+                basePackage: formData.get('basePackage'),
+                author: formData.get('author'),
+                entitySuffix: formData.get('entitySuffix'),
+                mapperSuffix: formData.get('mapperSuffix'),
+                serviceSuffix: formData.get('serviceSuffix'),
+                datetime: formData.get('datetime'),
+                useLombok: document.getElementById('useLombok').checked,
+                useSwagger: document.getElementById('useSwagger').checked,
+                useSwaggerV3: document.getElementById('useSwaggerV3').checked,
+                useMyBatisPlus: document.getElementById('useMyBatisPlus').checked
+            };
+
+            vscode.postMessage({
+                type: 'saveSettings',
+                settings: settings
+            });
+
+            closeSettings();
+            showStatus('success', '✅', 'Settings saved successfully');
+        });
+
+        // Close settings modal when clicking overlay
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                closeSettings();
+            }
+        });
+
+        function closeSettings() {
+            settingsModal.classList.remove('visible');
+        }
+
+        function loadSettingsToForm(settings) {
+            if (!settings) {
+                // Load defaults
+                settings = {
+                    basePackage: 'com.example.mybatis',
+                    author: 'MyBatis Boost',
+                    entitySuffix: 'PO',
+                    mapperSuffix: 'Mapper',
+                    serviceSuffix: 'Service',
+                    datetime: 'LocalDateTime',
+                    useLombok: true,
+                    useSwagger: false,
+                    useSwaggerV3: false,
+                    useMyBatisPlus: false
+                };
+            }
+
+            currentSettings = settings;
+
+            document.getElementById('basePackage').value = settings.basePackage || '';
+            document.getElementById('author').value = settings.author || '';
+            document.getElementById('entitySuffix').value = settings.entitySuffix || '';
+            document.getElementById('mapperSuffix').value = settings.mapperSuffix || '';
+            document.getElementById('serviceSuffix').value = settings.serviceSuffix || '';
+            document.getElementById('datetime').value = settings.datetime || 'LocalDateTime';
+            document.getElementById('useLombok').checked = settings.useLombok || false;
+            document.getElementById('useSwagger').checked = settings.useSwagger || false;
+            document.getElementById('useSwaggerV3').checked = settings.useSwaggerV3 || false;
+            document.getElementById('useMyBatisPlus').checked = settings.useMyBatisPlus || false;
+        }
+
+        // Generate button - show preview
+        generateBtn.addEventListener('click', () => {
+            const ddl = ddlInput.value.trim();
+            if (!ddl) {
+                showStatus('error', '❌', 'Please enter a CREATE TABLE statement');
+                return;
+            }
+
+            hideStatus();
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span>⏳</span><span>Generating Preview...</span>';
+
+            vscode.postMessage({
+                type: 'preview',
+                ddl: ddl
+            });
+        });
+
+        // Modal close buttons
+        modalClose.addEventListener('click', closePreview);
+        cancelBtn.addEventListener('click', closePreview);
+
+        // Export button - save files
+        exportBtn.addEventListener('click', () => {
+            if (!currentPreviewResults) {
+                console.log('[WebView Export] No preview results!');
+                return;
+            }
+
+            console.log('[WebView Export] Current preview results:', currentPreviewResults);
+            console.log('[WebView Export] Is array:', Array.isArray(currentPreviewResults));
+            console.log('[WebView Export] Length:', currentPreviewResults.length);
+
+            // Save reference BEFORE closing preview (closePreview sets currentPreviewResults to null)
+            const resultsToExport = currentPreviewResults;
+
+            closePreview();
+            showStatus('success', '⏳', 'Exporting files...');
+
+            // Create a clean, serializable copy of results
+            const serializableResults = resultsToExport.map(file => ({
+                name: file.name,
+                outputPath: file.outputPath,
+                content: file.content,
+                type: file.type
+            }));
+
+            console.log('[WebView Export] Serializable results:', serializableResults);
+
+            vscode.postMessage({
+                type: 'export',
+                ddl: ddlInput.value.trim(),
+                results: serializableResults
+            });
+        });
+
+        // Close modal when clicking overlay
+        previewModal.addEventListener('click', (e) => {
+            if (e.target === previewModal) {
+                closePreview();
+            }
+        });
+
+        function closePreview() {
+            previewModal.classList.remove('visible');
+            currentPreviewResults = null;
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<span>🔍</span><span>Preview Generated Code</span>';
+        }
+
+        function showPreview(results) {
+            currentPreviewResults = results;
+
+            previewBody.innerHTML = results.map(file => `
+                <div class="preview-file">
+                    <div class="preview-file-header">
+                        <div class="preview-file-title">
+                            <span class="preview-file-badge">${file.type.toUpperCase()}</span>
+                            <span>${escapeHtml(file.name)}</span>
+                        </div>
+                        <div class="preview-file-path">${escapeHtml(file.outputPath)}</div>
+                    </div>
+                    <div class="preview-file-content">
+                        <pre>${escapeHtml(file.content)}</pre>
+                    </div>
+                </div>
+            `).join('');
+
+            previewModal.classList.add('visible');
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<span>🔍</span><span>Preview Generated Code</span>';
+        }
+
+        function showStatus(type, icon, text) {
+            statusMessage.className = `status-message visible ${type}`;
+            statusIcon.textContent = icon;
+            statusText.textContent = text;
+        }
+
+        function hideStatus() {
+            statusMessage.classList.remove('visible');
+        }
+
+        // Handle messages from extension
+        window.addEventListener('message', event => {
+            const message = event.data;
+
+            switch (message.type) {
+                case 'previewResult':
+                    if (message.success) {
+                        showPreview(message.results);
+                    } else {
+                        showStatus('error', '❌', message.error);
+                        generateBtn.disabled = false;
+                        generateBtn.innerHTML = '<span>🔍</span><span>Preview Generated Code</span>';
+                    }
+                    break;
+
+                case 'exportResult':
+                    if (message.success) {
+                        showStatus('success', '✅', `Successfully exported ${message.results.length} files`);
+                        // Load history to show the new record
+                        if (historyVisible) {
+                            vscode.postMessage({ type: 'loadHistory' });
+                        }
+                    } else {
+                        showStatus('error', '❌', message.error);
+                    }
+                    break;
+
+                case 'historyLoaded':
+                case 'historyUpdated':
+                    renderHistory(message.history);
+                    break;
+
+                case 'historyCleared':
+                    renderHistory([]);
+                    if (historyVisible) {
+                        historyList.innerHTML = '<div class="empty-state">No history records</div>';
+                    }
+                    break;
+
+                case 'settingsLoaded':
+                    loadSettingsToForm(message.settings);
+                    break;
+            }
+        });
+
+        function renderHistory(history) {
+            if (!history || history.length === 0) {
+                historyList.innerHTML = '<div class="empty-state">No history records</div>';
+                return;
+            }
+
+            historyList.innerHTML = history.map((record, index) => {
+                const date = new Date(record.timestamp);
+                const timeStr = date.toLocaleString();
+                const ddlPreview = record.ddl.substring(0, 60);
+
+                const filesHtml = record.results.map(file => {
+                    return `<div class="file-item">
+                        <div class="file-header">
+                            <span>${escapeHtml(file.name)}</span>
+                            <span class="file-type">${file.type.toUpperCase()}</span>
+                        </div>
+                        <div class="file-content">
+                            <pre>${escapeHtml(file.content)}</pre>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                return `<div class="history-item" data-index="${index}">
+                    <div class="history-header" data-ddl="${escapeHtml(record.ddl)}">
+                        <div class="history-info">
+                            <div class="history-time">${timeStr}</div>
+                            <div class="history-ddl">${escapeHtml(ddlPreview)}...</div>
+                            <div class="history-count">${record.resultsCount} files generated</div>
+                        </div>
+                        <span class="history-toggle">▶</span>
+                    </div>
+                    <div class="history-content">${filesHtml}</div>
+                </div>`;
+            }).join('');
+
+            // Add click handlers
+            document.querySelectorAll('.history-header').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const toggle = header.querySelector('.history-toggle');
+                    const content = header.nextElementSibling;
+
+                    if (content.classList.contains('visible')) {
+                        content.classList.remove('visible');
+                        toggle.textContent = '▶';
+                    } else {
+                        document.querySelectorAll('.history-content').forEach(c => c.classList.remove('visible'));
+                        document.querySelectorAll('.history-toggle').forEach(t => t.textContent = '▶');
+                        content.classList.add('visible');
+                        toggle.textContent = '▼';
+                    }
+                });
+
+                header.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    const ddl = header.getAttribute('data-ddl');
+                    ddlInput.value = ddl;
+                    historySection.classList.remove('visible');
+                    historyVisible = false;
+                });
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load history on startup
+        vscode.postMessage({ type: 'loadHistory' });
+    </script>
+</body>
+</html>

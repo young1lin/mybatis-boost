@@ -44,7 +44,7 @@ public class <%= className %> {
 <%_ if (useMyBatisPlus && field.isPrimaryKey) { -%>
     @TableId(type = IdType.AUTO)
 <%_ } -%>
-<%_ if (useMyBatisPlus) { -%>
+<%_ if (useMyBatisPlus && !field.isPrimaryKey) { -%>
     @TableField("<%= field.columnName %>")
 <%_ } -%>
     private <%= field.javaType %> <%= field.name %>;

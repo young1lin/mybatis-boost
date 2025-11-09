@@ -310,6 +310,7 @@ export class CodeGenerator {
         if (this.config.useMyBatisPlus) {
             imports.add('com.baomidou.mybatisplus.core.mapper.BaseMapper');
         } else {
+            imports.add('java.util.List');
             imports.add('org.apache.ibatis.annotations.Mapper');
         }
 

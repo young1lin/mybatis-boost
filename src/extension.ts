@@ -21,6 +21,7 @@ import {
 import { XmlSqlHoverProvider, JavaSqlHoverProvider } from './hover';
 import { MybatisBindingDecorator } from './decorator';
 import { findProjectFileInParents } from './utils/projectDetector';
+import { GeneratorViewProvider } from './webview/GeneratorViewProvider';
 
 let fileMapper: FileMapper;
 let bindingDecorator: MybatisBindingDecorator;
@@ -33,6 +34,16 @@ let javaToXmlCodeLensProvider: vscode.Disposable | undefined;
 export async function activate(context: vscode.ExtensionContext) {
     console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.activating')}`);
     const activationStart = Date.now();
+
+    // Register WebView Provider for generator (always available)
+    const generatorProvider = new GeneratorViewProvider(context.extensionUri, context);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            GeneratorViewProvider.viewType,
+            generatorProvider
+        )
+    );
+    console.log('[MyBatis Boost] Generator WebView Provider registered');
 
     // Register commands first (always available)
     registerCommands(context);
