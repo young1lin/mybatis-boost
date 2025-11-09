@@ -187,9 +187,14 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
      */
     private async _handleClearHistory() {
         await this._context.globalState.update(HISTORY_STORAGE_KEY, []);
+
+        // Notify webview that history was cleared
         this._view?.webview.postMessage({
             type: 'historyCleared'
         });
+
+        // Show success message to user
+        vscode.window.showInformationMessage('History cleared successfully');
     }
 
     /**

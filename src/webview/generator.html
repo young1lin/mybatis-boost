@@ -401,9 +401,13 @@ CREATE TABLE user_info (
                     break;
 
                 case 'historyCleared':
+                    // Clear and refresh history display
                     renderHistory([]);
-                    historySection.classList.remove('visible');
-                    historyVisible = false;
+                    // Keep history panel open to show "No history records" message
+                    if (historyVisible) {
+                        // Force refresh the empty state
+                        historyList.innerHTML = '<div class="empty-state">No history records</div>';
+                    }
                     break;
             }
         });
