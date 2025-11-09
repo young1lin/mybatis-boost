@@ -64,8 +64,11 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
         // Handle messages from webview
         webviewView.webview.onDidReceiveMessage(async data => {
             switch (data.type) {
-                case 'generate':
-                    await this._handleGenerate(data.ddl);
+                case 'preview':
+                    await this._handlePreview(data.ddl);
+                    break;
+                case 'export':
+                    await this._handleExport(data.ddl, data.results);
                     break;
                 case 'loadHistory':
                     await this._handleLoadHistory();
@@ -78,16 +81,16 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * Handle DDL generation request
+     * Handle preview request - generate code without writing files
      */
-    private async _handleGenerate(ddl: string) {
+    private async _handlePreview(ddl: string) {
         try {
             // Parse DDL
             const parseResult = parseDDLWithConfig(ddl);
 
             if (!parseResult.success || !parseResult.data) {
                 this._view?.webview.postMessage({
-                    type: 'generateResult',
+                    type: 'previewResult',
                     success: false,
                     error: parseResult.error?.message || 'Failed to parse DDL'
                 });
@@ -98,7 +101,7 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             const workspaceFolders = vscode.workspace.workspaceFolders;
             if (!workspaceFolders || workspaceFolders.length === 0) {
                 this._view?.webview.postMessage({
-                    type: 'generateResult',
+                    type: 'previewResult',
                     success: false,
                     error: 'No workspace folder found'
                 });
@@ -121,11 +124,10 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
                 serviceSuffix: 'Service'
             };
 
-            // Generate code
+            // Generate code (in memory only, don't write files yet)
             const generator = new CodeGenerator(config, parseResult.data);
 
-            // Get template directory path (handles both dev and production environments)
-            // In production, templates are copied to dist/generator/template
+            // Get template directory path
             const templateDir = path.join(__dirname, 'generator', 'template');
 
             const results = [
@@ -135,12 +137,43 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
                 generator.generateService(path.join(templateDir, 'service.ejs'))
             ];
 
-            // Save history record
+            // Send preview results to webview (with full content)
+            this._view?.webview.postMessage({
+                type: 'previewResult',
+                success: true,
+                results: results.map(r => ({
+                    name: r.name,
+                    outputPath: r.outputPath,
+                    content: r.content,
+                    type: r.type
+                }))
+            });
+
+        } catch (error) {
+            this._view?.webview.postMessage({
+                type: 'previewResult',
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error occurred'
+            });
+        }
+    }
+
+    /**
+     * Handle export request - write files and save to history
+     */
+    private async _handleExport(ddl: string, results: GenerateReuslt[]) {
+        try {
+            // Write files to disk
+            for (const result of results) {
+                await fs.promises.writeFile(result.outputPath, result.content, 'utf-8');
+            }
+
+            // Save to history
             await this._saveHistoryRecord(ddl, results);
 
-            // Send results back to webview
+            // Send success message to webview
             this._view?.webview.postMessage({
-                type: 'generateResult',
+                type: 'exportResult',
                 success: true,
                 results: results.map(r => ({
                     name: r.name,
@@ -149,12 +182,12 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
                 }))
             });
 
-            // Show success message
-            vscode.window.showInformationMessage(`Successfully generated ${results.length} files`);
+            // Show success notification
+            vscode.window.showInformationMessage(`Successfully exported ${results.length} files`);
 
         } catch (error) {
             this._view?.webview.postMessage({
-                type: 'generateResult',
+                type: 'exportResult',
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error occurred'
             });
