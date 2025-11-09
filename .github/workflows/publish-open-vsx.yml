@@ -1,22 +1,21 @@
 name: Publish to Open VSX Registry
-
 on:
   push:
     tags:
-      - 'v*'  # Triggers when pushing a tag starting with 'v', e.g., v1.0.0
-  workflow_dispatch:  # allow manual trigger
+      - 'v*'
+  workflow_dispatch:
     inputs:
       version:
         description: 'Version to publish (e.g., 0.2.0)'
         required: false
         type: string
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -38,8 +37,8 @@ jobs:
       - name: Compile project
         run: pnpm run compile
 
-      - name: Install vsce
-        run: pnpm add -g @vscode/vsce
+      - name: Install vsce and ovsx
+        run: pnpm add -g @vscode/vsce ovsx
 
       - name: Package extension as VSIX file
         run: vsce package --no-dependencies
@@ -58,19 +57,7 @@ jobs:
           files: ${{ steps.get_vsix.outputs.vsix_file }}
           generate_release_notes: true
 
-      - name: Install ovsx (Open VSX CLI)
-        run: pnpm add -g ovsx
-
-      - name: Create namespace if not exists
-        run: |
-          # Try to create namespace, ignore error if already exists
-          ovsx create-namespace young1lin -p ${{ secrets.OPEN_VSX_TOKEN }} || true
-        env:
-          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
-
       - name: Publish to Open VSX Registry
-        run: vsce publish --packagePath ${{ steps.get_vsix.outputs.vsix_file }} -p ${{ secrets.VSCE_PAT }}
+        run: ovsx publish ${{ steps.get_vsix.outputs.vsix_file }} -p ${{ secrets.OPEN_VSX_TOKEN }}
         env:
           OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
-        # Note: Extensions will show as "unverified" until namespace ownership is claimed
-        # Claim ownership at: https://github.com/EclipseFdn/open-vsx.org/issues
