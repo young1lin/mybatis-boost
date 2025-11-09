@@ -14,24 +14,36 @@ import { MCPRequestHandler } from './handlers';
  */
 interface JsonRpcRequest {
     jsonrpc: '2.0';
-    id?: string | number;
+    id?: string | number | null;
     method: string;
     params?: any;
 }
 
 /**
- * JSON-RPC 2.0 response structure
+ * JSON-RPC 2.0 response structure (success)
  */
-interface JsonRpcResponse {
+interface JsonRpcSuccessResponse {
     jsonrpc: '2.0';
-    id: string | number | null;
-    result?: any;
-    error?: {
+    id: string | number;
+    result: any;
+}
+
+/**
+ * JSON-RPC 2.0 response structure (error)
+ * Note: Cursor IDE's Zod validation requires id to be string | number (not null)
+ * Use sentinel value -1 for parse errors where id cannot be determined
+ */
+interface JsonRpcErrorResponse {
+    jsonrpc: '2.0';
+    id: string | number;
+    error: {
         code: number;
         message: string;
         data?: any;
     };
 }
+
+type JsonRpcResponse = JsonRpcSuccessResponse | JsonRpcErrorResponse;
 
 /**
  * MCP stdio server
@@ -63,10 +75,11 @@ class MCPStdioServer {
                 this.sendResponse(response);
             } catch (error) {
                 this.logToStderr(`Error processing request: ${error}`);
-                // Send error response
+                // Send error response with sentinel id (-1) for parse errors
+                // Cursor's Zod validation doesn't accept null id even for error responses
                 this.sendResponse({
                     jsonrpc: '2.0',
-                    id: null,
+                    id: -1,
                     error: {
                         code: -32700,
                         message: 'Parse error',
@@ -87,8 +100,14 @@ class MCPStdioServer {
     /**
      * Handle JSON-RPC request
      */
-    private async handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse> {
+    private async handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
         const { id, method, params } = request;
+
+        // If no id, this is a notification - don't send response
+        if (id === undefined || id === null) {
+            this.logToStderr(`Received notification: ${method}`);
+            return null;
+        }
 
         try {
             // Handle different MCP methods
@@ -108,22 +127,19 @@ class MCPStdioServer {
                     break;
 
                 default:
-                    throw {
-                        code: -32601,
-                        message: `Method not found: ${method}`
-                    };
+                    throw new Error(`Method not found: ${method}`);
             }
 
             return {
                 jsonrpc: '2.0',
-                id: id ?? null,
+                id: id,
                 result
             };
 
         } catch (error: any) {
             return {
                 jsonrpc: '2.0',
-                id: id ?? null,
+                id: id,
                 error: {
                     code: error.code || -32603,
                     message: error.message || 'Internal error',
@@ -135,9 +151,12 @@ class MCPStdioServer {
 
     /**
      * Send response to stdout
+     * Handles null responses (for notifications that don't need responses)
      */
-    private sendResponse(response: JsonRpcResponse): void {
-        console.log(JSON.stringify(response));
+    private sendResponse(response: JsonRpcResponse | null): void {
+        if (response !== null) {
+            console.log(JSON.stringify(response));
+        }
     }
 
     /**

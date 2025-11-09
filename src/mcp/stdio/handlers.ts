@@ -180,11 +180,11 @@ export class MCPRequestHandler {
             case 'mybatis_parse_and_export':
                 return await this.handleParseAndExport(args);
 
-            default:
-                throw {
-                    code: -32602,
-                    message: `Unknown tool: ${name}`
-                };
+            default: {
+                const error = new Error(`Unknown tool: ${name}`);
+                (error as any).code = -32602;
+                throw error;
+            }
         }
     }
 
