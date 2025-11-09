@@ -171,10 +171,23 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
                 throw new Error('Invalid results format: expected an array');
             }
 
+            console.log('[Export] Starting file export for', results.length, 'files');
+
             // Write files to disk
             for (const result of results) {
+                console.log('[Export] Writing file:', result.outputPath);
+
+                // Ensure directory exists
+                const dir = path.dirname(result.outputPath);
+                console.log('[Export] Ensuring directory exists:', dir);
+                await fs.promises.mkdir(dir, { recursive: true });
+
+                // Write file
                 await fs.promises.writeFile(result.outputPath, result.content, 'utf-8');
+                console.log('[Export] Successfully wrote:', result.outputPath);
             }
+
+            console.log('[Export] All files written successfully');
 
             // Save to history
             await this._saveHistoryRecord(ddl, results);
@@ -194,6 +207,7 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             vscode.window.showInformationMessage(`Successfully exported ${results.length} files`);
 
         } catch (error) {
+            console.error('[Export] Error during export:', error);
             this._view?.webview.postMessage({
                 type: 'exportResult',
                 success: false,
