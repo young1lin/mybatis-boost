@@ -12,5 +12,14 @@
   "config.javaParseLines.description": "从 Java 文件中读取以提取命名空间的行数",
   "config.showBindingIcons.description": "在 Java 方法和 XML 语句之间显示 MyBatis 绑定的装订线图标",
   "config.useDefinitionProvider.description": "启用 Java 到 XML 导航的跳转到定义（F12）功能。当设为 false（默认）时，使用 CodeLens 以保留原生 Java 定义行为",
-  "config.generator.datetime.description": "解析 DDL 语句时用于 SQL DATETIME/TIMESTAMP 列的 Java 类型（DATE 始终映射为 LocalDate，TIME 始终映射为 LocalTime）"
+  "config.generator.datetime.description": "解析 DDL 语句时用于 SQL DATETIME/TIMESTAMP 列的 Java 类型（DATE 始终映射为 LocalDate，TIME 始终映射为 LocalTime）",
+  "config.generator.basePackage.description": "生成的 Java 代码的基础包名",
+  "config.generator.author.description": "生成的文件头中的作者名称",
+  "config.generator.entitySuffix.description": "实体类的后缀（例如 UserPO）",
+  "config.generator.mapperSuffix.description": "映射器接口的后缀（例如 UserMapper）",
+  "config.generator.serviceSuffix.description": "服务接口的后缀（例如 UserService）",
+  "config.generator.useLombok.description": "生成 Lombok 注解（@Data、@Builder 等）",
+  "config.generator.useSwagger.description": "生成 Swagger v2 注解（@ApiModel、@ApiModelProperty）",
+  "config.generator.useSwaggerV3.description": "生成 Swagger v3/OpenAPI 注解（@Schema）",
+  "config.generator.useMyBatisPlus.description": "生成 MyBatis Plus 注解"
 }
