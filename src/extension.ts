@@ -22,10 +22,12 @@ import { XmlSqlHoverProvider, JavaSqlHoverProvider } from './hover';
 import { MybatisBindingDecorator } from './decorator';
 import { findProjectFileInParents } from './utils/projectDetector';
 import { GeneratorViewProvider } from './webview/GeneratorViewProvider';
+import { MCPManager } from './mcp/MCPManager';
 
 let fileMapper: FileMapper;
 let bindingDecorator: MybatisBindingDecorator;
 let parameterValidator: ParameterValidator;
+let mcpManager: MCPManager;
 
 // Navigation providers (disposable based on configuration)
 let javaToXmlDefinitionProvider: vscode.Disposable | undefined;
@@ -44,6 +46,17 @@ export async function activate(context: vscode.ExtensionContext) {
         )
     );
     console.log('[MyBatis Boost] Generator WebView Provider registered');
+
+    // Initialize MCP Manager for AI-powered code generation
+    mcpManager = new MCPManager(context);
+    try {
+        await mcpManager.register();
+        const status = mcpManager.getStatus();
+        console.log(`[MyBatis Boost] MCP Manager initialized (IDE: ${status.isCursor ? 'Cursor' : 'VS Code'}, Enabled: ${status.enabled})`);
+    } catch (error) {
+        console.warn('[MyBatis Boost] Failed to register MCP:', error);
+        // Non-critical error - extension can still function without MCP
+    }
 
     // Register commands first (always available)
     registerCommands(context);
@@ -93,7 +106,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Listen for configuration changes
     context.subscriptions.push(
-        vscode.workspace.onDidChangeConfiguration((e) => {
+        vscode.workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('mybatis-boost.useDefinitionProvider')) {
                 const newUseDefinitionProvider = vscode.workspace
                     .getConfiguration('mybatis-boost')
@@ -112,6 +125,34 @@ export async function activate(context: vscode.ExtensionContext) {
                     vscode.l10n.t('extension.switchedMode', newMode)
                 );
             }
+
+            // Handle MCP configuration changes
+            if (e.affectsConfiguration('mybatis-boost.mcp.enable')) {
+                const mcpEnabled = vscode.workspace
+                    .getConfiguration('mybatis-boost')
+                    .get<boolean>('mcp.enable', true);
+
+                console.log(`[MyBatis Boost] MCP enable configuration changed: ${mcpEnabled}`);
+
+                if (mcpEnabled) {
+                    // Enable MCP
+                    try {
+                        await mcpManager.register();
+                        vscode.window.showInformationMessage('MyBatis Boost MCP enabled');
+                    } catch (error) {
+                        console.error('[MyBatis Boost] Failed to enable MCP:', error);
+                        vscode.window.showErrorMessage('Failed to enable MyBatis Boost MCP');
+                    }
+                } else {
+                    // Disable MCP
+                    try {
+                        await mcpManager.unregister();
+                        vscode.window.showInformationMessage('MyBatis Boost MCP disabled');
+                    } catch (error) {
+                        console.error('[MyBatis Boost] Failed to disable MCP:', error);
+                    }
+                }
+            }
         })
     );
 
@@ -126,6 +167,9 @@ export async function activate(context: vscode.ExtensionContext) {
             }
             if (parameterValidator) {
                 parameterValidator.dispose();
+            }
+            if (mcpManager) {
+                mcpManager.dispose();
             }
             unregisterJavaToXmlNavigationProvider();
         }
@@ -349,6 +393,9 @@ export function deactivate() {
     }
     if (parameterValidator) {
         parameterValidator.dispose();
+    }
+    if (mcpManager) {
+        mcpManager.dispose();
     }
     unregisterJavaToXmlNavigationProvider();
 }

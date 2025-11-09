@@ -2,7 +2,7 @@
   "name": "mybatis-boost",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "publisher": "young1lin",
   "license": "MIT",
   "packageManager": "pnpm@10.19.0",
@@ -154,6 +154,11 @@
           "type": "boolean",
           "default": false,
           "description": "%config.generator.useMyBatisPlus.description%"
+        },
+        "mybatis-boost.mcp.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.mcp.enable.description%"
         }
       }
     }

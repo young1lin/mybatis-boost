@@ -77,7 +77,8 @@ const copyResourcesPlugin = {
 };
 
 async function main() {
-	const ctx = await esbuild.context({
+	// Build main extension
+	const extensionCtx = await esbuild.context({
 		entryPoints: [
 			'src/extension.ts'
 		],
@@ -96,11 +97,35 @@ async function main() {
 			esbuildProblemMatcherPlugin,
 		],
 	});
+
+	// Build MCP stdio server
+	const mcpServerCtx = await esbuild.context({
+		entryPoints: [
+			'src/mcp/stdio/server.ts'
+		],
+		bundle: true,
+		format: 'cjs',
+		minify: production,
+		sourcemap: true,
+		sourcesContent: true,
+		platform: 'node',
+		outfile: 'dist/mcp/stdio/server.js',
+		external: [], // No external dependencies for standalone server
+		logLevel: 'silent',
+		banner: {
+			js: '#!/usr/bin/env node'
+		},
+		plugins: [],
+	});
+
 	if (watch) {
-		await ctx.watch();
+		await extensionCtx.watch();
+		await mcpServerCtx.watch();
 	} else {
-		await ctx.rebuild();
-		await ctx.dispose();
+		await extensionCtx.rebuild();
+		await mcpServerCtx.rebuild();
+		await extensionCtx.dispose();
+		await mcpServerCtx.dispose();
 	}
 }
 

@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "mybatis-boost": {
+      "command": "node",
+      "args": [
+        "dist/mcp/stdio/server.js"
+      ],
+      "env": {
+        "MYBATIS_BASE_PACKAGE": "com.example.mybatis",
+        "MYBATIS_AUTHOR": "Your Name",
+        "MYBATIS_OUTPUT_DIR": "/path/to/your/project",
+        "MYBATIS_USE_LOMBOK": "true",
+        "MYBATIS_USE_SWAGGER": "false",
+        "MYBATIS_USE_SWAGGER_V3": "false",
+        "MYBATIS_USE_MYBATIS_PLUS": "false",
+        "MYBATIS_ENTITY_SUFFIX": "PO",
+        "MYBATIS_MAPPER_SUFFIX": "Mapper",
+        "MYBATIS_SERVICE_SUFFIX": "Service",
+        "MYBATIS_DATETIME": "LocalDateTime"
+      }
+    }
+  }
+}

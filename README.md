@@ -7,6 +7,71 @@ High-performance VS Code extension providing comprehensive bidirectional navigat
 ![demo](images/demo.gif)
 ## Features
 
+### 🎯 MyBatis Code Generator
+
+Generate complete MyBatis boilerplate code from DDL SQL statements with an interactive WebView panel.
+
+**What it generates:**
+- **Entity classes** (POJOs) with configurable Lombok and Swagger annotations
+- **Mapper interfaces** with CRUD methods
+- **XML mapping files** with complete SQL statements (insert, update, delete, select)
+- **Service classes** with common business logic
+
+**Supported databases:**
+- MySQL (AUTO_INCREMENT, ENGINE, COMMENT syntax)
+- PostgreSQL (SERIAL, BIGSERIAL, COMMENT ON syntax)
+- Oracle (VARCHAR2, NUMBER, CLOB, COMMENT ON syntax)
+
+**Configuration options** (`mybatis-boost.generator.*`):
+- `basePackage`: Base package for generated code (e.g., `com.example.mybatis`)
+- `author`: Author name for code comments (default: `MyBatis Boost`)
+- `entitySuffix`: Entity class suffix (default: `PO`)
+- `mapperSuffix`: Mapper interface suffix (default: `Mapper`)
+- `serviceSuffix`: Service class suffix (default: `Service`)
+- `datetime`: DateTime type mapping - `Date` | `LocalDateTime` | `Instant` (default: `Date`)
+- `useLombok`: Enable Lombok annotations `@Data`, `@Getter`, `@Setter` (default: `true`)
+- `useSwagger`: Enable Swagger 2 annotations `@ApiModel`, `@ApiModelProperty` (default: `false`)
+- `useSwaggerV3`: Enable Swagger 3 (OpenAPI) annotations (default: `false`)
+
+**Features:**
+- **Preview before export**: Review all generated code in the WebView panel
+- **One-click export**: Automatically creates proper directory structure
+- **Generation history**: Track all generated code with SQL and file previews
+- **Smart type mapping**: Converts SQL types to appropriate Java types (e.g., `BIGINT` → `Long`, `VARCHAR` → `String`)
+- **Comment preservation**: Extracts table and column comments from DDL to Javadoc
+- **Flexible output**: Choose to generate with or without Lombok/Swagger based on your project needs
+
+**Example usage:**
+```sql
+CREATE TABLE user_info (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT 'User ID',
+    username VARCHAR(50) NOT NULL COMMENT 'Username',
+    email VARCHAR(100) COMMENT 'Email address',
+    created_at DATETIME COMMENT 'Creation time'
+) ENGINE=InnoDB COMMENT='User information table';
+```
+
+This generates:
+- `UserInfoPO.java` - Entity class with Lombok `@Data` annotation
+- `UserInfoMapper.java` - Mapper interface with CRUD methods
+- `UserInfoMapper.xml` - XML with insert/update/delete/select statements
+- `UserInfoService.java` - Service class with common operations
+
+**AI Integration (Cursor IDE / VS Code Copilot):**
+
+MyBatis Boost provides **Model Context Protocol (MCP)** support for AI-powered code generation:
+
+- **Automatic IDE detection**: Works seamlessly with VS Code Copilot and Cursor IDE
+- **Four MCP tools** available to AI assistants:
+  1. `mybatis_parse_sql_and_generate` - Parse DDL and generate code (preview only)
+  2. `mybatis_export_generated_files` - Export generated files to filesystem
+  3. `mybatis_query_generation_history` - Query past generations
+  4. `mybatis_parse_and_export` - Combined parse and export operation
+- **Configuration**: Enable/disable with `mybatis-boost.mcp.enable` (default: `true`)
+- **Dynamic updates**: Changes take effect immediately without restart
+
+For Cursor IDE users, the extension automatically registers a stdio MCP server for AI tool integration.
+
 ### 🚀 10 Types of Go-to-Definition Navigation
 
 **Java ↔ XML:**
