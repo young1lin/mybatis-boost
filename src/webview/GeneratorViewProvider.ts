@@ -12,12 +12,12 @@ import * as fs from 'fs';
 
 /**
  * History record structure
- * Stores DDL and generated results for history tracking
+ * Stores DDL and generated results with full content for history tracking
  */
 interface HistoryRecord {
     timestamp: number;
     ddl: string;
-    results: GenerateReuslt[];
+    results: GenerateReuslt[]; // Contains full content for each generated file
 }
 
 /**
@@ -171,7 +171,13 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             history: history.map(record => ({
                 timestamp: record.timestamp,
                 ddl: record.ddl,
-                resultsCount: record.results.length
+                resultsCount: record.results.length,
+                results: record.results.map(r => ({
+                    name: r.name,
+                    outputPath: r.outputPath,
+                    content: r.content,
+                    type: r.type
+                }))
             }))
         });
     }
@@ -212,7 +218,13 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             history: history.map(record => ({
                 timestamp: record.timestamp,
                 ddl: record.ddl,
-                resultsCount: record.results.length
+                resultsCount: record.results.length,
+                results: record.results.map(r => ({
+                    name: r.name,
+                    outputPath: r.outputPath,
+                    content: r.content,
+                    type: r.type
+                }))
             }))
         });
     }
@@ -306,7 +318,7 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
 
         .history-section {
             margin-bottom: 16px;
-            max-height: 200px;
+            max-height: 400px;
             overflow-y: auto;
             border: 1px solid var(--vscode-panel-border);
             border-radius: 4px;
@@ -318,17 +330,28 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
         }
 
         .history-item {
-            padding: 8px 12px;
             border-bottom: 1px solid var(--vscode-panel-border);
-            cursor: pointer;
-        }
-
-        .history-item:hover {
-            background-color: var(--vscode-list-hoverBackground);
         }
 
         .history-item:last-child {
             border-bottom: none;
+        }
+
+        .history-header {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-header:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .history-info {
+            flex: 1;
+            min-width: 0;
         }
 
         .history-time {
@@ -349,6 +372,69 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             font-size: 11px;
             color: var(--vscode-descriptionForeground);
             margin-top: 4px;
+        }
+
+        .history-toggle {
+            font-size: 18px;
+            color: var(--vscode-descriptionForeground);
+            margin-left: 8px;
+            user-select: none;
+        }
+
+        .history-content {
+            display: none;
+            padding: 8px 12px;
+            background-color: var(--vscode-editor-background);
+            border-top: 1px solid var(--vscode-panel-border);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-content.visible {
+            display: block;
+        }
+
+        .file-item {
+            margin-bottom: 12px;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .file-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .file-header {
+            padding: 6px 8px;
+            background-color: var(--vscode-editorGroupHeader-tabsBackground);
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .file-type {
+            font-size: 10px;
+            padding: 2px 6px;
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 2px;
+        }
+
+        .file-content {
+            padding: 8px;
+            background-color: var(--vscode-editor-background);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .file-content pre {
+            margin: 0;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
 
         .input-section {
@@ -568,22 +654,63 @@ CREATE TABLE user_info (
                 return;
             }
 
-            historyList.innerHTML = history.map(record => {
+            historyList.innerHTML = history.map((record, index) => {
                 const date = new Date(record.timestamp);
                 const timeStr = date.toLocaleString();
-                const ddlPreview = record.ddl.substring(0, 80);
+                const ddlPreview = record.ddl.substring(0, 60);
 
-                return '<div class="history-item" data-ddl="' + escapeHtml(record.ddl) + '">' +
+                // Render file items
+                const filesHtml = record.results.map(file => {
+                    return '<div class="file-item">' +
+                        '<div class="file-header">' +
+                        '<span>' + escapeHtml(file.name) + '</span>' +
+                        '<span class="file-type">' + file.type.toUpperCase() + '</span>' +
+                        '</div>' +
+                        '<div class="file-content">' +
+                        '<pre>' + escapeHtml(file.content) + '</pre>' +
+                        '</div>' +
+                        '</div>';
+                }).join('');
+
+                return '<div class="history-item" data-index="' + index + '">' +
+                    '<div class="history-header" data-ddl="' + escapeHtml(record.ddl) + '">' +
+                    '<div class="history-info">' +
                     '<div class="history-time">' + timeStr + '</div>' +
                     '<div class="history-ddl">' + escapeHtml(ddlPreview) + '...</div>' +
                     '<div class="history-count">' + record.resultsCount + ' files generated</div>' +
+                    '</div>' +
+                    '<span class="history-toggle">▶</span>' +
+                    '</div>' +
+                    '<div class="history-content">' + filesHtml + '</div>' +
                     '</div>';
             }).join('');
 
-            // Add click handlers to history items
-            document.querySelectorAll('.history-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const ddl = item.getAttribute('data-ddl');
+            // Add click handlers to history headers for DDL restore
+            document.querySelectorAll('.history-header').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const toggle = header.querySelector('.history-toggle');
+                    const content = header.nextElementSibling;
+
+                    // Toggle expand/collapse
+                    if (content.classList.contains('visible')) {
+                        content.classList.remove('visible');
+                        toggle.textContent = '▶';
+                    } else {
+                        // Collapse all others first
+                        document.querySelectorAll('.history-content').forEach(c => c.classList.remove('visible'));
+                        document.querySelectorAll('.history-toggle').forEach(t => t.textContent = '▶');
+
+                        // Expand this one
+                        content.classList.add('visible');
+                        toggle.textContent = '▼';
+                    }
+                });
+
+                // Double-click to restore DDL
+                header.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    const ddl = header.getAttribute('data-ddl');
                     ddlInput.value = ddl;
                     historySection.classList.remove('visible');
                     historyVisible = false;
