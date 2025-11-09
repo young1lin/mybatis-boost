@@ -113,47 +113,47 @@
         "mybatis-boost.generator.basePackage": {
           "type": "string",
           "default": "com.example.mybatis",
-          "description": "Base package for generated Java code"
+          "description": "%config.generator.basePackage.description%"
         },
         "mybatis-boost.generator.author": {
           "type": "string",
           "default": "MyBatis Boost",
-          "description": "Author name in generated file headers"
+          "description": "%config.generator.author.description%"
         },
         "mybatis-boost.generator.entitySuffix": {
           "type": "string",
           "default": "PO",
-          "description": "Suffix for entity classes (e.g., UserPO)"
+          "description": "%config.generator.entitySuffix.description%"
         },
         "mybatis-boost.generator.mapperSuffix": {
           "type": "string",
           "default": "Mapper",
-          "description": "Suffix for mapper interfaces (e.g., UserMapper)"
+          "description": "%config.generator.mapperSuffix.description%"
         },
         "mybatis-boost.generator.serviceSuffix": {
           "type": "string",
           "default": "Service",
-          "description": "Suffix for service interfaces (e.g., UserService)"
+          "description": "%config.generator.serviceSuffix.description%"
         },
         "mybatis-boost.generator.useLombok": {
           "type": "boolean",
           "default": true,
-          "description": "Generate Lombok annotations (@Data, @Builder, etc.)"
+          "description": "%config.generator.useLombok.description%"
         },
         "mybatis-boost.generator.useSwagger": {
           "type": "boolean",
           "default": false,
-          "description": "Generate Swagger v2 annotations (@ApiModel, @ApiModelProperty)"
+          "description": "%config.generator.useSwagger.description%"
         },
         "mybatis-boost.generator.useSwaggerV3": {
           "type": "boolean",
           "default": false,
-          "description": "Generate Swagger v3/OpenAPI annotations (@Schema)"
+          "description": "%config.generator.useSwaggerV3.description%"
         },
         "mybatis-boost.generator.useMyBatisPlus": {
           "type": "boolean",
           "default": false,
-          "description": "Generate MyBatis Plus annotations"
+          "description": "%config.generator.useMyBatisPlus.description%"
         }
       }
     }

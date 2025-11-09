@@ -12,5 +12,14 @@
   "config.javaParseLines.description": "Number of lines to read from Java files for namespace extraction",
   "config.showBindingIcons.description": "Show gutter icons for MyBatis bindings between Java methods and XML statements",
   "config.useDefinitionProvider.description": "Enable Go-to-Definition (F12) for Java-to-XML navigation. When false (default), use CodeLens instead to preserve native Java definition behavior",
-  "config.generator.datetime.description": "Java type to use for SQL DATETIME/TIMESTAMP columns when parsing DDL statements (DATE always maps to LocalDate, TIME always maps to LocalTime)"
+  "config.generator.datetime.description": "Java type to use for SQL DATETIME/TIMESTAMP columns when parsing DDL statements (DATE always maps to LocalDate, TIME always maps to LocalTime)",
+  "config.generator.basePackage.description": "Base package for generated Java code",
+  "config.generator.author.description": "Author name in generated file headers",
+  "config.generator.entitySuffix.description": "Suffix for entity classes (e.g., UserPO)",
+  "config.generator.mapperSuffix.description": "Suffix for mapper interfaces (e.g., UserMapper)",
+  "config.generator.serviceSuffix.description": "Suffix for service interfaces (e.g., UserService)",
+  "config.generator.useLombok.description": "Generate Lombok annotations (@Data, @Builder, etc.)",
+  "config.generator.useSwagger.description": "Generate Swagger v2 annotations (@ApiModel, @ApiModelProperty)",
+  "config.generator.useSwaggerV3.description": "Generate Swagger v3/OpenAPI annotations (@Schema)",
+  "config.generator.useMyBatisPlus.description": "Generate MyBatis Plus annotations"
 }
