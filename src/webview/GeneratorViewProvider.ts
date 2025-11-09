@@ -63,16 +63,22 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
 
         // Handle messages from webview
         webviewView.webview.onDidReceiveMessage(async data => {
+            console.log('[GeneratorViewProvider] Received message:', data.type);
             switch (data.type) {
                 case 'generate':
+                    console.log('[GeneratorViewProvider] Handling generate request');
                     await this._handleGenerate(data.ddl);
                     break;
                 case 'loadHistory':
+                    console.log('[GeneratorViewProvider] Handling loadHistory request');
                     await this._handleLoadHistory();
                     break;
                 case 'clearHistory':
+                    console.log('[GeneratorViewProvider] Handling clearHistory request');
                     await this._handleClearHistory();
                     break;
+                default:
+                    console.log('[GeneratorViewProvider] Unknown message type:', data.type);
             }
         });
     }
