@@ -6,6 +6,59 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.0] - 2025-11-09
+
+### Added
+
+- ✨ **MyBatis Code Generator WebView**: Interactive UI panel for generating MyBatis code from DDL SQL statements
+  - Generate complete MyBatis boilerplate code (Entity, Mapper interface, XML mapping file, Service class)
+  - Support for MySQL, PostgreSQL, and Oracle DDL parsing
+  - Rich configuration options:
+    - `mybatis-boost.generator.basePackage`: Base package for generated code (e.g., `com.example.mybatis`)
+    - `mybatis-boost.generator.author`: Author name for code comments
+    - `mybatis-boost.generator.entitySuffix`: Entity class suffix (default: `PO`)
+    - `mybatis-boost.generator.mapperSuffix`: Mapper interface suffix (default: `Mapper`)
+    - `mybatis-boost.generator.serviceSuffix`: Service class suffix (default: `Service`)
+    - `mybatis-boost.generator.datetime`: DateTime type mapping (`Date` | `LocalDateTime` | `Instant`)
+    - `mybatis-boost.generator.useLombok`: Enable Lombok annotations (`@Data`, `@Getter`, `@Setter`)
+    - `mybatis-boost.generator.useSwagger`: Enable Swagger 2 annotations (`@ApiModel`, `@ApiModelProperty`)
+    - `mybatis-boost.generator.useSwaggerV3`: Enable Swagger 3 (OpenAPI) annotations
+  - Preview generated code before exporting
+  - One-click export to appropriate directory structure
+  - Generation history tracking with SQL and file previews
+  - Support for table and column comments from DDL
+
+- ✨ **Cursor IDE MCP Integration**: Model Context Protocol support for AI-powered code generation
+  - Automatic IDE detection (VS Code vs Cursor)
+  - Configuration option `mybatis-boost.mcp.enable` to enable/disable MCP features (default: `true`)
+  - Dynamic enable/disable without extension restart
+  - For VS Code: Uses Language Model Tools API (`vscode.lm.registerTool`)
+  - For Cursor IDE: Uses MCP Extension API with stdio server
+  - Four MCP tools available:
+    1. `mybatis_parse_sql_and_generate`: Parse DDL and generate code (in-memory preview)
+    2. `mybatis_export_generated_files`: Export generated files to filesystem
+    3. `mybatis_query_generation_history`: Query generation history with previews
+    4. `mybatis_parse_and_export`: Combined parse and export in one operation
+  - Standalone stdio MCP server for Cursor IDE (`dist/mcp/stdio/server.js`)
+  - Inherits all configuration from `mybatis-boost.generator.*` settings
+
+### Fixed
+
+- 🐛 **JSON-RPC Protocol Compliance**: Fixed stdio MCP server response format for Cursor IDE
+  - Enforce strict `id` field type (`string | number`, never `null`) in all responses
+  - Use sentinel value `-1` for parse errors where request id is unavailable
+  - Proper handling of JSON-RPC notifications (requests without id)
+  - Fixes Zod validation error: "Expected number, received null"
+
+### Technical Details
+
+- Core service layer abstraction (`GeneratorService`, `FileExportService`, `HistoryService`)
+- Dual MCP transport support (Language Model Tools + stdio)
+- Environment variable-based configuration for stdio server
+- File system-based history storage for standalone server
+- esbuild bundling for both extension and stdio server
+- Comprehensive unit tests for all new services
+
 ## [0.1.4] - 2025-01-07
 
 ### Performance Improvements

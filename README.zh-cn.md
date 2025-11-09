@@ -7,6 +7,71 @@ MyBatis 映射器接口（Java）与 XML 映射文件之间的高性能双向导
 ![demo](images/demo.gif)
 ## 功能特性
 
+### 🎯 MyBatis 代码生成器
+
+通过交互式 WebView 面板，从 DDL SQL 语句生成完整的 MyBatis 样板代码。
+
+**生成内容：**
+- **实体类**（POJOs），支持可配置的 Lombok 和 Swagger 注解
+- **Mapper 接口**，包含 CRUD 方法
+- **XML 映射文件**，包含完整的 SQL 语句（insert、update、delete、select）
+- **Service 类**，包含常用业务逻辑
+
+**支持的数据库：**
+- MySQL（AUTO_INCREMENT、ENGINE、COMMENT 语法）
+- PostgreSQL（SERIAL、BIGSERIAL、COMMENT ON 语法）
+- Oracle（VARCHAR2、NUMBER、CLOB、COMMENT ON 语法）
+
+**配置选项**（`mybatis-boost.generator.*`）：
+- `basePackage`：生成代码的基础包名（例如：`com.example.mybatis`）
+- `author`：代码注释中的作者名称（默认：`MyBatis Boost`）
+- `entitySuffix`：实体类后缀（默认：`PO`）
+- `mapperSuffix`：Mapper 接口后缀（默认：`Mapper`）
+- `serviceSuffix`：Service 类后缀（默认：`Service`）
+- `datetime`：日期时间类型映射 - `Date` | `LocalDateTime` | `Instant`（默认：`Date`）
+- `useLombok`：启用 Lombok 注解 `@Data`、`@Getter`、`@Setter`（默认：`true`）
+- `useSwagger`：启用 Swagger 2 注解 `@ApiModel`、`@ApiModelProperty`（默认：`false`）
+- `useSwaggerV3`：启用 Swagger 3 (OpenAPI) 注解（默认：`false`）
+
+**功能特性：**
+- **导出前预览**：在 WebView 面板中查看所有生成的代码
+- **一键导出**：自动创建正确的目录结构
+- **生成历史**：跟踪所有生成的代码，包含 SQL 和文件预览
+- **智能类型映射**：将 SQL 类型转换为适当的 Java 类型（例如：`BIGINT` → `Long`、`VARCHAR` → `String`）
+- **注释保留**：从 DDL 中提取表和列注释到 Javadoc
+- **灵活输出**：根据项目需要选择是否使用 Lombok/Swagger
+
+**使用示例：**
+```sql
+CREATE TABLE user_info (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '用户 ID',
+    username VARCHAR(50) NOT NULL COMMENT '用户名',
+    email VARCHAR(100) COMMENT '邮箱地址',
+    created_at DATETIME COMMENT '创建时间'
+) ENGINE=InnoDB COMMENT='用户信息表';
+```
+
+这将生成：
+- `UserInfoPO.java` - 实体类，带 Lombok `@Data` 注解
+- `UserInfoMapper.java` - Mapper 接口，包含 CRUD 方法
+- `UserInfoMapper.xml` - XML 文件，包含 insert/update/delete/select 语句
+- `UserInfoService.java` - Service 类，包含常用操作
+
+**AI 集成（Cursor IDE / VS Code Copilot）：**
+
+MyBatis Boost 提供**模型上下文协议（MCP）**支持，用于 AI 驱动的代码生成：
+
+- **自动 IDE 检测**：与 VS Code Copilot 和 Cursor IDE 无缝协作
+- **四个 MCP 工具**可供 AI 助手使用：
+  1. `mybatis_parse_sql_and_generate` - 解析 DDL 并生成代码（仅预览）
+  2. `mybatis_export_generated_files` - 将生成的文件导出到文件系统
+  3. `mybatis_query_generation_history` - 查询过去的生成记录
+  4. `mybatis_parse_and_export` - 组合的解析和导出操作
+- **配置**：使用 `mybatis-boost.mcp.enable` 启用/禁用（默认：`true`）
+- **动态更新**：更改立即生效，无需重启
+
+对于 Cursor IDE 用户，扩展会自动注册一个 stdio MCP 服务器，用于 AI 工具集成。
+
 ### 🚀 10 种跳转到定义的导航方式
 
 **Java ↔ XML 双向导航：**

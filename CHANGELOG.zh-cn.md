@@ -6,6 +6,59 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.2.0] - 2025-11-09
+
+### 新增
+
+- ✨ **MyBatis 代码生成器 WebView**：交互式 UI 面板，用于从 DDL SQL 语句生成 MyBatis 代码
+  - 生成完整的 MyBatis 样板代码（实体类、Mapper 接口、XML 映射文件、Service 类）
+  - 支持 MySQL、PostgreSQL 和 Oracle DDL 解析
+  - 丰富的配置选项：
+    - `mybatis-boost.generator.basePackage`：生成代码的基础包名（例如：`com.example.mybatis`）
+    - `mybatis-boost.generator.author`：代码注释中的作者名称
+    - `mybatis-boost.generator.entitySuffix`：实体类后缀（默认：`PO`）
+    - `mybatis-boost.generator.mapperSuffix`：Mapper 接口后缀（默认：`Mapper`）
+    - `mybatis-boost.generator.serviceSuffix`：Service 类后缀（默认：`Service`）
+    - `mybatis-boost.generator.datetime`：日期时间类型映射（`Date` | `LocalDateTime` | `Instant`）
+    - `mybatis-boost.generator.useLombok`：启用 Lombok 注解（`@Data`、`@Getter`、`@Setter`）
+    - `mybatis-boost.generator.useSwagger`：启用 Swagger 2 注解（`@ApiModel`、`@ApiModelProperty`）
+    - `mybatis-boost.generator.useSwaggerV3`：启用 Swagger 3 (OpenAPI) 注解
+  - 导出前预览生成的代码
+  - 一键导出到适当的目录结构
+  - 生成历史记录跟踪，包含 SQL 和文件预览
+  - 支持从 DDL 中提取表和列注释
+
+- ✨ **Cursor IDE MCP 集成**：模型上下文协议支持，用于 AI 驱动的代码生成
+  - 自动 IDE 检测（VS Code vs Cursor）
+  - 配置选项 `mybatis-boost.mcp.enable` 用于启用/禁用 MCP 功能（默认：`true`）
+  - 无需重启扩展即可动态启用/禁用
+  - VS Code：使用 Language Model Tools API (`vscode.lm.registerTool`)
+  - Cursor IDE：使用 MCP Extension API 和 stdio 服务器
+  - 提供四个 MCP 工具：
+    1. `mybatis_parse_sql_and_generate`：解析 DDL 并生成代码（内存预览）
+    2. `mybatis_export_generated_files`：将生成的文件导出到文件系统
+    3. `mybatis_query_generation_history`：查询生成历史记录和预览
+    4. `mybatis_parse_and_export`：一次操作完成解析和导出
+  - Cursor IDE 独立 stdio MCP 服务器 (`dist/mcp/stdio/server.js`)
+  - 继承所有 `mybatis-boost.generator.*` 配置
+
+### 修复
+
+- 🐛 **JSON-RPC 协议合规性**：修复 Cursor IDE 的 stdio MCP 服务器响应格式
+  - 在所有响应中强制使用严格的 `id` 字段类型（`string | number`，永不为 `null`）
+  - 对于无法获取请求 id 的解析错误，使用哨兵值 `-1`
+  - 正确处理 JSON-RPC 通知（无 id 的请求）
+  - 修复 Zod 验证错误："Expected number, received null"
+
+### 技术细节
+
+- 核心服务层抽象（`GeneratorService`、`FileExportService`、`HistoryService`）
+- 双 MCP 传输支持（Language Model Tools + stdio）
+- stdio 服务器基于环境变量的配置
+- 独立服务器基于文件系统的历史记录存储
+- esbuild 同时打包扩展和 stdio 服务器
+- 为所有新服务提供全面的单元测试
+
 ## [0.1.4] - 2025-01-07
 
 ### 性能优化
