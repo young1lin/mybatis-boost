@@ -93,19 +93,19 @@ export function parseWithRegex(
     // Extract table-level comment based on database type
     let tableComment: string | undefined;
 
-    if (dbType === 'oracle') {
-      // Oracle: Extract from COMMENT ON TABLE statement
-      const commentMetadata = extractOracleComments(sql, tableName);
+    if (dbType === 'oracle' || dbType === 'postgresql') {
+      // Oracle/PostgreSQL: Extract from COMMENT ON TABLE/COLUMN statements
+      const commentMetadata = extractExternalComments(sql, tableName);
       tableComment = commentMetadata.tableComment;
 
-      // Merge Oracle COMMENT ON COLUMN statements with inline comments
+      // Merge COMMENT ON COLUMN statements with inline comments
       for (const column of columns) {
         if (!column.comment && commentMetadata.columnComments[column.columnName]) {
           column.comment = commentMetadata.columnComments[column.columnName];
         }
       }
-    } else if (dbType === 'mysql' || dbType === 'postgresql') {
-      // MySQL/PostgreSQL: Extract table comment from table options
+    } else if (dbType === 'mysql') {
+      // MySQL: Extract table comment from table options
       tableComment = extractTableComment(sql);
     }
 
@@ -254,12 +254,13 @@ function extractTableComment(sql: string): string | undefined {
 }
 
 /**
- * Extract Oracle COMMENT ON TABLE and COMMENT ON COLUMN statements
+ * Extract COMMENT ON TABLE and COMMENT ON COLUMN statements (PostgreSQL/Oracle)
+ * Both PostgreSQL and Oracle use the same syntax: COMMENT ON COLUMN table.column IS 'comment'
  * @param sql - Full DDL SQL (may contain multiple statements)
  * @param tableName - Table name to extract comments for
  * @returns Object containing table comment and column comments
  */
-function extractOracleComments(
+function extractExternalComments(
   sql: string,
   tableName: string
 ): { tableComment?: string; columnComments: Record<string, string> } {

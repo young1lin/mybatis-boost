@@ -249,15 +249,16 @@ describe('DDL Parser', () => {
       assert.strictEqual(dataCol.javaType, 'byte[]');
     });
 
-    it('should extract PostgreSQL table comment from inline COMMENT', () => {
-      const tableComment = "User session data";
+    it('should parse PostgreSQL table without inline COMMENT support', () => {
+      // PostgreSQL does not support inline COMMENT='...' syntax (MySQL-specific)
+      // Use COMMENT ON TABLE instead
       const sql = `
         CREATE TABLE sessions (
           session_id SERIAL PRIMARY KEY,
           user_id INT NOT NULL,
           token VARCHAR(255),
           expires_at TIMESTAMP
-        ) COMMENT='${tableComment}'
+        )
       `;
 
       const result = parseDDL(sql, { dbType: 'postgresql' });
@@ -265,7 +266,7 @@ describe('DDL Parser', () => {
       assert.strictEqual(result.success, true);
       assert.ok(result.data);
       assert.strictEqual(result.data.tableName, 'sessions');
-      assert.strictEqual(result.data.comment, tableComment);
+      assert.strictEqual(result.data.comment, undefined); // No comment since inline COMMENT not supported
     });
 
     it('should extract PostgreSQL column comments', () => {
@@ -295,22 +296,22 @@ describe('DDL Parser', () => {
       assert.strictEqual(dateCol.comment, 'Event timestamp');
     });
 
-    it('should extract both PostgreSQL table and column comments', () => {
-      const tableComment = "Product catalog";
+    it('should extract PostgreSQL inline column comments', () => {
+      // PostgreSQL regex parser supports inline COMMENT as fallback (non-standard)
       const sql = `
         CREATE TABLE products (
           product_id BIGSERIAL PRIMARY KEY COMMENT 'Product ID',
           product_name VARCHAR(200) NOT NULL COMMENT 'Product name',
           price NUMERIC(10,2) COMMENT 'Product price',
           created_at TIMESTAMP COMMENT 'Creation time'
-        ) COMMENT='${tableComment}'
+        )
       `;
 
       const result = parseDDL(sql, { dbType: 'postgresql' });
 
       assert.strictEqual(result.success, true);
       assert.ok(result.data);
-      assert.strictEqual(result.data.comment, tableComment);
+      assert.strictEqual(result.data.comment, undefined); // Inline table COMMENT not supported
 
       const idCol = result.data.columns.find(c => c.columnName === 'product_id');
       assert.ok(idCol);
@@ -323,6 +324,133 @@ describe('DDL Parser', () => {
       const priceCol = result.data.columns.find(c => c.columnName === 'price');
       assert.ok(priceCol);
       assert.strictEqual(priceCol.comment, 'Product price');
+    });
+
+    it('should extract PostgreSQL column comments from COMMENT ON COLUMN statements', () => {
+      const sql = `
+        BEGIN;
+
+        CREATE TABLE orders (
+          order_id BIGSERIAL PRIMARY KEY,
+          order_no VARCHAR(64) NOT NULL UNIQUE,
+          user_id BIGINT NOT NULL,
+          product_id BIGINT NOT NULL,
+          product_name VARCHAR(255) NOT NULL,
+          product_price DECIMAL(10, 2) NOT NULL,
+          quantity INT NOT NULL DEFAULT 1,
+          total_amount DECIMAL(10, 2) NOT NULL,
+          discount_amount DECIMAL(10, 2) DEFAULT 0.00,
+          actual_amount DECIMAL(10, 2) NOT NULL,
+          order_status SMALLINT NOT NULL DEFAULT 0,
+          payment_method SMALLINT,
+          payment_time TIMESTAMP,
+          shipping_address VARCHAR(500),
+          receiver_name VARCHAR(100),
+          receiver_phone VARCHAR(20),
+          remark TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          deleted_at TIMESTAMP
+        );
+
+        COMMENT ON COLUMN orders.order_id IS '订单主键ID';
+        COMMENT ON COLUMN orders.order_no IS '订单编号';
+        COMMENT ON COLUMN orders.user_id IS '用户ID';
+        COMMENT ON COLUMN orders.product_name IS '商品名称';
+        COMMENT ON COLUMN orders.quantity IS '购买数量';
+        COMMENT ON COLUMN orders.discount_amount IS '优惠金额';
+        COMMENT ON COLUMN orders.order_status IS '订单状态：0-待支付 1-已支付 2-已发货 3-已完成 4-已取消';
+        COMMENT ON COLUMN orders.payment_time IS '支付时间';
+        COMMENT ON COLUMN orders.receiver_name IS '收货人姓名';
+        COMMENT ON COLUMN orders.remark IS '订单备注';
+
+        COMMIT;
+      `;
+
+      const result = parseDDL(sql, { dbType: 'postgresql' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.tableName, 'orders');
+
+      const orderIdCol = result.data.columns.find(c => c.columnName === 'order_id');
+      assert.ok(orderIdCol);
+      assert.strictEqual(orderIdCol.comment, '订单主键ID');
+
+      const orderNoCol = result.data.columns.find(c => c.columnName === 'order_no');
+      assert.ok(orderNoCol);
+      assert.strictEqual(orderNoCol.comment, '订单编号');
+
+      const userIdCol = result.data.columns.find(c => c.columnName === 'user_id');
+      assert.ok(userIdCol);
+      assert.strictEqual(userIdCol.comment, '用户ID');
+
+      const productNameCol = result.data.columns.find(c => c.columnName === 'product_name');
+      assert.ok(productNameCol);
+      assert.strictEqual(productNameCol.comment, '商品名称');
+
+      const quantityCol = result.data.columns.find(c => c.columnName === 'quantity');
+      assert.ok(quantityCol);
+      assert.strictEqual(quantityCol.comment, '购买数量');
+
+      const discountCol = result.data.columns.find(c => c.columnName === 'discount_amount');
+      assert.ok(discountCol);
+      assert.strictEqual(discountCol.comment, '优惠金额');
+
+      const statusCol = result.data.columns.find(c => c.columnName === 'order_status');
+      assert.ok(statusCol);
+      assert.strictEqual(statusCol.comment, '订单状态：0-待支付 1-已支付 2-已发货 3-已完成 4-已取消');
+
+      const paymentTimeCol = result.data.columns.find(c => c.columnName === 'payment_time');
+      assert.ok(paymentTimeCol);
+      assert.strictEqual(paymentTimeCol.comment, '支付时间');
+
+      const receiverNameCol = result.data.columns.find(c => c.columnName === 'receiver_name');
+      assert.ok(receiverNameCol);
+      assert.strictEqual(receiverNameCol.comment, '收货人姓名');
+
+      const remarkCol = result.data.columns.find(c => c.columnName === 'remark');
+      assert.ok(remarkCol);
+      assert.strictEqual(remarkCol.comment, '订单备注');
+
+      // Verify columns without comments have undefined comment
+      const productIdCol = result.data.columns.find(c => c.columnName === 'product_id');
+      assert.ok(productIdCol);
+      assert.strictEqual(productIdCol.comment, undefined);
+    });
+
+    it('should extract both PostgreSQL table and column comments from COMMENT ON statements', () => {
+      const sql = `
+        CREATE TABLE users (
+          user_id SERIAL PRIMARY KEY,
+          username VARCHAR(50) NOT NULL,
+          email VARCHAR(100)
+        );
+
+        COMMENT ON TABLE users IS 'User accounts table';
+        COMMENT ON COLUMN users.user_id IS 'User ID';
+        COMMENT ON COLUMN users.username IS 'Login username';
+        COMMENT ON COLUMN users.email IS 'Email address';
+      `;
+
+      const result = parseDDL(sql, { dbType: 'postgresql' });
+
+      assert.strictEqual(result.success, true);
+      assert.ok(result.data);
+      assert.strictEqual(result.data.tableName, 'users');
+      assert.strictEqual(result.data.comment, 'User accounts table');
+
+      const userIdCol = result.data.columns.find(c => c.columnName === 'user_id');
+      assert.ok(userIdCol);
+      assert.strictEqual(userIdCol.comment, 'User ID');
+
+      const usernameCol = result.data.columns.find(c => c.columnName === 'username');
+      assert.ok(usernameCol);
+      assert.strictEqual(usernameCol.comment, 'Login username');
+
+      const emailCol = result.data.columns.find(c => c.columnName === 'email');
+      assert.ok(emailCol);
+      assert.strictEqual(emailCol.comment, 'Email address');
     });
   });
 
