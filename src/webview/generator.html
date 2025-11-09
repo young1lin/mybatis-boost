@@ -356,8 +356,15 @@ CREATE TABLE user_info (
 
         // Clear history button - confirm and clear all history
         clearHistoryBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to clear all history records? This action cannot be undone.')) {
+            console.log('[WebView] Clear History button clicked');
+            const confirmed = confirm('Are you sure you want to clear all history records? This action cannot be undone.');
+            console.log('[WebView] Confirmation result:', confirmed);
+            if (confirmed) {
+                console.log('[WebView] Sending clearHistory message');
                 vscode.postMessage({ type: 'clearHistory' });
+                console.log('[WebView] clearHistory message sent');
+            } else {
+                console.log('[WebView] User cancelled clear history');
             }
         });
 

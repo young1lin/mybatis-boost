@@ -192,15 +192,23 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
      * Clear all history records
      */
     private async _handleClearHistory() {
+        console.log('[GeneratorViewProvider] _handleClearHistory called');
+        console.log('[GeneratorViewProvider] Current history before clear:', this._getHistory());
+
         await this._context.globalState.update(HISTORY_STORAGE_KEY, []);
+        console.log('[GeneratorViewProvider] GlobalState updated to empty array');
+
+        console.log('[GeneratorViewProvider] History after clear:', this._getHistory());
 
         // Notify webview that history was cleared
         this._view?.webview.postMessage({
             type: 'historyCleared'
         });
+        console.log('[GeneratorViewProvider] Sent historyCleared message to webview');
 
         // Show success message to user
         vscode.window.showInformationMessage('History cleared successfully');
+        console.log('[GeneratorViewProvider] Showed success notification');
     }
 
     /**
