@@ -604,17 +604,25 @@ CREATE TABLE user_info (
         // Export button - save files
         exportBtn.addEventListener('click', () => {
             if (!currentPreviewResults) {
+                console.log('[WebView Export] No preview results!');
                 return;
             }
+
+            console.log('[WebView Export] Current preview results:', currentPreviewResults);
+            console.log('[WebView Export] Is array:', Array.isArray(currentPreviewResults));
+            console.log('[WebView Export] Length:', currentPreviewResults.length);
 
             closePreview();
             showStatus('success', '⏳', 'Exporting files...');
 
-            vscode.postMessage({
+            const exportData = {
                 type: 'export',
                 ddl: ddlInput.value.trim(),
                 results: currentPreviewResults
-            });
+            };
+
+            console.log('[WebView Export] Sending message:', exportData);
+            vscode.postMessage(exportData);
         });
 
         // Close modal when clicking overlay

@@ -68,6 +68,9 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
                     await this._handlePreview(data.ddl);
                     break;
                 case 'export':
+                    console.log('[Export] Received data:', JSON.stringify(data, null, 2));
+                    console.log('[Export] Results type:', typeof data.results);
+                    console.log('[Export] Results is array:', Array.isArray(data.results));
                     await this._handleExport(data.ddl, data.results);
                     break;
                 case 'loadHistory':
@@ -161,8 +164,13 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
     /**
      * Handle export request - write files and save to history
      */
-    private async _handleExport(ddl: string, results: GenerateReuslt[]) {
+    private async _handleExport(ddl: string, results: any) {
         try {
+            // Ensure results is an array
+            if (!results || !Array.isArray(results)) {
+                throw new Error('Invalid results format: expected an array');
+            }
+
             // Write files to disk
             for (const result of results) {
                 await fs.promises.writeFile(result.outputPath, result.content, 'utf-8');
@@ -175,7 +183,7 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             this._view?.webview.postMessage({
                 type: 'exportResult',
                 success: true,
-                results: results.map(r => ({
+                results: results.map((r: GenerateReuslt) => ({
                     name: r.name,
                     outputPath: r.outputPath,
                     type: r.type
