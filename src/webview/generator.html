@@ -334,17 +334,9 @@ CREATE TABLE user_info (
         const resultMessage = document.getElementById('resultMessage');
         const resultFiles = document.getElementById('resultFiles');
 
-        console.log('[WebView] Elements loaded:', {
-            newBtn: !!newBtn,
-            historyBtn: !!historyBtn,
-            clearHistoryBtn: !!clearHistoryBtn,
-            generateBtn: !!generateBtn
-        });
-
         let historyVisible = false;
 
         // New button - clear input and start new session
-        console.log('[WebView] Adding event listener for newBtn');
         newBtn.addEventListener('click', () => {
             ddlInput.value = '';
             resultSection.classList.remove('visible');
@@ -352,7 +344,6 @@ CREATE TABLE user_info (
         });
 
         // History button - toggle history section
-        console.log('[WebView] Adding event listener for historyBtn');
         historyBtn.addEventListener('click', () => {
             historyVisible = !historyVisible;
             if (historyVisible) {
@@ -364,15 +355,11 @@ CREATE TABLE user_info (
         });
 
         // Clear history button - send request to backend for confirmation
-        console.log('[WebView] Adding event listener for clearHistoryBtn');
         clearHistoryBtn.addEventListener('click', () => {
-            console.log('[WebView] Clear History button clicked');
-            console.log('[WebView] Sending clearHistory message (backend will confirm)');
             vscode.postMessage({ type: 'clearHistory' });
         });
 
         // Generate button - trigger code generation
-        console.log('[WebView] Adding event listener for generateBtn');
         generateBtn.addEventListener('click', () => {
             const ddl = ddlInput.value.trim();
             if (!ddl) {

@@ -63,22 +63,16 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
 
         // Handle messages from webview
         webviewView.webview.onDidReceiveMessage(async data => {
-            console.log('[GeneratorViewProvider] Received message:', data.type);
             switch (data.type) {
                 case 'generate':
-                    console.log('[GeneratorViewProvider] Handling generate request');
                     await this._handleGenerate(data.ddl);
                     break;
                 case 'loadHistory':
-                    console.log('[GeneratorViewProvider] Handling loadHistory request');
                     await this._handleLoadHistory();
                     break;
                 case 'clearHistory':
-                    console.log('[GeneratorViewProvider] Handling clearHistory request');
                     await this._handleClearHistory();
                     break;
-                default:
-                    console.log('[GeneratorViewProvider] Unknown message type:', data.type);
             }
         });
     }
@@ -192,9 +186,6 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
      * Clear all history records
      */
     private async _handleClearHistory() {
-        console.log('[GeneratorViewProvider] _handleClearHistory called');
-        console.log('[GeneratorViewProvider] Current history before clear:', this._getHistory());
-
         // Show confirmation dialog (VS Code native, not blocked by sandbox)
         const confirmed = await vscode.window.showWarningMessage(
             'Are you sure you want to clear all history records? This action cannot be undone.',
@@ -202,27 +193,19 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             'Clear History'
         );
 
-        console.log('[GeneratorViewProvider] User confirmation result:', confirmed);
-
         if (confirmed !== 'Clear History') {
-            console.log('[GeneratorViewProvider] User cancelled clear history');
             return;
         }
 
         await this._context.globalState.update(HISTORY_STORAGE_KEY, []);
-        console.log('[GeneratorViewProvider] GlobalState updated to empty array');
-
-        console.log('[GeneratorViewProvider] History after clear:', this._getHistory());
 
         // Notify webview that history was cleared
         this._view?.webview.postMessage({
             type: 'historyCleared'
         });
-        console.log('[GeneratorViewProvider] Sent historyCleared message to webview');
 
         // Show success message to user
         vscode.window.showInformationMessage('History cleared successfully');
-        console.log('[GeneratorViewProvider] Showed success notification');
     }
 
     /**
