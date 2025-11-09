@@ -69,7 +69,7 @@ jobs:
           OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
 
       - name: Publish to Open VSX Registry
-        run: ovsx publish ${{ steps.get_vsix.outputs.vsix_file }} -p ${{ secrets.OPEN_VSX_TOKEN }}
+        run: vsce publish --packagePath ${{ steps.get_vsix.outputs.vsix_file }} -p ${{ secrets.VSCE_PAT }}
         env:
           OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
         # Note: Extensions will show as "unverified" until namespace ownership is claimed
