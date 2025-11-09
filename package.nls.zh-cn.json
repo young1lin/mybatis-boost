@@ -21,5 +21,6 @@
   "config.generator.useLombok.description": "生成 Lombok 注解（@Data、@Builder 等）",
   "config.generator.useSwagger.description": "生成 Swagger v2 注解（@ApiModel、@ApiModelProperty）",
   "config.generator.useSwaggerV3.description": "生成 Swagger v3/OpenAPI 注解（@Schema）",
-  "config.generator.useMyBatisPlus.description": "生成 MyBatis Plus 注解"
+  "config.generator.useMyBatisPlus.description": "生成 MyBatis Plus 注解",
+  "config.mcp.enable.description": "启用 MCP 服务器进行代码生成"
 }

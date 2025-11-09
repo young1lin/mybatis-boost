@@ -21,5 +21,6 @@
   "config.generator.useLombok.description": "Generate Lombok annotations (@Data, @Builder, etc.)",
   "config.generator.useSwagger.description": "Generate Swagger v2 annotations (@ApiModel, @ApiModelProperty)",
   "config.generator.useSwaggerV3.description": "Generate Swagger v3/OpenAPI annotations (@Schema)",
-  "config.generator.useMyBatisPlus.description": "Generate MyBatis Plus annotations"
+  "config.generator.useMyBatisPlus.description": "Generate MyBatis Plus annotations",
+  "config.mcp.enable.description": "Enable MCP server for code generation"
 }
