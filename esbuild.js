@@ -26,33 +26,51 @@ const esbuildProblemMatcherPlugin = {
 };
 
 /**
- * Plugin to copy EJS template files to dist directory
+ * Plugin to copy resource files to dist directory
+ * Copies EJS templates and HTML files
  * @type {import('esbuild').Plugin}
  */
-const copyTemplatesPlugin = {
-	name: 'copy-templates',
+const copyResourcesPlugin = {
+	name: 'copy-resources',
 
 	setup(build) {
 		build.onEnd(() => {
+			let filesCopied = 0;
+
 			// Copy EJS templates from src/generator/template to dist/generator/template
 			const srcTemplateDir = path.join(__dirname, 'src', 'generator', 'template');
 			const distTemplateDir = path.join(__dirname, 'dist', 'generator', 'template');
 
-			// Create dist/generator/template directory if it doesn't exist
 			if (!fs.existsSync(distTemplateDir)) {
 				fs.mkdirSync(distTemplateDir, { recursive: true });
 			}
 
-			// Copy all .ejs files
 			const templateFiles = fs.readdirSync(srcTemplateDir).filter(file => file.endsWith('.ejs'));
 			templateFiles.forEach(file => {
 				const srcPath = path.join(srcTemplateDir, file);
 				const distPath = path.join(distTemplateDir, file);
 				fs.copyFileSync(srcPath, distPath);
+				filesCopied++;
 			});
 
-			if (templateFiles.length > 0) {
-				console.log(`[templates] Copied ${templateFiles.length} EJS template files to dist`);
+			// Copy HTML files from src/webview to dist/webview
+			const srcWebviewDir = path.join(__dirname, 'src', 'webview');
+			const distWebviewDir = path.join(__dirname, 'dist', 'webview');
+
+			if (!fs.existsSync(distWebviewDir)) {
+				fs.mkdirSync(distWebviewDir, { recursive: true });
+			}
+
+			const htmlFiles = fs.readdirSync(srcWebviewDir).filter(file => file.endsWith('.html'));
+			htmlFiles.forEach(file => {
+				const srcPath = path.join(srcWebviewDir, file);
+				const distPath = path.join(distWebviewDir, file);
+				fs.copyFileSync(srcPath, distPath);
+				filesCopied++;
+			});
+
+			if (filesCopied > 0) {
+				console.log(`[resources] Copied ${filesCopied} resource files to dist (${templateFiles.length} EJS, ${htmlFiles.length} HTML)`);
 			}
 		});
 	},
@@ -73,7 +91,7 @@ async function main() {
 		external: ['vscode'],
 		logLevel: 'silent',
 		plugins: [
-			copyTemplatesPlugin,
+			copyResourcesPlugin,
 			/* add to the end of plugins array */
 			esbuildProblemMatcherPlugin,
 		],
