@@ -644,6 +644,18 @@ CREATE TABLE user_info (
             <div class="modal-body" id="settingsBody">
                 <form id="settingsForm">
                     <div class="form-section">
+                        <h3>Configuration Scope</h3>
+                        <div class="form-group">
+                            <label for="configScope">Save Settings To</label>
+                            <select id="configScope" name="configScope" required>
+                                <option value="workspace">Project (Workspace)</option>
+                                <option value="global">Global (User)</option>
+                            </select>
+                            <small>Project settings are saved to .vscode/settings.json. Global settings apply to all projects.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
                         <h3>Package Configuration</h3>
                         <div class="form-group">
                             <label for="basePackage">Base Package</label>
@@ -816,9 +828,12 @@ CREATE TABLE user_info (
                 useMyBatisPlus: document.getElementById('useMyBatisPlus').checked
             };
 
+            const configScope = formData.get('configScope');
+
             vscode.postMessage({
                 type: 'saveSettings',
-                settings: settings
+                settings: settings,
+                configScope: configScope
             });
 
             closeSettings();
@@ -836,7 +851,7 @@ CREATE TABLE user_info (
             settingsModal.classList.remove('visible');
         }
 
-        function loadSettingsToForm(settings) {
+        function loadSettingsToForm(settings, configScope) {
             if (!settings) {
                 // Load defaults
                 settings = {
@@ -854,6 +869,9 @@ CREATE TABLE user_info (
             }
 
             currentSettings = settings;
+
+            // Set configuration scope (default to workspace)
+            document.getElementById('configScope').value = configScope || 'workspace';
 
             document.getElementById('basePackage').value = settings.basePackage || '';
             document.getElementById('author').value = settings.author || '';
@@ -1010,7 +1028,7 @@ CREATE TABLE user_info (
                     break;
 
                 case 'settingsLoaded':
-                    loadSettingsToForm(message.settings);
+                    loadSettingsToForm(message.settings, message.configScope);
                     break;
             }
         });

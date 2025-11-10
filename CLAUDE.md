@@ -123,12 +123,30 @@ interface MappingMetadata {
 
 ### Important Configuration
 
-Settings in `package.json` that affect behavior:
+**Navigation Settings** in `package.json`:
 - `mybatis-boost.cacheSize` (default: 5000): LRU cache size
 - `mybatis-boost.customXmlDirectories` (default: []): Custom XML search paths (Priority 1)
 - `mybatis-boost.javaParseLines` (default: 100): Lines to read for namespace extraction
 - `mybatis-boost.showBindingIcons` (default: true): Show gutter icons for Java-XML bindings
 - `mybatis-boost.useDefinitionProvider` (default: false): Use DefinitionProvider for Java→XML (when false, uses CodeLens instead)
+
+**Generator Settings** (`mybatis-boost.generator.*`):
+- `basePackage` (default: "com.example.mybatis"): Base package for generated code
+- `author` (default: "MyBatis Boost"): Author name for code comments
+- `entitySuffix` (default: "PO"): Entity class suffix
+- `mapperSuffix` (default: "Mapper"): Mapper interface suffix
+- `serviceSuffix` (default: "Service"): Service class suffix
+- `datetime` (default: "LocalDateTime"): DateTime type mapping (Date | LocalDateTime | Instant)
+- `useLombok` (default: true): Enable Lombok annotations
+- `useSwagger` (default: false): Enable Swagger 2 annotations
+- `useSwaggerV3` (default: false): Enable Swagger 3 (OpenAPI) annotations
+- `useMyBatisPlus` (default: false): Enable MyBatis Plus annotations
+
+**Configuration Scope**:
+- Generator settings support **project-level** (workspace) and **global-level** (user) configurations
+- Project settings saved to `.vscode/settings.json` take priority over global settings
+- Configuration priority: Project > Global > Default
+- Each project can have independent generator configurations
 
 ### Extension Activation
 
@@ -201,6 +219,132 @@ File searches automatically skip: `node_modules`, `target`, `.git`, `.vscode`, `
 - Icons appear in both Java and XML files
 - Automatically updates when files change
 - Can be disabled via `mybatis-boost.showBindingIcons` setting
+
+### MyBatis Code Generator
+
+**Location**: `src/webview/GeneratorViewProvider.ts`, `src/generator/`
+
+**Overview**:
+The code generator provides an interactive WebView panel for generating MyBatis boilerplate code from DDL SQL statements. It supports MySQL, PostgreSQL, and Oracle DDL parsing and generates Entity classes, Mapper interfaces, XML mapping files, and Service classes.
+
+**Key Components**:
+- `GeneratorViewProvider.ts`: WebView provider managing the sidebar panel
+- `generator/ddlParser.ts`: Parses DDL statements and extracts table metadata
+- `generator/template/templateGenerator.ts`: Generates code from templates using EJS
+- `generator/vscodeHelper.ts`: Helper functions for VS Code integration
+- `webview/generator.html`: Interactive UI for the generator
+
+**Architecture**:
+```
+GeneratorViewProvider
+  ├── WebView (generator.html)
+  │   ├── DDL Input Textarea
+  │   ├── Settings Modal (with Configuration Scope Selector)
+  │   ├── Preview Modal
+  │   └── History Section
+  ├── DDL Parser (parseDDLWithConfig)
+  ├── Code Generator (CodeGenerator)
+  │   ├── generateEntity()
+  │   ├── generateMapper()
+  │   ├── generateMapperXml()
+  │   └── generateService()
+  └── Configuration Manager
+      ├── _getSettings()
+      ├── _handleSaveSettings()
+      ├── _getConfigurationScope()
+      └── _handleLoadSettings()
+```
+
+**Workflow**:
+1. User pastes DDL statement into WebView
+2. Click "Preview" → Parse DDL → Generate code (in-memory)
+3. Show preview in modal with syntax-highlighted code
+4. Click "Export" → Write files to disk → Save to history
+5. History stored in GlobalState for persistence
+
+### Project-Level Configuration Support (v0.2.2)
+
+**Location**: `src/webview/GeneratorViewProvider.ts` (lines 337-418)
+
+**Problem Solved**:
+Previously, all generator settings were saved globally, causing conflicts when working on multiple projects with different configuration requirements.
+
+**Solution Architecture**:
+
+**1. Configuration Scope Detection** (`_getConfigurationScope()`):
+```typescript
+private _getConfigurationScope(): string {
+    // Returns 'workspace' or 'global' based on:
+    // 1. Workspace folder existence check
+    // 2. Inspection of workspace-level config values
+    // 3. Default to 'workspace' if workspace exists
+}
+```
+
+**2. Configuration Saving** (`_handleSaveSettings()`):
+```typescript
+private async _handleSaveSettings(data: { settings: SettingsConfig; configScope?: string }) {
+    // Determines target: ConfigurationTarget.Workspace or ConfigurationTarget.Global
+    // Automatic fallback to Global if workspace unavailable
+    // Shows warning message when fallback occurs
+}
+```
+
+**3. Configuration Loading** (`_handleLoadSettings()`):
+```typescript
+private async _handleLoadSettings() {
+    const settings = this._getSettings();  // VS Code auto-merges: Project > Global > Default
+    const configScope = this._getConfigurationScope();  // Detect current scope
+    // Send both to webview for UI display
+}
+```
+
+**WebView Integration**:
+- Added configuration scope selector dropdown in settings modal
+- Options: "Project (Workspace)" or "Global (User)"
+- Intelligent default selection based on existing configuration
+- Clear description: "Project settings are saved to .vscode/settings.json"
+
+**Configuration Priority Flow**:
+```
+User modifies settings in WebView
+  ↓
+Clicks "Save Settings"
+  ↓
+configScope selected: 'workspace' or 'global'
+  ↓
+_handleSaveSettings() determines target
+  ↓
+  ├─ If 'workspace' selected:
+  │    ├─ Check workspace exists → save to ConfigurationTarget.Workspace
+  │    └─ No workspace → fallback to ConfigurationTarget.Global (show warning)
+  └─ If 'global' selected:
+       └─ Save to ConfigurationTarget.Global
+
+When reading configuration:
+  ↓
+VS Code's built-in priority system applies:
+  ↓
+Project (.vscode/settings.json) > Global (user settings) > Default (package.json)
+```
+
+**Key Implementation Details**:
+- **No breaking changes**: Existing global configurations continue to work
+- **Automatic detection**: Extension detects which scope is active on load
+- **Fallback mechanism**: Gracefully handles missing workspace scenario
+- **Immediate effect**: No restart required when switching configuration scopes
+- **Per-project isolation**: Each project can have completely independent settings
+
+**Testing**:
+- 6 comprehensive unit tests in `src/test/unit/GeneratorViewProvider.test.ts`
+- Tests cover: workspace detection, global fallback, scope selection, priority rules
+- All 106 unit tests pass
+
+**Benefits**:
+1. **Project Independence**: Different projects can use different author names, package structures, etc.
+2. **Team Collaboration**: Project-level configs can be committed to version control
+3. **No Conflicts**: Global settings serve as defaults without interfering with project-specific needs
+4. **Flexibility**: Users can choose to override project settings with global settings if needed
 
 ## Development Guidelines
 

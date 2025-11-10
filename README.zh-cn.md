@@ -38,6 +38,12 @@ MyBatis 映射器接口（Java）与 XML 映射文件之间的高性能双向导
 - `useSwagger`：启用 Swagger 2 注解 `@ApiModel`、`@ApiModelProperty`（默认：`false`）
 - `useSwaggerV3`：启用 Swagger 3 (OpenAPI) 注解（默认：`false`）
 
+**配置范围：**
+- 设置可以保存在**项目级别**（`.vscode/settings.json`）或**全局级别**（用户设置）
+- 在设置对话框中使用**配置范围选择器**选择保存位置
+- 项目级别设置优先于全局设置
+- 每个项目可以拥有独立的配置，防止冲突
+
 **功能特性：**
 - **导出前预览**：在 WebView 面板中查看所有生成的代码
 - **一键导出**：自动创建正确的目录结构

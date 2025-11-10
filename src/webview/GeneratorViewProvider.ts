@@ -100,7 +100,7 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
                     await this._handleLoadSettings();
                     break;
                 case 'saveSettings':
-                    await this._handleSaveSettings(data.settings);
+                    await this._handleSaveSettings({ settings: data.settings, configScope: data.configScope });
                     break;
             }
         });
@@ -336,30 +336,49 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
      */
     private async _handleLoadSettings() {
         const settings = this._getSettings();
+        const configScope = this._getConfigurationScope();
 
         this._view?.webview.postMessage({
             type: 'settingsLoaded',
-            settings: settings
+            settings: settings,
+            configScope: configScope
         });
     }
 
     /**
      * Save settings to VS Code configuration
      */
-    private async _handleSaveSettings(settings: SettingsConfig) {
+    private async _handleSaveSettings(data: { settings: SettingsConfig; configScope?: string }) {
+        const { settings, configScope } = data;
         const config = vscode.workspace.getConfiguration('mybatis-boost.generator');
 
+        // Determine configuration target
+        let target: vscode.ConfigurationTarget;
+        if (configScope === 'workspace') {
+            // Check if workspace folder exists
+            if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+                vscode.window.showWarningMessage(
+                    'No workspace folder is open. Settings will be saved globally instead.'
+                );
+                target = vscode.ConfigurationTarget.Global;
+            } else {
+                target = vscode.ConfigurationTarget.Workspace;
+            }
+        } else {
+            target = vscode.ConfigurationTarget.Global;
+        }
+
         // Save each setting to VS Code configuration
-        await config.update('basePackage', settings.basePackage, vscode.ConfigurationTarget.Global);
-        await config.update('author', settings.author, vscode.ConfigurationTarget.Global);
-        await config.update('entitySuffix', settings.entitySuffix, vscode.ConfigurationTarget.Global);
-        await config.update('mapperSuffix', settings.mapperSuffix, vscode.ConfigurationTarget.Global);
-        await config.update('serviceSuffix', settings.serviceSuffix, vscode.ConfigurationTarget.Global);
-        await config.update('datetime', settings.datetime, vscode.ConfigurationTarget.Global);
-        await config.update('useLombok', settings.useLombok, vscode.ConfigurationTarget.Global);
-        await config.update('useSwagger', settings.useSwagger, vscode.ConfigurationTarget.Global);
-        await config.update('useSwaggerV3', settings.useSwaggerV3, vscode.ConfigurationTarget.Global);
-        await config.update('useMyBatisPlus', settings.useMyBatisPlus, vscode.ConfigurationTarget.Global);
+        await config.update('basePackage', settings.basePackage, target);
+        await config.update('author', settings.author, target);
+        await config.update('entitySuffix', settings.entitySuffix, target);
+        await config.update('mapperSuffix', settings.mapperSuffix, target);
+        await config.update('serviceSuffix', settings.serviceSuffix, target);
+        await config.update('datetime', settings.datetime, target);
+        await config.update('useLombok', settings.useLombok, target);
+        await config.update('useSwagger', settings.useSwagger, target);
+        await config.update('useSwaggerV3', settings.useSwaggerV3, target);
+        await config.update('useMyBatisPlus', settings.useMyBatisPlus, target);
     }
 
     /**
@@ -380,6 +399,41 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             useSwaggerV3: config.get<boolean>('useSwaggerV3', false),
             useMyBatisPlus: config.get<boolean>('useMyBatisPlus', false)
         };
+    }
+
+    /**
+     * Detect configuration scope - check if workspace-level config exists
+     * Returns 'workspace' if any workspace-level config exists, otherwise 'global'
+     */
+    private _getConfigurationScope(): string {
+        const config = vscode.workspace.getConfiguration('mybatis-boost.generator');
+
+        // Check if workspace folder exists
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            return 'global';
+        }
+
+        // Check if any workspace-level configuration exists
+        const workspaceConfig = config.inspect('basePackage');
+        if (workspaceConfig?.workspaceValue !== undefined) {
+            return 'workspace';
+        }
+
+        // Check other config keys as well
+        const configKeys = [
+            'author', 'entitySuffix', 'mapperSuffix', 'serviceSuffix',
+            'datetime', 'useLombok', 'useSwagger', 'useSwaggerV3', 'useMyBatisPlus'
+        ];
+
+        for (const key of configKeys) {
+            const inspection = config.inspect(key);
+            if (inspection?.workspaceValue !== undefined) {
+                return 'workspace';
+            }
+        }
+
+        // Default to workspace if workspace exists (for new configurations)
+        return 'workspace';
     }
 
     /**
