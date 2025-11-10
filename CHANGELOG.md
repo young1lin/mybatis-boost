@@ -6,6 +6,27 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.2.2] - 2025-11-10
+
+### Added
+
+- ✨ **Project-Level Configuration Support**: Generator settings can now be saved at project or global level
+  - New configuration scope selector in settings modal (Project/Global)
+  - Project settings saved to `.vscode/settings.json` for workspace isolation
+  - Global settings serve as defaults for projects without local configuration
+  - Intelligent default selection based on existing configuration
+  - Automatic fallback to global when workspace is not available
+  - Each project can have independent generator configurations
+  - Prevents configuration conflicts between different projects
+
+### Technical Details
+
+- Added `_getConfigurationScope()` method to detect current configuration source
+- Modified `_handleSaveSettings()` to support both `ConfigurationTarget.Workspace` and `ConfigurationTarget.Global`
+- Enhanced `_handleLoadSettings()` to return configuration scope information
+- Added 6 comprehensive unit tests for configuration scope management
+- All configuration reads follow VS Code's priority: Project > Global > Default
+
 ## [0.2.0] - 2025-11-09
 
 ### Added

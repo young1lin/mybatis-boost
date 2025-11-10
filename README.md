@@ -38,6 +38,12 @@ Generate complete MyBatis boilerplate code from DDL SQL statements with an inter
 - `useSwagger`: Enable Swagger 2 annotations `@ApiModel`, `@ApiModelProperty` (default: `false`)
 - `useSwaggerV3`: Enable Swagger 3 (OpenAPI) annotations (default: `false`)
 
+**Configuration Scope:**
+- Settings can be saved at **Project level** (`.vscode/settings.json`) or **Global level** (user settings)
+- Use the **configuration scope selector** in the settings modal to choose where to save
+- Project-level settings take priority over global settings
+- Each project can have independent configurations to prevent conflicts
+
 **Features:**
 - **Preview before export**: Review all generated code in the WebView panel
 - **One-click export**: Automatically creates proper directory structure

@@ -6,6 +6,27 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.2.2] - 2025-11-10
+
+### 新增
+
+- ✨ **项目级配置支持**：生成器设置现在可以在项目级别或全局级别保存
+  - 在设置对话框中新增配置范围选择器（项目/全局）
+  - 项目设置保存到 `.vscode/settings.json` 以实现工作区隔离
+  - 全局设置作为没有本地配置的项目的默认值
+  - 基于现有配置的智能默认选择
+  - 当工作区不可用时自动降级为全局配置
+  - 每个项目可以拥有独立的生成器配置
+  - 防止不同项目之间的配置冲突
+
+### 技术细节
+
+- 添加 `_getConfigurationScope()` 方法检测当前配置来源
+- 修改 `_handleSaveSettings()` 以支持 `ConfigurationTarget.Workspace` 和 `ConfigurationTarget.Global`
+- 增强 `_handleLoadSettings()` 返回配置范围信息
+- 为配置范围管理添加 6 个全面的单元测试
+- 所有配置读取遵循 VS Code 的优先级：项目 > 全局 > 默认值
+
 ## [0.2.0] - 2025-11-09
 
 ### 新增
