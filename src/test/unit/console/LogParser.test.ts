@@ -195,4 +195,272 @@ describe('LogParser', () => {
             assert.strictEqual(total, null);
         });
     });
+
+    describe('extractUpdates', () => {
+        it('should extract updates count', () => {
+            const content = 'Updates: 1';
+            const updates = LogParser.extractUpdates(content);
+
+            assert.strictEqual(updates, 1);
+        });
+
+        it('should extract large numbers', () => {
+            const content = 'Updates: 999';
+            const updates = LogParser.extractUpdates(content);
+
+            assert.strictEqual(updates, 999);
+        });
+
+        it('should return null for non-Updates content', () => {
+            const content = 'Total: 1';
+            const updates = LogParser.extractUpdates(content);
+
+            assert.strictEqual(updates, null);
+        });
+    });
+
+    describe('parse - loose pattern (custom log formats)', () => {
+        describe('minimal formats', () => {
+            it('should recognize minimal format with just arrow and keyword', () => {
+                const line = '==> Preparing: SELECT * FROM user WHERE id = ?';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+            });
+
+            it('should parse minimal Preparing log', () => {
+                const line = '==> Preparing: SELECT * FROM user WHERE id = ?';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.logType, LogType.Preparing);
+                assert.strictEqual(result.content, 'Preparing: SELECT * FROM user WHERE id = ?');
+                assert.strictEqual(result.mapper, 'UnknownMapper'); // Default value
+                assert.ok(result.timestamp); // Should have a timestamp (generated)
+            });
+
+            it('should parse minimal Parameters log', () => {
+                const line = '==> Parameters: 1(Integer), active(String)';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.logType, LogType.Parameters);
+                assert.strictEqual(result.content, 'Parameters: 1(Integer), active(String)');
+            });
+
+            it('should parse minimal Total log', () => {
+                const line = '<== Total: 5';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.logType, LogType.Total);
+                assert.strictEqual(result.content, 'Total: 5');
+            });
+
+            it('should parse minimal Updates log', () => {
+                const line = '<== Updates: 3';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.logType, LogType.Updates);
+                assert.strictEqual(result.content, 'Updates: 3');
+            });
+        });
+
+        describe('custom timestamp formats', () => {
+            it('should recognize and parse yyyy/MM/dd HH:mm:ss format', () => {
+                const line = '2025/01/15 10:30:45.123 DEBUG UserMapper - ==> Preparing: SELECT * FROM user';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.timestamp, '2025/01/15 10:30:45.123');
+                assert.strictEqual(result.mapper, 'UserMapper');
+                assert.strictEqual(result.logType, LogType.Preparing);
+            });
+
+            it('should recognize ISO 8601 format', () => {
+                const line = '2025-01-15T10:30:45.123 INFO UserMapper - ==> Preparing: SELECT 1';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.timestamp, '2025-01-15T10:30:45.123');
+            });
+
+            it('should recognize time-only format', () => {
+                const line = '10:30:45.123 UserMapper ==> Preparing: SELECT 1';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.timestamp, '10:30:45.123');
+                assert.strictEqual(result.mapper, 'UserMapper');
+            });
+
+            it('should handle format without milliseconds', () => {
+                const line = '2025-01-15 10:30:45 UserMapper - ==> Preparing: SELECT 1';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.timestamp, '2025-01-15 10:30:45');
+            });
+        });
+
+        describe('custom mapper name formats', () => {
+            it('should extract mapper name with colon separator', () => {
+                const line = 'DEBUG UserMapper: ==> Preparing: SELECT 1';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'UserMapper');
+            });
+
+            it('should extract mapper name with dash separator', () => {
+                const line = 'DEBUG UserMapper - ==> Preparing: SELECT 1';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'UserMapper');
+            });
+
+            it('should extract mapper name in square brackets', () => {
+                const line = '[DEBUG] [UserMapper] ==> Preparing: SELECT 1';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'UserMapper');
+            });
+
+            it('should extract mapper name with pipe separator', () => {
+                const line = 'DEBUG | UserMapper | ==> Preparing: SELECT 1';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'UserMapper');
+            });
+
+            it('should extract fully qualified mapper name', () => {
+                const line = 'com.example.mapper.UserMapper: ==> Preparing: SELECT 1';
+                const result = LogParser.parse(line);
+
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'com.example.mapper.UserMapper');
+            });
+        });
+
+        describe('real-world custom log formats', () => {
+            it('should handle Logback custom pattern', () => {
+                const line = '[2025-01-15 10:30:45] [DEBUG] [UserMapper] ==> Preparing: SELECT * FROM user WHERE id = ?';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.logType, LogType.Preparing);
+                assert.strictEqual(result.mapper, 'UserMapper');
+                assert.strictEqual(result.timestamp, '2025-01-15 10:30:45');
+            });
+
+            it('should handle Log4j2 custom pattern', () => {
+                const line = 'DEBUG | 2025-01-15 10:30:45 | com.example.UserMapper | ==> Preparing: SELECT 1';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'com.example.UserMapper');
+                assert.strictEqual(result.timestamp, '2025-01-15 10:30:45');
+            });
+
+            it('should handle format with request ID', () => {
+                const line = '[request-123] [2025-01-15 10:30:45] DEBUG UserMapper - ==> Preparing: SELECT 1';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'UserMapper');
+            });
+
+            it('should handle format with multiple metadata fields', () => {
+                const line = '2025-01-15 10:30:45 [thread-1] [INFO] [UserMapper] [traceId:abc123] ==> Preparing: SELECT 1';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.logType, LogType.Preparing);
+            });
+
+            it('should handle custom separator before arrow', () => {
+                const line = '2025-01-15 10:30:45 DEBUG UserMapper - ==> Preparing: SELECT 1';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'UserMapper');
+            });
+
+            it('should handle format without timestamp', () => {
+                const line = 'DEBUG UserMapper - ==> Preparing: SELECT * FROM user WHERE id = ?';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'UserMapper');
+                assert.ok(result.timestamp); // Should have generated timestamp
+            });
+
+            it('should handle format with extra whitespace', () => {
+                const line = '  2025-01-15 10:30:45   DEBUG   UserMapper   -   ==>   Preparing:   SELECT 1  ';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.mapper, 'UserMapper');
+            });
+        });
+
+        describe('edge cases', () => {
+            it('should handle very long SQL statements', () => {
+                const longSql = 'SELECT ' + 'column, '.repeat(100) + 'id FROM user';
+                const line = `==> Preparing: ${longSql}`;
+
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.ok(result.content.includes(longSql));
+            });
+
+            it('should handle SQL with special characters', () => {
+                const line = '==> Preparing: SELECT * FROM "user" WHERE name = ? AND status IN (?, ?) -- comment';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.logType, LogType.Preparing);
+            });
+
+            it('should not match lines without MyBatis keywords', () => {
+                const line = 'DEBUG UserMapper - Some other log message';
+                assert.strictEqual(LogParser.isMyBatisLog(line), false);
+            });
+
+            it('should not match lines with only partial keywords', () => {
+                const line = 'DEBUG Preparing for something';
+                assert.strictEqual(LogParser.isMyBatisLog(line), false);
+            });
+
+            it('should require arrow symbol before keyword', () => {
+                const line = 'Preparing: SELECT 1'; // Missing ==>
+                assert.strictEqual(LogParser.isMyBatisLog(line), false);
+            });
+
+            it('should handle mixed case in log level but preserve keyword case', () => {
+                const line = 'debug UserMapper - ==> Preparing: SELECT 1';
+                assert.strictEqual(LogParser.isMyBatisLog(line), true);
+
+                const result = LogParser.parse(line);
+                assert.ok(result);
+                assert.strictEqual(result.content, 'Preparing: SELECT 1');
+            });
+        });
+    });
 });
