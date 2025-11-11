@@ -69,7 +69,8 @@ export class ThreadSessionManager {
                 break;
 
             case LogType.Total:
-                // Total marks completion, session will be consumed
+            case LogType.Updates:
+                // Total (SELECT) or Updates (INSERT/UPDATE/DELETE) marks completion, session will be consumed
                 break;
         }
 

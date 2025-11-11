@@ -129,6 +129,10 @@ export class LogParser {
             return LogType.Total;
         }
 
+        if (trimmed.startsWith('Updates:')) {
+            return LogType.Updates;
+        }
+
         return LogType.Unknown;
     }
 
@@ -153,6 +157,14 @@ export class LogParser {
      */
     public static extractTotal(content: string): number | null {
         const match = content.match(/^Total:\s*(\d+)$/);
+        return match ? parseInt(match[1], 10) : null;
+    }
+
+    /**
+     * Extract updates count from Updates log content (for INSERT/UPDATE/DELETE)
+     */
+    public static extractUpdates(content: string): number | null {
+        const match = content.match(/^Updates:\s*(\d+)$/);
         return match ? parseInt(match[1], 10) : null;
     }
 }

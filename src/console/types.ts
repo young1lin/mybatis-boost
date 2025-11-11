@@ -20,6 +20,7 @@ export enum LogType {
     Preparing = 'preparing',
     Parameters = 'parameters',
     Total = 'total',
+    Updates = 'updates',  // For INSERT/UPDATE/DELETE operations
     Unknown = 'unknown'
 }
 

@@ -89,7 +89,7 @@ export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
         const isMyBatis = LogParser.isMyBatisLog(line);
 
         // Log detection result for first few potential MyBatis lines
-        if (this.lineCount <= 10 && (line.includes('Preparing') || line.includes('Parameters') || line.includes('Total'))) {
+        if (this.lineCount <= 10 && (line.includes('Preparing') || line.includes('Parameters') || line.includes('Total') || line.includes('Updates'))) {
             console.log(`[MyBatis Console] Line contains MyBatis keyword, isMyBatis=${isMyBatis}`);
         }
 
@@ -130,9 +130,12 @@ export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
                 break;
 
             case LogType.Total:
+            case LogType.Updates:
+                // Total (SELECT) or Updates (INSERT/UPDATE/DELETE) marks completion
                 // Convert and output if session is complete
                 if (this.sessionManager.isSessionComplete(session)) {
-                    console.log('[MyBatis Console] Converting and outputting SQL');
+                    const operationType = entry.logType === LogType.Total ? 'SELECT' : 'DML';
+                    console.log(`[MyBatis Console] Converting and outputting SQL (${operationType})`);
                     this.convertAndOutput(session, entry.rawLine);
                     this.sessionManager.removeSession(session.sessionId);
                 }
