@@ -3,6 +3,8 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ConvertedSql, DatabaseType } from '../types';
 
 /**
@@ -10,6 +12,7 @@ import { ConvertedSql, DatabaseType } from '../types';
  */
 export class SqlOutputChannel {
     private outputChannel: vscode.OutputChannel;
+    private logHistory: string[] = [];
 
     constructor() {
         this.outputChannel = vscode.window.createOutputChannel('MyBatis SQL Console');
@@ -21,66 +24,49 @@ export class SqlOutputChannel {
     public show(result: ConvertedSql): void {
         this.outputChannel.show(true); // Preserve focus
 
-        const separator = '─'.repeat(80);
         const lines: string[] = [];
 
-        // Header with timestamp
-        lines.push('');
-        lines.push(separator);
-        lines.push(`[MyBatis SQL Console - ${result.timestamp}]`);
-        lines.push(`Mapper: ${result.mapper}`);
+        // Timestamp
+        lines.push(`[${result.timestamp}]`);
 
-        // Thread info if available
-        if (result.threadInfo) {
-            lines.push(`Thread: ${result.threadInfo}`);
+        // Mapper (if available)
+        if (result.mapper) {
+            lines.push(`Mapper: ${result.mapper}`);
         }
 
-        lines.push('');
+        // Converted SQL (no length limit)
+        lines.push(`SQL: ${result.convertedSql}`);
 
-        // Original Preparing line
-        lines.push(result.preparingLine);
-
-        // Original Parameters line
-        lines.push(result.parametersLine);
-
-        lines.push('');
-
-        // Converted SQL with box
-        lines.push(`Converted SQL (${this.getDatabaseDisplayName(result.database)}):`);
-        lines.push('┌' + '─'.repeat(78) + '┐');
-        lines.push('│ ' + this.padRight(result.convertedSql, 77) + '│');
-        lines.push('└' + '─'.repeat(78) + '┘');
-
-        lines.push('');
-
-        // Execution time if available
+        // Execution time (if available)
         if (result.executionTime !== undefined && result.executionTime >= 0) {
-            lines.push(`Execution Time: ${result.executionTime}ms`);
+            lines.push(`Time: ${result.executionTime}ms`);
         }
 
-        // Total line if available
-        if (result.totalLine) {
-            lines.push(result.totalLine);
-        }
+        lines.push(''); // Empty line separator
 
-        lines.push(separator);
-        lines.push('');
+        const output = lines.join('\n');
+        this.outputChannel.appendLine(output);
 
-        this.outputChannel.appendLine(lines.join('\n'));
+        // Save to history for export
+        this.logHistory.push(output);
     }
 
     /**
      * Show error message
      */
     public showError(message: string): void {
-        this.outputChannel.appendLine(`[ERROR] ${message}`);
+        const output = `[ERROR] ${message}`;
+        this.outputChannel.appendLine(output);
+        this.logHistory.push(output);
     }
 
     /**
      * Show info message
      */
     public showInfo(message: string): void {
-        this.outputChannel.appendLine(`[INFO] ${message}`);
+        const output = `[INFO] ${message}`;
+        this.outputChannel.appendLine(output);
+        this.logHistory.push(output);
     }
 
     /**
@@ -88,6 +74,60 @@ export class SqlOutputChannel {
      */
     public clear(): void {
         this.outputChannel.clear();
+        this.logHistory = [];
+    }
+
+    /**
+     * Export logs to file
+     */
+    public async exportLogs(): Promise<void> {
+        if (this.logHistory.length === 0) {
+            vscode.window.showWarningMessage('No logs to export');
+            return;
+        }
+
+        // Prompt user to select export location
+        const uri = await vscode.window.showSaveDialog({
+            defaultUri: vscode.Uri.file(path.join(this.getDefaultExportPath(), `mybatis-sql-${this.getTimestamp()}.log`)),
+            filters: {
+                'Log Files': ['log'],
+                'Text Files': ['txt'],
+                'All Files': ['*']
+            }
+        });
+
+        if (!uri) {
+            return; // User cancelled
+        }
+
+        try {
+            // Write logs to file
+            const content = this.logHistory.join('\n');
+            await fs.promises.writeFile(uri.fsPath, content, 'utf-8');
+
+            vscode.window.showInformationMessage(`Logs exported to ${uri.fsPath}`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to export logs: ${error}`);
+        }
+    }
+
+    /**
+     * Get default export path
+     */
+    private getDefaultExportPath(): string {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+            return workspaceFolders[0].uri.fsPath;
+        }
+        return process.env.HOME || process.env.USERPROFILE || '/tmp';
+    }
+
+    /**
+     * Get current timestamp for filename
+     */
+    private getTimestamp(): string {
+        const now = new Date();
+        return now.toISOString().replace(/[:.]/g, '-').substring(0, 19);
     }
 
     /**
@@ -95,34 +135,6 @@ export class SqlOutputChannel {
      */
     public dispose(): void {
         this.outputChannel.dispose();
-    }
-
-    /**
-     * Get database display name
-     */
-    private getDatabaseDisplayName(dbType: DatabaseType): string {
-        switch (dbType) {
-            case DatabaseType.MySQL:
-                return 'MySQL';
-            case DatabaseType.PostgreSQL:
-                return 'PostgreSQL';
-            case DatabaseType.Oracle:
-                return 'Oracle';
-            case DatabaseType.SQLServer:
-                return 'SQL Server';
-            default:
-                return 'Unknown';
-        }
-    }
-
-    /**
-     * Pad string to right with spaces
-     */
-    private padRight(str: string, length: number): string {
-        if (str.length >= length) {
-            // Truncate if too long
-            return str.substring(0, length - 3) + '...';
-        }
-        return str + ' '.repeat(length - str.length);
+        this.logHistory = [];
     }
 }

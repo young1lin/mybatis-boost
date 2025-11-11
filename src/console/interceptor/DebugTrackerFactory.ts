@@ -223,6 +223,13 @@ export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
     }
 
     /**
+     * Export logs to file
+     */
+    public async exportLogs(): Promise<void> {
+        await this.outputChannel.exportLogs();
+    }
+
+    /**
      * Dispose resources
      */
     public dispose(): void {

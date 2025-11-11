@@ -77,6 +77,15 @@ export class ConsoleInterceptor {
             }
         );
         this.disposables.push(toggleCommand);
+
+        // Command: Export SQL logs
+        const exportCommand = vscode.commands.registerCommand(
+            'mybatis-boost.exportSqlLogs',
+            async () => {
+                await this.trackerFactory.exportLogs();
+            }
+        );
+        this.disposables.push(exportCommand);
     }
 
     /**

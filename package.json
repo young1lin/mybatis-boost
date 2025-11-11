@@ -75,6 +75,11 @@
         "command": "mybatis-boost.toggleSqlConsole",
         "title": "Toggle SQL Console",
         "category": "MyBatis Boost"
+      },
+      {
+        "command": "mybatis-boost.exportSqlLogs",
+        "title": "Export SQL Logs",
+        "category": "MyBatis Boost"
       }
     ],
     "configuration": {
