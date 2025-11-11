@@ -23,11 +23,13 @@ import { MybatisBindingDecorator } from './decorator';
 import { findProjectFileInParents } from './utils/projectDetector';
 import { GeneratorViewProvider } from './webview/GeneratorViewProvider';
 import { MCPManager } from './mcp/MCPManager';
+import { ConsoleInterceptor } from './console';
 
 let fileMapper: FileMapper;
 let bindingDecorator: MybatisBindingDecorator;
 let parameterValidator: ParameterValidator;
 let mcpManager: MCPManager;
+let consoleInterceptor: ConsoleInterceptor;
 
 // Navigation providers (disposable based on configuration)
 let javaToXmlDefinitionProvider: vscode.Disposable | undefined;
@@ -60,6 +62,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register commands first (always available)
     registerCommands(context);
+
+    // Initialize console interceptor for SQL logging (always available)
+    consoleInterceptor = new ConsoleInterceptor();
+    consoleInterceptor.activate(context);
+    console.log('[MyBatis Boost] Console interceptor initialized');
 
     // Quick check if this is a Java project
     const isJava = await isJavaProject();
@@ -170,6 +177,9 @@ export async function activate(context: vscode.ExtensionContext) {
             }
             if (mcpManager) {
                 mcpManager.dispose();
+            }
+            if (consoleInterceptor) {
+                consoleInterceptor.dispose();
             }
             unregisterJavaToXmlNavigationProvider();
         }
@@ -396,6 +406,9 @@ export function deactivate() {
     }
     if (mcpManager) {
         mcpManager.dispose();
+    }
+    if (consoleInterceptor) {
+        consoleInterceptor.dispose();
     }
     unregisterJavaToXmlNavigationProvider();
 }
