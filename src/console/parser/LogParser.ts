@@ -43,6 +43,10 @@ export class LogParser {
         /([\w.]+)\s+(==>|<==)/  // mapper ==> (direct, no separator) or mapper <==
     ];
 
+    // Thread info pattern (try to extract thread ID and name from Spring Boot-like formats)
+    // Matches: "DEBUG 16332 --- [-update-coinMap]" or "DEBUG 16332 --- [thread-1]"
+    private static readonly THREAD_INFO_PATTERN = /DEBUG\s+(\d+)\s+---\s+\[([\w\s-]+)\]/;
+
     /**
      * Check if a line is a MyBatis log line
      * First tries strict patterns (fast), then falls back to loose pattern
@@ -156,6 +160,15 @@ export class LogParser {
             }
         }
 
+        // Try to extract thread info (process ID and thread name)
+        let threadId: string | undefined;
+        let threadName: string | undefined;
+        const threadMatch = rawLine.match(this.THREAD_INFO_PATTERN);
+        if (threadMatch) {
+            threadId = threadMatch[1];  // Process ID
+            threadName = threadMatch[2].trim();  // Thread name
+        }
+
         // Use defaults if not found
         if (!timestamp) {
             timestamp = new Date().toISOString();
@@ -166,6 +179,8 @@ export class LogParser {
 
         return {
             timestamp,
+            threadId,
+            threadName,
             mapper,
             logType: this.parseLogType(content),
             content: content.trim(),

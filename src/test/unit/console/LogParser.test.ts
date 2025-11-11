@@ -71,6 +71,8 @@ describe('LogParser', () => {
 
             assert.ok(result);
             assert.strictEqual(result.timestamp, '2025-11-11 16:51:45.067');
+            assert.strictEqual(result.threadId, '21104');
+            assert.strictEqual(result.threadName, '-update-coinMap');
             assert.strictEqual(result.mapper, 'c.z.i.d.m.C.selectListByCondition');
             assert.strictEqual(result.logType, LogType.Preparing);
         });
@@ -80,6 +82,8 @@ describe('LogParser', () => {
             const result = LogParser.parse(line);
 
             assert.ok(result);
+            assert.strictEqual(result.threadId, '21104');
+            assert.strictEqual(result.threadName, '-update-coinMap');
             assert.strictEqual(result.logType, LogType.Parameters);
         });
 
@@ -88,7 +92,41 @@ describe('LogParser', () => {
             const result = LogParser.parse(line);
 
             assert.ok(result);
+            assert.strictEqual(result.threadId, '21104');
+            assert.strictEqual(result.threadName, '-update-coinMap');
             assert.strictEqual(result.logType, LogType.Total);
+        });
+
+        it('should extract thread info from custom format with different timestamps', () => {
+            // This test ensures that logs with different timestamps but same thread ID
+            // will be grouped into the same session
+            const line1 = '[traceId:] 2025-11-11 20:02:36.245 DEBUG 16332 --- [-update-coinMap] c.z.i.d.m.C.selectListByCondition : ==> Preparing: SELECT * FROM test';
+            const line2 = '[traceId:] 2025-11-11 20:02:36.245 DEBUG 16332 --- [-update-coinMap] c.z.i.d.m.C.selectListByCondition : ==> Parameters: 1(Long)';
+            const line3 = '[traceId:] 2025-11-11 20:02:36.255 DEBUG 16332 --- [-update-coinMap] c.z.i.d.m.C.selectListByCondition : <== Total: 1';
+
+            const result1 = LogParser.parse(line1);
+            const result2 = LogParser.parse(line2);
+            const result3 = LogParser.parse(line3);
+
+            assert.ok(result1);
+            assert.ok(result2);
+            assert.ok(result3);
+
+            // All three should have the same thread ID and thread name
+            assert.strictEqual(result1.threadId, '16332');
+            assert.strictEqual(result2.threadId, '16332');
+            assert.strictEqual(result3.threadId, '16332');
+
+            assert.strictEqual(result1.threadName, '-update-coinMap');
+            assert.strictEqual(result2.threadName, '-update-coinMap');
+            assert.strictEqual(result3.threadName, '-update-coinMap');
+
+            // They have different timestamps
+            assert.strictEqual(result1.timestamp, '2025-11-11 20:02:36.245');
+            assert.strictEqual(result2.timestamp, '2025-11-11 20:02:36.245');
+            assert.strictEqual(result3.timestamp, '2025-11-11 20:02:36.255'); // Different!
+
+            // But should belong to the same session because they have the same threadId
         });
     });
 
