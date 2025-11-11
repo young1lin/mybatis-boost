@@ -37,10 +37,10 @@ export class LogParser {
 
     // Mapper name pattern (try to extract mapper/logger name)
     private static readonly MAPPER_PATTERNS = [
-        /([\w.]+)\s*[:-]\s*==/,  // mapper: ==> or mapper - ==>
-        /\[\s*([\w.]+)\s*\]\s*==/,  // [mapper] ==>
-        /\|\s*([\w.]+)\s*\|\s*==/,  // | mapper | ==>
-        /([\w.]+)\s+==>/  // mapper ==> (direct, no separator)
+        /([\w.]+)\s*[:-]\s*(==>|<==)/,  // mapper: ==> or mapper - ==> or mapper: <==
+        /\[\s*([\w.]+)\s*\]\s*(==>|<==)/,  // [mapper] ==> or [mapper] <==
+        /\|\s*([\w.]+)\s*\|\s*(==>|<==)/,  // | mapper | ==> or | mapper | <==
+        /([\w.]+)\s+(==>|<==)/  // mapper ==> (direct, no separator) or mapper <==
     ];
 
     /**
