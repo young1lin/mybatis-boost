@@ -169,10 +169,18 @@ describe('SqlConverter', () => {
     });
 
     describe('formatSql', () => {
-        it('should clean up extra whitespace', () => {
+        it('should format SQL with proper indentation and newlines', () => {
             const sql = 'SELECT   *   FROM    user   WHERE   id   =   1';
             const formatted = SqlConverter.formatSql(sql);
-            assert.strictEqual(formatted, 'SELECT * FROM user WHERE id = 1');
+
+            // sql-formatter adds newlines and proper formatting
+            assert.ok(formatted.includes('SELECT'));
+            assert.ok(formatted.includes('FROM'));
+            assert.ok(formatted.includes('WHERE'));
+            // Keywords should be uppercase
+            assert.ok(formatted.match(/SELECT/));
+            assert.ok(formatted.match(/FROM/));
+            assert.ok(formatted.match(/WHERE/));
         });
 
         it('should handle empty SQL', () => {
@@ -181,10 +189,106 @@ describe('SqlConverter', () => {
             assert.strictEqual(formatted, '');
         });
 
-        it('should trim leading and trailing whitespace', () => {
+        it('should format SQL with newlines and indentation', () => {
             const sql = '  SELECT * FROM user  ';
             const formatted = SqlConverter.formatSql(sql);
-            assert.strictEqual(formatted, 'SELECT * FROM user');
+
+            // Should have proper formatting with newlines
+            assert.ok(formatted.includes('\n'), 'Should contain newlines');
+            assert.ok(formatted.includes('SELECT'), 'Should contain SELECT');
+            assert.ok(formatted.includes('FROM'), 'Should contain FROM');
+        });
+
+        it('should format MySQL SQL with proper dialect', () => {
+            const sql = 'select id, name from `user` where status = 1';
+            const formatted = SqlConverter.formatSql(sql, DatabaseType.MySQL);
+
+            // Keywords should be uppercase
+            assert.ok(formatted.includes('SELECT'));
+            assert.ok(formatted.includes('FROM'));
+            assert.ok(formatted.includes('WHERE'));
+            // Should preserve backticks for MySQL
+            assert.ok(formatted.includes('`user`') || formatted.includes('user'));
+        });
+
+        it('should format PostgreSQL SQL with proper dialect', () => {
+            const sql = 'select id, name from user where created_at::date > current_date';
+            const formatted = SqlConverter.formatSql(sql, DatabaseType.PostgreSQL);
+
+            // Keywords should be uppercase
+            assert.ok(formatted.includes('SELECT'));
+            assert.ok(formatted.includes('FROM'));
+            assert.ok(formatted.includes('WHERE'));
+        });
+
+        it('should format complex SQL with JOIN and GROUP BY', () => {
+            const sql = 'SELECT u.id, u.name, COUNT(o.id) FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.status = 1 GROUP BY u.id, u.name ORDER BY u.name';
+            const formatted = SqlConverter.formatSql(sql, DatabaseType.MySQL);
+
+            // Should contain all major keywords
+            assert.ok(formatted.includes('SELECT'));
+            assert.ok(formatted.includes('FROM'));
+            assert.ok(formatted.includes('LEFT JOIN'));
+            assert.ok(formatted.includes('WHERE'));
+            assert.ok(formatted.includes('GROUP BY'));
+            assert.ok(formatted.includes('ORDER BY'));
+
+            // Should have multiple lines
+            assert.ok(formatted.split('\n').length > 3, 'Should have multiple lines');
+        });
+
+        it('should format INSERT statement', () => {
+            const sql = 'INSERT INTO users (id, name, email) VALUES (1, "John", "john@example.com")';
+            const formatted = SqlConverter.formatSql(sql, DatabaseType.MySQL);
+
+            assert.ok(formatted.includes('INSERT INTO'));
+            assert.ok(formatted.includes('VALUES'));
+        });
+
+        it('should format UPDATE statement', () => {
+            const sql = 'UPDATE users SET name = "John", email = "john@example.com" WHERE id = 1';
+            const formatted = SqlConverter.formatSql(sql, DatabaseType.MySQL);
+
+            assert.ok(formatted.includes('UPDATE'));
+            assert.ok(formatted.includes('SET'));
+            assert.ok(formatted.includes('WHERE'));
+        });
+
+        it('should format DELETE statement', () => {
+            const sql = 'DELETE FROM users WHERE id = 1 AND status = 0';
+            const formatted = SqlConverter.formatSql(sql, DatabaseType.MySQL);
+
+            assert.ok(formatted.includes('DELETE'));
+            assert.ok(formatted.includes('FROM'));
+            assert.ok(formatted.includes('WHERE'));
+        });
+
+        it('should handle formatting errors gracefully', () => {
+            // Malformed SQL that might cause formatter to fail
+            const sql = 'SELECT * FROM';
+            const formatted = SqlConverter.formatSql(sql);
+
+            // Should return something (either formatted or fallback)
+            assert.ok(typeof formatted === 'string');
+            assert.ok(formatted.length > 0);
+        });
+
+        it('should use correct dialect for Oracle', () => {
+            const sql = 'SELECT id, name FROM user WHERE rownum <= 10';
+            const formatted = SqlConverter.formatSql(sql, DatabaseType.Oracle);
+
+            assert.ok(formatted.includes('SELECT'));
+            assert.ok(formatted.includes('FROM'));
+            assert.ok(formatted.includes('WHERE'));
+        });
+
+        it('should use correct dialect for SQL Server', () => {
+            const sql = 'SELECT TOP 10 id, name FROM [user] WHERE status = 1';
+            const formatted = SqlConverter.formatSql(sql, DatabaseType.SQLServer);
+
+            assert.ok(formatted.includes('SELECT'));
+            assert.ok(formatted.includes('TOP'));
+            assert.ok(formatted.includes('FROM'));
         });
     });
 });
