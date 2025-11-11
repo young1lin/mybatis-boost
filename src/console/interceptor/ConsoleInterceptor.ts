@@ -1,0 +1,124 @@
+/**
+ * Main console interceptor for MyBatis SQL logs
+ */
+
+import * as vscode from 'vscode';
+import { DebugTrackerFactory } from './DebugTrackerFactory';
+import { ConsoleConfig, DatabaseType } from '../types';
+
+/**
+ * Console interceptor entry point
+ */
+export class ConsoleInterceptor {
+    private trackerFactory: DebugTrackerFactory;
+    private disposables: vscode.Disposable[] = [];
+
+    constructor() {
+        this.trackerFactory = new DebugTrackerFactory();
+    }
+
+    /**
+     * Activate console interceptor
+     */
+    public activate(context: vscode.ExtensionContext): void {
+        // Get configuration
+        const config = this.getConfig();
+
+        if (!config.enabled) {
+            return;
+        }
+
+        // Register debug adapter tracker factory for Java
+        const trackerDisposable = vscode.debug.registerDebugAdapterTrackerFactory('java', this.trackerFactory);
+        this.disposables.push(trackerDisposable);
+
+        // Register commands
+        this.registerCommands(context);
+
+        // Listen to configuration changes
+        const configDisposable = vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('mybatis-boost.console')) {
+                this.handleConfigChange();
+            }
+        });
+        this.disposables.push(configDisposable);
+    }
+
+    /**
+     * Register console-related commands
+     */
+    private registerCommands(context: vscode.ExtensionContext): void {
+        // Command: Clear SQL output
+        const clearCommand = vscode.commands.registerCommand(
+            'mybatis-boost.clearSqlOutput',
+            () => {
+                this.trackerFactory.clearOutput();
+                vscode.window.showInformationMessage('MyBatis SQL output cleared');
+            }
+        );
+        this.disposables.push(clearCommand);
+
+        // Command: Toggle SQL console
+        const toggleCommand = vscode.commands.registerCommand(
+            'mybatis-boost.toggleSqlConsole',
+            () => {
+                const currentState = this.trackerFactory.isEnabled();
+                this.trackerFactory.setEnabled(!currentState);
+                const newState = !currentState ? 'enabled' : 'disabled';
+                vscode.window.showInformationMessage(`MyBatis SQL console ${newState}`);
+            }
+        );
+        this.disposables.push(toggleCommand);
+    }
+
+    /**
+     * Handle configuration changes
+     */
+    private handleConfigChange(): void {
+        const config = this.getConfig();
+        this.trackerFactory.setEnabled(config.enabled);
+    }
+
+    /**
+     * Get console configuration
+     */
+    private getConfig(): ConsoleConfig {
+        const config = vscode.workspace.getConfiguration('mybatis-boost.console');
+
+        return {
+            enabled: config.get<boolean>('enabled', true),
+            autoDetectDatabase: config.get<boolean>('autoDetectDatabase', true),
+            defaultDatabase: this.parseDatabase(config.get<string>('defaultDatabase', 'mysql')),
+            showExecutionTime: config.get<boolean>('showExecutionTime', true),
+            sessionTimeout: config.get<number>('sessionTimeout', 5000),
+            formatSql: config.get<boolean>('formatSql', true)
+        };
+    }
+
+    /**
+     * Parse database type from string
+     */
+    private parseDatabase(dbString: string): DatabaseType {
+        switch (dbString.toLowerCase()) {
+            case 'mysql':
+                return DatabaseType.MySQL;
+            case 'postgresql':
+                return DatabaseType.PostgreSQL;
+            case 'oracle':
+                return DatabaseType.Oracle;
+            case 'sqlserver':
+                return DatabaseType.SQLServer;
+            default:
+                return DatabaseType.MySQL;
+        }
+    }
+
+    /**
+     * Dispose resources
+     */
+    public dispose(): void {
+        this.trackerFactory.dispose();
+        this.disposables.forEach(d => d.dispose());
+        this.disposables = [];
+    }
+}

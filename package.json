@@ -65,6 +65,16 @@
       {
         "command": "mybatis-boost.jumpToXml",
         "title": "%command.jumpToXml%"
+      },
+      {
+        "command": "mybatis-boost.clearSqlOutput",
+        "title": "Clear SQL Output",
+        "category": "MyBatis Boost"
+      },
+      {
+        "command": "mybatis-boost.toggleSqlConsole",
+        "title": "Toggle SQL Console",
+        "category": "MyBatis Boost"
       }
     ],
     "configuration": {
@@ -159,6 +169,42 @@
           "type": "boolean",
           "default": true,
           "description": "%config.mcp.enable.description%"
+        },
+        "mybatis-boost.console.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable MyBatis SQL console interceptor"
+        },
+        "mybatis-boost.console.autoDetectDatabase": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically detect database type from SQL syntax"
+        },
+        "mybatis-boost.console.defaultDatabase": {
+          "type": "string",
+          "enum": [
+            "mysql",
+            "postgresql",
+            "oracle",
+            "sqlserver"
+          ],
+          "default": "mysql",
+          "description": "Default database type when auto-detection fails"
+        },
+        "mybatis-boost.console.showExecutionTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show SQL execution time in output"
+        },
+        "mybatis-boost.console.sessionTimeout": {
+          "type": "number",
+          "default": 5000,
+          "description": "Session timeout in milliseconds for cleaning up incomplete logs"
+        },
+        "mybatis-boost.console.formatSql": {
+          "type": "boolean",
+          "default": true,
+          "description": "Format SQL output for better readability"
         }
       }
     }
