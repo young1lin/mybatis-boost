@@ -2,6 +2,7 @@
  * SQL converter for replacing parameters in parameterized SQL
  */
 
+import { format } from 'sql-formatter';
 import { DatabaseType, Parameter } from '../types';
 import { DatabaseDialect } from './DatabaseDialect';
 
@@ -42,29 +43,44 @@ export class SqlConverter {
     }
 
     /**
-     * Format SQL for better readability (optional)
+     * Format SQL for better readability using sql-formatter
      */
-    public static formatSql(sql: string): string {
+    public static formatSql(sql: string, dbType?: DatabaseType): string {
         if (!sql) {
             return '';
         }
 
-        // Basic SQL formatting (can be enhanced)
-        let formatted = sql;
+        try {
+            // Map DatabaseType to sql-formatter language
+            const languageMap: Record<DatabaseType, string> = {
+                [DatabaseType.MySQL]: 'mysql',
+                [DatabaseType.PostgreSQL]: 'postgresql',
+                [DatabaseType.Oracle]: 'plsql',
+                [DatabaseType.SQLServer]: 'transactsql',
+                [DatabaseType.Unknown]: 'sql'
+            };
 
-        // Add newlines before major keywords
-        const keywords = [
-            'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ORDER BY',
-            'GROUP BY', 'HAVING', 'LIMIT', 'OFFSET', 'JOIN',
-            'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN',
-            'UNION', 'INTERSECT', 'EXCEPT'
-        ];
+            const language = dbType ? languageMap[dbType] : 'sql';
 
-        // Not applying aggressive formatting to preserve original structure
-        // Just clean up extra spaces
-        formatted = formatted.replace(/\s+/g, ' ').trim();
-
-        return formatted;
+            // Format with sql-formatter
+            return format(sql, {
+                language: language as any,
+                tabWidth: 2,                        // 2 spaces indentation
+                keywordCase: 'upper',               // Keywords in uppercase
+                identifierCase: 'preserve',         // Keep original case for identifiers
+                dataTypeCase: 'upper',              // Data types in uppercase
+                functionCase: 'upper',              // Functions in uppercase
+                indentStyle: 'standard',            // Standard indentation
+                logicalOperatorNewline: 'before',   // AND/OR on new line before
+                linesBetweenQueries: 2,             // Empty lines between queries
+                denseOperators: false,              // Space around operators
+                newlineBeforeSemicolon: false       // Semicolon on same line
+            });
+        } catch (error) {
+            // Fallback to original SQL if formatting fails
+            console.error('SQL formatting failed:', error);
+            return sql.replace(/\s+/g, ' ').trim();
+        }
     }
 
     /**

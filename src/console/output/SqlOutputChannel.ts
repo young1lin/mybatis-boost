@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConvertedSql, DatabaseType } from '../types';
+import { SqlConverter } from '../converter/SqlConverter';
 
 /**
  * Manage output channel for MyBatis SQL console
@@ -25,6 +26,10 @@ export class SqlOutputChannel {
         // Don't auto-show the output channel - let users manually open it if needed
         // this.outputChannel.show(true);
 
+        // Get formatSql configuration
+        const config = vscode.workspace.getConfiguration('mybatis-boost.console');
+        const shouldFormat = config.get<boolean>('formatSql', true);
+
         const lines: string[] = [];
 
         // Timestamp
@@ -35,8 +40,18 @@ export class SqlOutputChannel {
             lines.push(`Mapper: ${result.mapper}`);
         }
 
+        // Thread info (if available)
+        if (result.threadInfo) {
+            lines.push(`Thread: ${result.threadInfo}`);
+        }
+
+        // Format SQL if enabled
+        const displaySql = shouldFormat
+            ? SqlConverter.formatSql(result.convertedSql, result.database)
+            : result.convertedSql;
+
         // Converted SQL (no length limit)
-        lines.push(`SQL: ${result.convertedSql}`);
+        lines.push(`SQL:\n${displaySql}`);
 
         // Execution time (if available)
         if (result.executionTime !== undefined && result.executionTime >= 0) {
@@ -44,6 +59,8 @@ export class SqlOutputChannel {
         }
 
         lines.push(''); // Empty line separator
+        lines.push('─'.repeat(80)); // Visual separator
+        lines.push(''); // Empty line
 
         const output = lines.join('\n');
         this.outputChannel.appendLine(output);

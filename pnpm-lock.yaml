@@ -14,6 +14,9 @@ importers:
       sql-ddl-to-json-schema:
         specifier: 6.0.0
         version: 6.0.0
+      sql-formatter:
+        specifier: ^15.6.10
+        version: 15.6.10
     devDependencies:
       '@types/ejs':
         specifier: ^3.1.5
@@ -2258,6 +2261,10 @@ packages:
   sql-ddl-to-json-schema@6.0.0:
     resolution: {integrity: sha512-wkFpSrGdFN6NjikVTJ02ISBTVhb7Gdcj2sCh/01INO73jl76TTS5Ta0uW0AANmDbWjGVqiQrACFVBqpIBXB5kg==}
     engines: {node: '>=16 <=24'}
+
+  sql-formatter@15.6.10:
+    resolution: {integrity: sha512-0bJOPQrRO/JkjQhiThVayq0hOKnI1tHI+2OTkmT7TGtc6kqS+V7kveeMzRW+RNQGxofmTmet9ILvztyuxv0cJQ==}
+    hasBin: true
 
   stdin-discarder@0.2.2:
     resolution: {integrity: sha512-UhDfHmA92YAlNnCfhmq0VeNL5bDbiZGg7sZ2IvPsXubGkiNa9EC+tUTsjBRsYUAz87btI6/1wf4XoVvQ3uRnmQ==}
@@ -5132,6 +5139,11 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
       moo: 0.5.1
+      nearley: 2.20.1
+
+  sql-formatter@15.6.10:
+    dependencies:
+      argparse: 2.0.1
       nearley: 2.20.1
 
   stdin-discarder@0.2.2: {}
