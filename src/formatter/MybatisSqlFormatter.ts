@@ -174,20 +174,28 @@ export class MybatisSqlFormatter {
             const lines = result.split('\n');
             let placeholderLineIndex = -1;
             let placeholderIndent = '';
+            let isPlaceholderAloneOnLine = false;
 
             // Find the line containing the placeholder
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].includes(placeholder)) {
                     placeholderLineIndex = i;
+                    const line = lines[i];
+
                     // Extract the indentation before the placeholder
-                    const lineBeforePlaceholder = lines[i].substring(0, lines[i].indexOf(placeholder));
+                    const lineBeforePlaceholder = line.substring(0, line.indexOf(placeholder));
                     placeholderIndent = lineBeforePlaceholder.match(/^\s*/)?.[0] || '';
+
+                    // Check if placeholder is alone on the line (only whitespace before and after)
+                    const lineAfterPlaceholder = line.substring(line.indexOf(placeholder) + placeholder.length);
+                    isPlaceholderAloneOnLine = lineBeforePlaceholder.trim() === '' && lineAfterPlaceholder.trim() === '';
+
                     break;
                 }
             }
 
             // Format the tag with proper indentation (Style A: extra indent inside tags)
-            const formattedTag = this.formatDynamicTag(originalTag, placeholderIndent);
+            const formattedTag = this.formatDynamicTag(originalTag, placeholderIndent, isPlaceholderAloneOnLine);
 
             // Replace the placeholder with the formatted tag
             result = result.replace(placeholder, formattedTag);
@@ -202,15 +210,19 @@ export class MybatisSqlFormatter {
      *
      * @param tagContent - Original tag content
      * @param baseIndent - Base indentation from the placeholder position
+     * @param isAloneOnLine - Whether the placeholder was alone on its line
      * @returns Formatted tag with proper indentation
      */
-    private formatDynamicTag(tagContent: string, baseIndent: string): string {
+    private formatDynamicTag(tagContent: string, baseIndent: string, isAloneOnLine: boolean = false): string {
         // Parse the tag to extract tag name, attributes, and inner content
         const selfClosingMatch = tagContent.match(/^<(\w+)([^>]*)\/>$/);
 
         if (selfClosingMatch) {
             // Self-closing tag (e.g., <include refid="xxx"/>)
-            // No need to add extra indentation
+            // If placeholder was alone on line, don't add leading newline (already on new line)
+            if (isAloneOnLine) {
+                return `${baseIndent}${tagContent}`;
+            }
             return `\n${baseIndent}${tagContent}`;
         }
 
@@ -241,9 +253,17 @@ export class MybatisSqlFormatter {
                 return trimmedLine ? `${contentIndent}${trimmedLine}` : '';
             });
 
+            // If placeholder was alone on line, don't add leading newline
+            if (isAloneOnLine) {
+                return `${baseIndent}<${tagName}${attributes}>\n${indentedLines.join('\n')}\n${baseIndent}</${tagName}>`;
+            }
             return `\n${baseIndent}<${tagName}${attributes}>\n${indentedLines.join('\n')}\n${baseIndent}</${tagName}>`;
         } else {
             // Single-line content: add on new line with indentation
+            // If placeholder was alone on line, don't add leading newline
+            if (isAloneOnLine) {
+                return `${baseIndent}<${tagName}${attributes}>\n${contentIndent}${trimmedContent}\n${baseIndent}</${tagName}>`;
+            }
             return `\n${baseIndent}<${tagName}${attributes}>\n${contentIndent}${trimmedContent}\n${baseIndent}</${tagName}>`;
         }
     }
