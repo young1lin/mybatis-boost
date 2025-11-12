@@ -230,6 +230,58 @@
           "type": "boolean",
           "default": true,
           "description": "Format SQL output for better readability"
+        },
+        "mybatis-boost.formatter.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "mysql",
+            "postgresql",
+            "plsql",
+            "tsql",
+            "db2",
+            "hive",
+            "mariadb",
+            "n1ql",
+            "redshift",
+            "spark",
+            "snowflake",
+            "bigquery"
+          ],
+          "default": "auto",
+          "description": "SQL dialect for formatting. 'auto' will auto-detect from SQL syntax."
+        },
+        "mybatis-boost.formatter.keywordCase": {
+          "type": "string",
+          "enum": [
+            "upper",
+            "lower",
+            "preserve"
+          ],
+          "default": "upper",
+          "description": "Keyword case for SQL formatting (IDEA default: upper)"
+        },
+        "mybatis-boost.formatter.tabWidth": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Indentation width for SQL formatting (IDEA default: 2)"
+        },
+        "mybatis-boost.formatter.indentStyle": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "tabularLeft",
+            "tabularRight"
+          ],
+          "default": "standard",
+          "description": "Indentation style for SQL formatting (IDEA default: standard)"
+        },
+        "mybatis-boost.formatter.denseOperators": {
+          "type": "boolean",
+          "default": false,
+          "description": "Remove spaces around operators (IDEA default: false, e.g., '1 = 1' vs '1=1')"
         }
       }
     }

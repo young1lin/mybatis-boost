@@ -24,6 +24,7 @@ import { findProjectFileInParents } from './utils/projectDetector';
 import { GeneratorViewProvider } from './webview/GeneratorViewProvider';
 import { MCPManager } from './mcp/MCPManager';
 import { ConsoleInterceptor } from './console';
+import { MybatisXmlFormattingProvider } from './formatter';
 
 let fileMapper: FileMapper;
 let bindingDecorator: MybatisBindingDecorator;
@@ -90,6 +91,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register Hover providers for SQL composition (always enabled)
     registerHoverProviders(context);
+
+    // Register XML formatting provider (always enabled, triggered by Alt+Shift+F)
+    registerXmlFormattingProvider(context);
 
     // Register Java-to-XML navigation providers based on configuration
     const useDefinitionProvider = config.get<boolean>('useDefinitionProvider', false);
@@ -477,6 +481,21 @@ function registerHoverProviders(context: vscode.ExtensionContext) {
     );
 
     console.log('[MyBatis Boost] Hover providers registered');
+}
+
+/**
+ * Register XML formatting provider for MyBatis mapper files (always enabled)
+ * Triggered by Alt+Shift+F (or Cmd+Shift+F on Mac)
+ */
+function registerXmlFormattingProvider(context: vscode.ExtensionContext) {
+    context.subscriptions.push(
+        vscode.languages.registerDocumentFormattingEditProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            new MybatisXmlFormattingProvider()
+        )
+    );
+
+    console.log('[MyBatis Boost] XML formatting provider registered');
 }
 
 /**
