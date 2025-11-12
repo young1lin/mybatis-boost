@@ -16,25 +16,38 @@
     </sql>
 
     <!-- <select id="listAll" resultMap="RoleResultMap">
-        SELECT <include refid="BaseColumns" /> FROM `role`
+        SELECT
+        <include refid="BaseColumns" />
+        FROM
+        `role`
     </select> -->
 
     <select id="getById" resultMap="RoleResultMap">
-        SELECT <include refid="BaseColumns" /> FROM `role` WHERE id = #{id}
+        SELECT
+        <include refid="BaseColumns" />
+        FROM
+        `role`
+        WHERE
+        id = #{id}
     </select>
 
     <update id="updateById" parameterType="com.young1lin.mybatis.boost.integration.test.domain.Role">
         UPDATE `role`
-        SET role_name = #{roleName},
-            remark = #{remark},
-            update_time = #{updateTime},
-            version = version + 1
-        WHERE id = #{id}
-            AND version = #{version}
+        SET
+        role_name = #{roleName},
+        remark = #{remark},
+        update_time = #{updateTime},
+        version = version + 1
+        WHERE
+        id = #{id}
+        AND version = #{version}
     </update>
 
     <delete id="deleteById">
-        DELETE FROM `role` WHERE id = #{id} AND version = #{version}
+        DELETE FROM `role`
+        WHERE
+        id = #{id}
+        AND version = #{version}
     </delete>
 
 </mapper>

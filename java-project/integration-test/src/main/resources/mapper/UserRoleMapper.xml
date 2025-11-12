@@ -16,7 +16,12 @@
     </sql>
 
     <select id="listAllByUserId" resultMap="UserRoleResultMap" parameterType="long">
-        SELECT <include refid="BaseColumns" /> FROM `user_role` WHERE user_id = #{userId}
+        SELECT
+        <include refid="BaseColumns" />
+        FROM
+        `user_role`
+        WHERE
+        user_id = #{userId}
     </select>
 
 </mapper>

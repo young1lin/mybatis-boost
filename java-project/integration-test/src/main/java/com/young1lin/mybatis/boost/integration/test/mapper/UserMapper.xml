@@ -20,50 +20,68 @@
     </sql>
 
     <select id="listAllByIds" resultType="com.young1lin.mybatis.boost.integration.test.domain.User">
-        SELECT <include refid="BaseColumns" /> FROM `user` WHERE id IN
+        SELECT
+        <include refid="BaseColumns" />
+        FROM
+        `user`
+        WHERE
+        id IN
         <foreach collection="ids" item="id" separator="," open="(" close=")">
-            #{id}
+        #{id}
         </foreach>
     </select>
 
     <select id="selectByIdAndName" resultMap="UserResultMap">
-        SELECT <include refid="BaseColumns" /> FROM `user`
-        WHERE id = #{id} AND name = #{name}
+        SELECT
+        <include refid="BaseColumns" />
+        FROM
+        `user`
+        WHERE
+        id = #{id}
+        AND name = #{name}
     </select>
 
     <update id="updateById" parameterType="com.young1lin.mybatis.boost.integration.test.domain.User">
         UPDATE `user`
-        SET `name` = #{name},
-            age = #{age},
-            update_time = #{updateTime},
-            version = version + 1
-        WHERE id = #{id}
-            AND version = #{version}
+        SET
+        `name` = #{name},
+        age = #{age},
+        update_time = #{updateTime},
+        version = version + 1
+        WHERE
+        id = #{id}
+        AND version = #{version}
     </update>
 
     <insert id="batchInsert" keyProperty="id" useGeneratedKeys="true"
         parameterType="com.young1lin.mybatis.boost.integration.test.domain.User">
-        INSERT INTO `user` (<include refid="BaseInsertColumns" />)
+        INSERT INTO
+        `user` (
+        <include refid="BaseInsertColumns" />)
         VALUES
         <foreach collection="users" item="user"
         separator=",">
-            (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
+        (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
         </foreach>
     </insert>
 
     <insert id="batchInsertV2" keyProperty="id" useGeneratedKeys="true">
-        INSERT INTO `user` (<include refid="BaseInsertColumns" />)
+        INSERT INTO
+        `user` (
+        <include refid="BaseInsertColumns" />)
         VALUES
         <foreach collection="users" item="user" separator=",">
-            (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
+        (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
         </foreach>
     </insert>
 
     <insert id="batchInsertV3" keyProperty="id" useGeneratedKeys="true">
-        INSERT INTO `user` (<include refid="BaseInsertColumns" />)
+        INSERT INTO
+        `user` (
+        <include refid="BaseInsertColumns" />)
         VALUES
         <foreach collection="aUsers" item="user" separator=",">
-            (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
+        (#{user.name}, #{user.age}, #{user.createTime}, #{user.updateTime}, 0)
         </foreach>
     </insert>
 

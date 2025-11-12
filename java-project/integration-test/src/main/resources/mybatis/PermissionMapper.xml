@@ -23,11 +23,19 @@
     </sql>
 
     <select id="selectById" resultMap="PermissionResultMap">
-        SELECT <include refid="BaseColumns" /> FROM permission WHERE id = #{id}
+        SELECT
+        <include refid="BaseColumns" />
+        FROM
+        permission
+        WHERE
+        id = #{id}
     </select>
 
     <select id="listAll" resultMap="PermissionResultMap">
-        SELECT <include refid="BaseColumns" /> FROM permission
+        SELECT
+        <include refid="BaseColumns" />
+        FROM
+        permission
     </select>
 
 </mapper>
