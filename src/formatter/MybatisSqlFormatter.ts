@@ -62,6 +62,7 @@ export class MybatisSqlFormatter {
         keywordCase: 'upper',
         tabWidth: 2,
         indentStyle: 'standard',
+        logicalOperatorNewline: 'before',  // AND/OR on new line before the condition
         denseOperators: false,
         newlineBeforeSemicolon: false,
         linesBetweenQueries: 1
@@ -83,20 +84,26 @@ export class MybatisSqlFormatter {
         // Step 1: Extract and replace dynamic tags with placeholders
         const { cleanedSql, tagMap } = this.extractDynamicTags(sqlContent);
 
-        // Step 2: Format the cleaned SQL using sql-formatter
+        // Step 2: Replace MyBatis parameters with ? placeholders for better formatting
+        const { sql: sqlWithPlaceholders, paramMap } = this.replaceMyBatisParams(cleanedSql);
+
+        // Step 3: Format the cleaned SQL using sql-formatter
         const formatterOptions = this.buildFormatterOptions(options);
         let formatted: string;
 
         try {
-            formatted = format(cleanedSql, formatterOptions);
+            formatted = format(sqlWithPlaceholders, formatterOptions);
         } catch (error) {
             // If formatting fails, return original content
             console.error('[MyBatis SQL Formatter] Failed to format SQL:', error);
             return sqlContent;
         }
 
-        // Step 3: Restore dynamic tags from placeholders
-        const result = this.restoreDynamicTags(formatted, tagMap);
+        // Step 4: Restore MyBatis parameters
+        const sqlWithParams = this.restoreMyBatisParams(formatted, paramMap);
+
+        // Step 5: Restore dynamic tags from placeholders
+        const result = this.restoreDynamicTags(sqlWithParams, tagMap);
 
         return result;
     }
@@ -155,6 +162,60 @@ export class MybatisSqlFormatter {
         const pattern = `<(${tagNames})(?:\\s+[^>]*)?(?:/>|>.*?</\\1>)`;
 
         return new RegExp(pattern, 'is'); // 'i' for case-insensitive, 's' for dotAll mode
+    }
+
+    /**
+     * Replace MyBatis parameters with ? placeholders
+     * This helps sql-formatter recognize the SQL structure correctly and apply proper formatting
+     *
+     * @param sql - SQL content with MyBatis parameters
+     * @returns SQL with ? placeholders and parameter mapping
+     */
+    private replaceMyBatisParams(sql: string): { sql: string; paramMap: Map<string, string> } {
+        const paramMap = new Map<string, string>();
+        let paramIndex = 0;
+        let result = sql;
+
+        // Replace #{param} with numbered placeholders
+        result = result.replace(/#\{[^}]+\}/g, (match) => {
+            const placeholder = `__PARAM_${paramIndex}__`;
+            paramMap.set(placeholder, match);
+            paramIndex++;
+            return '?';
+        });
+
+        // Replace ${param} with numbered placeholders
+        result = result.replace(/\$\{[^}]+\}/g, (match) => {
+            const placeholder = `__PARAM_${paramIndex}__`;
+            paramMap.set(placeholder, match);
+            paramIndex++;
+            return '?';
+        });
+
+        return { sql: result, paramMap };
+    }
+
+    /**
+     * Restore MyBatis parameters from ? placeholders
+     * Replaces ? back to original MyBatis parameters in order
+     *
+     * @param sql - SQL content with ? placeholders
+     * @param paramMap - Map of placeholders to original parameters
+     * @returns SQL with restored MyBatis parameters
+     */
+    private restoreMyBatisParams(sql: string, paramMap: Map<string, string>): string {
+        let result = sql;
+        let paramIndex = 0;
+
+        // Replace ? with original MyBatis parameters in order
+        result = result.replace(/\?/g, () => {
+            const placeholder = `__PARAM_${paramIndex}__`;
+            const originalParam = paramMap.get(placeholder);
+            paramIndex++;
+            return originalParam || '?';
+        });
+
+        return result;
     }
 
     /**
