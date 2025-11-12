@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.UserMapper">
+
+    <!-- Test SQL keyword highlighting with various database dialects -->
+
+    <!-- Basic SELECT statement with MySQL syntax -->
+    <select id="selectUserById" parameterType="int" resultType="com.example.entity.User">
+        SELECT
+            id,
+            username,
+            email,
+            created_at,
+            updated_at
+        FROM user
+        WHERE id = #{id}
+    </select>
+
+    <!-- Complex SELECT with JOIN, GROUP BY, HAVING, ORDER BY -->
+    <select id="selectUserWithOrders" resultType="com.example.entity.UserOrderVO">
+        SELECT
+            u.id,
+            u.username,
+            u.email,
+            COUNT(o.id) AS order_count,
+            SUM(o.total_amount) AS total_spent,
+            MAX(o.created_at) AS last_order_date
+        FROM user u
+        LEFT JOIN orders o ON u.id = o.user_id
+        WHERE u.status = 'ACTIVE'
+            AND o.created_at >= #{startDate}
+            AND o.created_at <= #{endDate}
+        GROUP BY u.id, u.username, u.email
+        HAVING COUNT(o.id) > 0
+        ORDER BY total_spent DESC, u.username ASC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <!-- SELECT with subquery and UNION -->
+    <select id="selectActiveAndInactiveUsers" resultType="com.example.entity.User">
+        SELECT id, username, email, 'ACTIVE' AS user_status
+        FROM user
+        WHERE status = 'ACTIVE'
+        UNION ALL
+        SELECT id, username, email, 'INACTIVE' AS user_status
+        FROM user
+        WHERE status = 'INACTIVE'
+            AND last_login_at < CURRENT_DATE - INTERVAL 90 DAY
+        ORDER BY username
+    </select>
+
+    <!-- SELECT with CASE statement -->
+    <select id="selectUserWithCategoryLabel" resultType="com.example.entity.UserCategoryVO">
+        SELECT
+            id,
+            username,
+            total_orders,
+            CASE
+                WHEN total_orders >= 100 THEN 'VIP'
+                WHEN total_orders >= 50 THEN 'Gold'
+                WHEN total_orders >= 10 THEN 'Silver'
+                ELSE 'Bronze'
+            END AS category
+        FROM user
+        WHERE status = 'ACTIVE'
+    </select>
+
+    <!-- INSERT statement -->
+    <insert id="insertUser" parameterType="com.example.entity.User" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO user (
+            username,
+            email,
+            password,
+            status,
+            created_at
+        ) VALUES (
+            #{username},
+            #{email},
+            #{password},
+            'ACTIVE',
+            CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <!-- INSERT with dynamic SQL -->
+    <insert id="insertUserSelective" parameterType="com.example.entity.User">
+        INSERT INTO user
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="username != null">
+                username,
+            </if>
+            <if test="email != null">
+                email,
+            </if>
+            <if test="password != null">
+                password,
+            </if>
+            created_at,
+        </trim>
+        <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
+            <if test="username != null">
+                #{username},
+            </if>
+            <if test="email != null">
+                #{email},
+            </if>
+            <if test="password != null">
+                #{password},
+            </if>
+            CURRENT_TIMESTAMP,
+        </trim>
+    </insert>
+
+    <!-- UPDATE statement -->
+    <update id="updateUser" parameterType="com.example.entity.User">
+        UPDATE user
+        SET username = #{username},
+            email = #{email},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <!-- UPDATE with dynamic SET clause -->
+    <update id="updateUserSelective" parameterType="com.example.entity.User">
+        UPDATE user
+        <set>
+            <if test="username != null">
+                username = #{username},
+            </if>
+            <if test="email != null">
+                email = #{email},
+            </if>
+            <if test="status != null">
+                status = #{status},
+            </if>
+            updated_at = CURRENT_TIMESTAMP
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- DELETE statement -->
+    <delete id="deleteUserById" parameterType="int">
+        DELETE FROM user
+        WHERE id = #{id}
+    </delete>
+
+    <!-- DELETE with dynamic WHERE clause -->
+    <delete id="deleteUsersByCondition">
+        DELETE FROM user
+        <where>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="lastLoginBefore != null">
+                AND last_login_at <![CDATA[ < ]]> #{lastLoginBefore}
+            </if>
+            <if test="emailPattern != null">
+                AND email LIKE #{emailPattern}
+            </if>
+        </where>
+    </delete>
+
+    <!-- SELECT with FOREACH for IN clause -->
+    <select id="selectUsersByIds" resultType="com.example.entity.User">
+        SELECT id, username, email
+        FROM user
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- SELECT with multiple FOREACH and CHOOSE/WHEN/OTHERWISE -->
+    <select id="searchUsers" resultType="com.example.entity.User">
+        SELECT
+            id,
+            username,
+            email,
+            status
+        FROM user
+        <where>
+            <if test="userIds != null and userIds.size() > 0">
+                AND id IN
+                <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                    #{userId}
+                </foreach>
+            </if>
+            <if test="keyword != null">
+                AND (
+                    username LIKE CONCAT('%', #{keyword}, '%')
+                    OR email LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <choose>
+                <when test="status != null">
+                    AND status = #{status}
+                </when>
+                <when test="includeInactive != null and includeInactive == true">
+                    AND status IN ('ACTIVE', 'INACTIVE')
+                </when>
+                <otherwise>
+                    AND status = 'ACTIVE'
+                </otherwise>
+            </choose>
+            <if test="createdAfter != null">
+                AND created_at >= #{createdAfter}
+            </if>
+        </where>
+        ORDER BY
+        <choose>
+            <when test="orderBy == 'username'">
+                username
+            </when>
+            <when test="orderBy == 'email'">
+                email
+            </when>
+            <when test="orderBy == 'created_at'">
+                created_at
+            </when>
+            <otherwise>
+                id
+            </otherwise>
+        </choose>
+        <if test="orderDirection != null and orderDirection == 'DESC'">
+            DESC
+        </if>
+    </select>
+
+    <!-- SQL fragment with INCLUDE -->
+    <sql id="userColumns">
+        id, username, email, status, created_at, updated_at
+    </sql>
+
+    <sql id="baseWhereClause">
+        <where>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="createdAfter != null">
+                AND created_at >= #{createdAfter}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectUsersWithFragment" resultType="com.example.entity.User">
+        SELECT
+            <include refid="userColumns"/>
+        FROM user
+        <include refid="baseWhereClause"/>
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- PostgreSQL specific syntax -->
+    <select id="selectUsersPg" resultType="com.example.entity.User">
+        SELECT
+            id,
+            username,
+            email,
+            created_at::DATE AS created_date
+        FROM user
+        WHERE status = ANY(#{statuses}::VARCHAR[])
+            AND created_at >= NOW() - INTERVAL '30 days'
+        ORDER BY created_at DESC
+        FETCH FIRST 10 ROWS ONLY
+    </select>
+
+    <!-- Oracle specific syntax -->
+    <select id="selectUsersOracle" resultType="com.example.entity.User">
+        SELECT
+            id,
+            username,
+            NVL(email, 'no-email@example.com') AS email,
+            TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at_str
+        FROM user
+        WHERE ROWNUM <![CDATA[ <= ]]> 10
+            AND status = #{status}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- SQL Server specific syntax -->
+    <select id="selectUsersSqlServer" resultType="com.example.entity.User">
+        SELECT TOP 10
+            id,
+            username,
+            ISNULL(email, 'no-email@example.com') AS email,
+            FORMAT(created_at, 'yyyy-MM-dd HH:mm:ss') AS created_at_str
+        FROM [user]
+        WHERE status = #{status}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- Test with window functions -->
+    <select id="selectUsersWithRanking" resultType="com.example.entity.UserRankVO">
+        SELECT
+            id,
+            username,
+            total_orders,
+            ROW_NUMBER() OVER (ORDER BY total_orders DESC) AS row_num,
+            RANK() OVER (ORDER BY total_orders DESC) AS rank,
+            DENSE_RANK() OVER (ORDER BY total_orders DESC) AS dense_rank,
+            NTILE(4) OVER (ORDER BY total_orders DESC) AS quartile,
+            LAG(username, 1) OVER (ORDER BY total_orders DESC) AS prev_user,
+            LEAD(username, 1) OVER (ORDER BY total_orders DESC) AS next_user
+        FROM user
+        WHERE status = 'ACTIVE'
+    </select>
+
+    <!-- Test with CTE (Common Table Expression) -->
+    <select id="selectUsersWithCTE" resultType="com.example.entity.User">
+        WITH active_users AS (
+            SELECT id, username, email, created_at
+            FROM user
+            WHERE status = 'ACTIVE'
+        ),
+        recent_users AS (
+            SELECT id, username, email, created_at
+            FROM active_users
+            WHERE created_at >= #{recentDate}
+        )
+        SELECT
+            ru.id,
+            ru.username,
+            ru.email,
+            COUNT(o.id) AS order_count
+        FROM recent_users ru
+        LEFT JOIN orders o ON ru.id = o.user_id
+        GROUP BY ru.id, ru.username, ru.email
+        HAVING COUNT(o.id) > 0
+        ORDER BY order_count DESC
+    </select>
+
+</mapper>

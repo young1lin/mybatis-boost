@@ -51,6 +51,18 @@
         }
       ]
     },
+    "grammars": [
+      {
+        "path": "./syntaxes/mybatis-xml-injection.tmLanguage.json",
+        "scopeName": "mybatis.xml.injection.sql",
+        "injectTo": [
+          "text.xml"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.sql.mybatis": "sql"
+        }
+      }
+    ],
     "commands": [
       {
         "command": "mybatis-boost.clearCache",
