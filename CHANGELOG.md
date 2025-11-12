@@ -6,6 +6,37 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.1] - 2025-11-12
+
+### Added
+
+- ✨ **Custom Template Path Support**: Users can now specify custom EJS template files for code generation
+  - New configuration options for custom template paths:
+    - `mybatis-boost.generator.template-path.entity`: Custom template for entity generation
+    - `mybatis-boost.generator.template-path.mapper`: Custom template for mapper interface generation
+    - `mybatis-boost.generator.template-path.mapper-xml`: Custom template for mapper XML generation
+    - `mybatis-boost.generator.template-path.service`: Custom template for service class generation
+  - All template paths default to empty string, which uses built-in templates
+  - If custom path is provided, it overrides the default template
+  - New "Custom Template Paths" section in generator settings UI
+  - Full support for both project-level and global-level template configurations
+
+### Technical Details
+
+- Updated `SettingsConfig` interface to include 4 new template path fields
+- Modified `GeneratorViewProvider._getSettings()` to load template paths from configuration
+- Modified `GeneratorViewProvider._handleSaveSettings()` to persist template paths
+- Enhanced `GeneratorViewProvider._handlePreview()` to use custom templates when generating code
+- Added 4 comprehensive unit tests for custom template path functionality
+- All 114 unit tests pass successfully
+
+### Benefits
+
+- **Flexibility**: Teams can customize code generation templates to match their coding standards
+- **Reusability**: Custom templates can be shared across team members via project settings
+- **Backward Compatibility**: Empty template paths automatically fall back to built-in templates
+- **No Breaking Changes**: Existing users continue to use default templates without any configuration
+
 ## [0.3.0] - 2025-11-11
 
 ### Added

@@ -733,6 +733,34 @@ CREATE TABLE user_info (
                             <small>Generate MyBatis Plus annotations</small>
                         </div>
                     </div>
+
+                    <div class="form-section">
+                        <h3>Custom Template Paths</h3>
+                        <div class="form-group">
+                            <label for="templatePathEntity">Entity Template Path</label>
+                            <input type="text" id="templatePathEntity" name="templatePathEntity"
+                                   placeholder="Leave empty to use built-in template">
+                            <small>Custom EJS template path for entity generation (e.g., /path/to/custom-entity.ejs)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="templatePathMapper">Mapper Template Path</label>
+                            <input type="text" id="templatePathMapper" name="templatePathMapper"
+                                   placeholder="Leave empty to use built-in template">
+                            <small>Custom EJS template path for mapper generation (e.g., /path/to/custom-mapper.ejs)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="templatePathMapperXml">Mapper XML Template Path</label>
+                            <input type="text" id="templatePathMapperXml" name="templatePathMapperXml"
+                                   placeholder="Leave empty to use built-in template">
+                            <small>Custom EJS template path for mapper XML generation (e.g., /path/to/custom-mapper-xml.ejs)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="templatePathService">Service Template Path</label>
+                            <input type="text" id="templatePathService" name="templatePathService"
+                                   placeholder="Leave empty to use built-in template">
+                            <small>Custom EJS template path for service generation (e.g., /path/to/custom-service.ejs)</small>
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -825,7 +853,11 @@ CREATE TABLE user_info (
                 useLombok: document.getElementById('useLombok').checked,
                 useSwagger: document.getElementById('useSwagger').checked,
                 useSwaggerV3: document.getElementById('useSwaggerV3').checked,
-                useMyBatisPlus: document.getElementById('useMyBatisPlus').checked
+                useMyBatisPlus: document.getElementById('useMyBatisPlus').checked,
+                templatePathEntity: formData.get('templatePathEntity'),
+                templatePathMapper: formData.get('templatePathMapper'),
+                templatePathMapperXml: formData.get('templatePathMapperXml'),
+                templatePathService: formData.get('templatePathService')
             };
 
             const configScope = formData.get('configScope');
@@ -864,7 +896,11 @@ CREATE TABLE user_info (
                     useLombok: true,
                     useSwagger: false,
                     useSwaggerV3: false,
-                    useMyBatisPlus: false
+                    useMyBatisPlus: false,
+                    templatePathEntity: '',
+                    templatePathMapper: '',
+                    templatePathMapperXml: '',
+                    templatePathService: ''
                 };
             }
 
@@ -883,6 +919,10 @@ CREATE TABLE user_info (
             document.getElementById('useSwagger').checked = settings.useSwagger || false;
             document.getElementById('useSwaggerV3').checked = settings.useSwaggerV3 || false;
             document.getElementById('useMyBatisPlus').checked = settings.useMyBatisPlus || false;
+            document.getElementById('templatePathEntity').value = settings.templatePathEntity || '';
+            document.getElementById('templatePathMapper').value = settings.templatePathMapper || '';
+            document.getElementById('templatePathMapperXml').value = settings.templatePathMapperXml || '';
+            document.getElementById('templatePathService').value = settings.templatePathService || '';
         }
 
         // Generate button - show preview

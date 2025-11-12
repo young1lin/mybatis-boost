@@ -170,6 +170,26 @@
           "default": false,
           "description": "%config.generator.useMyBatisPlus.description%"
         },
+        "mybatis-boost.generator.template-path.entity": {
+          "type": "string",
+          "default": "",
+          "description": "Custom template path for entity generation. If empty, use built-in template."
+        },
+        "mybatis-boost.generator.template-path.mapper": {
+          "type": "string",
+          "default": "",
+          "description": "Custom template path for mapper generation. If empty, use built-in template."
+        },
+        "mybatis-boost.generator.template-path.mapper-xml": {
+          "type": "string",
+          "default": "",
+          "description": "Custom template path for mapper XML generation. If empty, use built-in template."
+        },
+        "mybatis-boost.generator.template-path.service": {
+          "type": "string",
+          "default": "",
+          "description": "Custom template path for service generation. If empty, use built-in template."
+        },
         "mybatis-boost.mcp.enable": {
           "type": "boolean",
           "default": true,

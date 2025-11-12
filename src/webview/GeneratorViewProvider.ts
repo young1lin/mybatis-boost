@@ -35,6 +35,10 @@ interface SettingsConfig {
     useSwagger: boolean;
     useSwaggerV3: boolean;
     useMyBatisPlus: boolean;
+    templatePathEntity: string;
+    templatePathMapper: string;
+    templatePathMapperXml: string;
+    templatePathService: string;
 }
 
 /**
@@ -157,11 +161,17 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             // Get template directory path
             const templateDir = path.join(__dirname, 'generator', 'template');
 
+            // Determine template paths (use custom if provided, otherwise use built-in)
+            const entityTemplatePath = settings.templatePathEntity || path.join(templateDir, 'entity.ejs');
+            const mapperTemplatePath = settings.templatePathMapper || path.join(templateDir, 'mapper.ejs');
+            const mapperXmlTemplatePath = settings.templatePathMapperXml || path.join(templateDir, 'mapper-xml.ejs');
+            const serviceTemplatePath = settings.templatePathService || path.join(templateDir, 'service.ejs');
+
             const results = [
-                generator.generateEntity(path.join(templateDir, 'entity.ejs')),
-                generator.generateMapper(path.join(templateDir, 'mapper.ejs')),
-                generator.generateMapperXml(path.join(templateDir, 'mapper-xml.ejs')),
-                generator.generateService(path.join(templateDir, 'service.ejs'))
+                generator.generateEntity(entityTemplatePath),
+                generator.generateMapper(mapperTemplatePath),
+                generator.generateMapperXml(mapperXmlTemplatePath),
+                generator.generateService(serviceTemplatePath)
             ];
 
             // Send preview results to webview (with full content)
@@ -379,6 +389,10 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
         await config.update('useSwagger', settings.useSwagger, target);
         await config.update('useSwaggerV3', settings.useSwaggerV3, target);
         await config.update('useMyBatisPlus', settings.useMyBatisPlus, target);
+        await config.update('template-path.entity', settings.templatePathEntity, target);
+        await config.update('template-path.mapper', settings.templatePathMapper, target);
+        await config.update('template-path.mapper-xml', settings.templatePathMapperXml, target);
+        await config.update('template-path.service', settings.templatePathService, target);
     }
 
     /**
@@ -397,7 +411,11 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             useLombok: config.get<boolean>('useLombok', true),
             useSwagger: config.get<boolean>('useSwagger', false),
             useSwaggerV3: config.get<boolean>('useSwaggerV3', false),
-            useMyBatisPlus: config.get<boolean>('useMyBatisPlus', false)
+            useMyBatisPlus: config.get<boolean>('useMyBatisPlus', false),
+            templatePathEntity: config.get<string>('template-path.entity', ''),
+            templatePathMapper: config.get<string>('template-path.mapper', ''),
+            templatePathMapperXml: config.get<string>('template-path.mapper-xml', ''),
+            templatePathService: config.get<string>('template-path.service', '')
         };
     }
 

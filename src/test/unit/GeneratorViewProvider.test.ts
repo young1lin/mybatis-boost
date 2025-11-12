@@ -321,4 +321,225 @@ describe('GeneratorViewProvider', () => {
             );
         });
     });
+
+    describe('Custom Template Path Configuration', () => {
+        let mockContext: any;
+        let mockWebview: any;
+        let mockWebviewView: any;
+        let getConfigurationStub: sinon.SinonStub;
+        let updateStub: sinon.SinonStub;
+        let getStub: sinon.SinonStub;
+        let workspaceFoldersStub: sinon.SinonStub;
+
+        beforeEach(() => {
+            // Mock configuration methods
+            updateStub = sandbox.stub().resolves();
+            getStub = sandbox.stub();
+
+            const mockConfig = {
+                get: getStub,
+                update: updateStub,
+                inspect: sandbox.stub()
+            };
+
+            getConfigurationStub = sandbox.stub(vscode.workspace, 'getConfiguration').returns(mockConfig as any);
+
+            // Mock webview
+            mockWebview = {
+                options: {},
+                html: '',
+                postMessage: sandbox.stub().resolves(true),
+                onDidReceiveMessage: sandbox.stub(),
+                asWebviewUri: sandbox.stub().returns(vscode.Uri.file('/mock/uri')),
+                cspSource: 'mock-csp'
+            };
+
+            mockWebviewView = {
+                webview: mockWebview,
+                visible: true,
+                show: sandbox.stub(),
+                onDidDispose: sandbox.stub(),
+                onDidChangeVisibility: sandbox.stub()
+            };
+
+            // Mock extension context
+            mockContext = {
+                extensionUri: vscode.Uri.file('/mock/path'),
+                globalState: {
+                    get: sandbox.stub().returns([]),
+                    update: sandbox.stub().resolves()
+                }
+            };
+
+            // Mock workspace folders
+            workspaceFoldersStub = sandbox.stub(vscode.workspace, 'workspaceFolders' as any);
+            workspaceFoldersStub.value([{ uri: vscode.Uri.file('/workspace'), name: 'test', index: 0 }]);
+        });
+
+        it('should load template paths from configuration with default empty values', async () => {
+            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
+
+            // Setup: default empty template paths
+            getStub.withArgs('template-path.entity', '').returns('');
+            getStub.withArgs('template-path.mapper', '').returns('');
+            getStub.withArgs('template-path.mapper-xml', '').returns('');
+            getStub.withArgs('template-path.service', '').returns('');
+
+            const provider = new GeneratorViewProvider(mockContext.extensionUri, mockContext);
+            provider.resolveWebviewView(mockWebviewView, {} as any, {} as any);
+
+            // Simulate loadSettings message
+            const messageHandler = mockWebview.onDidReceiveMessage.firstCall.args[0];
+            await messageHandler({ type: 'loadSettings' });
+
+            // Verify postMessage was called with empty template paths
+            const messageCall = mockWebview.postMessage.getCalls().find(
+                (call: any) => call.args[0].type === 'settingsLoaded'
+            );
+            assert.ok(messageCall, 'settingsLoaded message should be sent');
+            const settings = messageCall.args[0].settings;
+            assert.strictEqual(settings.templatePathEntity, '', 'Entity template path should be empty by default');
+            assert.strictEqual(settings.templatePathMapper, '', 'Mapper template path should be empty by default');
+            assert.strictEqual(settings.templatePathMapperXml, '', 'Mapper XML template path should be empty by default');
+            assert.strictEqual(settings.templatePathService, '', 'Service template path should be empty by default');
+        });
+
+        it('should load custom template paths from configuration', async () => {
+            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
+
+            // Setup: custom template paths
+            getStub.withArgs('template-path.entity', '').returns('/custom/entity.ejs');
+            getStub.withArgs('template-path.mapper', '').returns('/custom/mapper.ejs');
+            getStub.withArgs('template-path.mapper-xml', '').returns('/custom/mapper-xml.ejs');
+            getStub.withArgs('template-path.service', '').returns('/custom/service.ejs');
+
+            const provider = new GeneratorViewProvider(mockContext.extensionUri, mockContext);
+            provider.resolveWebviewView(mockWebviewView, {} as any, {} as any);
+
+            // Simulate loadSettings message
+            const messageHandler = mockWebview.onDidReceiveMessage.firstCall.args[0];
+            await messageHandler({ type: 'loadSettings' });
+
+            // Verify postMessage was called with custom template paths
+            const messageCall = mockWebview.postMessage.getCalls().find(
+                (call: any) => call.args[0].type === 'settingsLoaded'
+            );
+            assert.ok(messageCall, 'settingsLoaded message should be sent');
+            const settings = messageCall.args[0].settings;
+            assert.strictEqual(settings.templatePathEntity, '/custom/entity.ejs', 'Entity template path should match');
+            assert.strictEqual(settings.templatePathMapper, '/custom/mapper.ejs', 'Mapper template path should match');
+            assert.strictEqual(settings.templatePathMapperXml, '/custom/mapper-xml.ejs', 'Mapper XML template path should match');
+            assert.strictEqual(settings.templatePathService, '/custom/service.ejs', 'Service template path should match');
+        });
+
+        it('should save template paths to workspace configuration', async () => {
+            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
+
+            const provider = new GeneratorViewProvider(mockContext.extensionUri, mockContext);
+            provider.resolveWebviewView(mockWebviewView, {} as any, {} as any);
+
+            // Simulate saveSettings message with custom template paths
+            const messageHandler = mockWebview.onDidReceiveMessage.firstCall.args[0];
+            await messageHandler({
+                type: 'saveSettings',
+                settings: {
+                    basePackage: 'com.test.package',
+                    author: 'Test Author',
+                    entitySuffix: 'Entity',
+                    mapperSuffix: 'Mapper',
+                    serviceSuffix: 'Service',
+                    datetime: 'LocalDateTime',
+                    useLombok: true,
+                    useSwagger: false,
+                    useSwaggerV3: false,
+                    useMyBatisPlus: false,
+                    templatePathEntity: '/custom/entity.ejs',
+                    templatePathMapper: '/custom/mapper.ejs',
+                    templatePathMapperXml: '/custom/mapper-xml.ejs',
+                    templatePathService: '/custom/service.ejs'
+                },
+                configScope: 'workspace'
+            });
+
+            // Verify template paths were saved
+            const entityCall = updateStub.getCalls().find(
+                (call: any) => call.args[0] === 'template-path.entity'
+            );
+            assert.ok(entityCall, 'Entity template path should be updated');
+            assert.strictEqual(entityCall.args[1], '/custom/entity.ejs', 'Entity template path value should match');
+
+            const mapperCall = updateStub.getCalls().find(
+                (call: any) => call.args[0] === 'template-path.mapper'
+            );
+            assert.ok(mapperCall, 'Mapper template path should be updated');
+            assert.strictEqual(mapperCall.args[1], '/custom/mapper.ejs', 'Mapper template path value should match');
+
+            const mapperXmlCall = updateStub.getCalls().find(
+                (call: any) => call.args[0] === 'template-path.mapper-xml'
+            );
+            assert.ok(mapperXmlCall, 'Mapper XML template path should be updated');
+            assert.strictEqual(mapperXmlCall.args[1], '/custom/mapper-xml.ejs', 'Mapper XML template path value should match');
+
+            const serviceCall = updateStub.getCalls().find(
+                (call: any) => call.args[0] === 'template-path.service'
+            );
+            assert.ok(serviceCall, 'Service template path should be updated');
+            assert.strictEqual(serviceCall.args[1], '/custom/service.ejs', 'Service template path value should match');
+        });
+
+        it('should save empty template paths to use built-in defaults', async () => {
+            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
+
+            const provider = new GeneratorViewProvider(mockContext.extensionUri, mockContext);
+            provider.resolveWebviewView(mockWebviewView, {} as any, {} as any);
+
+            // Simulate saveSettings message with empty template paths
+            const messageHandler = mockWebview.onDidReceiveMessage.firstCall.args[0];
+            await messageHandler({
+                type: 'saveSettings',
+                settings: {
+                    basePackage: 'com.test.package',
+                    author: 'Test Author',
+                    entitySuffix: 'Entity',
+                    mapperSuffix: 'Mapper',
+                    serviceSuffix: 'Service',
+                    datetime: 'LocalDateTime',
+                    useLombok: true,
+                    useSwagger: false,
+                    useSwaggerV3: false,
+                    useMyBatisPlus: false,
+                    templatePathEntity: '',
+                    templatePathMapper: '',
+                    templatePathMapperXml: '',
+                    templatePathService: ''
+                },
+                configScope: 'workspace'
+            });
+
+            // Verify empty template paths were saved
+            const entityCall = updateStub.getCalls().find(
+                (call: any) => call.args[0] === 'template-path.entity'
+            );
+            assert.ok(entityCall, 'Entity template path should be updated');
+            assert.strictEqual(entityCall.args[1], '', 'Entity template path should be empty');
+
+            const mapperCall = updateStub.getCalls().find(
+                (call: any) => call.args[0] === 'template-path.mapper'
+            );
+            assert.ok(mapperCall, 'Mapper template path should be updated');
+            assert.strictEqual(mapperCall.args[1], '', 'Mapper template path should be empty');
+
+            const mapperXmlCall = updateStub.getCalls().find(
+                (call: any) => call.args[0] === 'template-path.mapper-xml'
+            );
+            assert.ok(mapperXmlCall, 'Mapper XML template path should be updated');
+            assert.strictEqual(mapperXmlCall.args[1], '', 'Mapper XML template path should be empty');
+
+            const serviceCall = updateStub.getCalls().find(
+                (call: any) => call.args[0] === 'template-path.service'
+            );
+            assert.ok(serviceCall, 'Service template path should be updated');
+            assert.strictEqual(serviceCall.args[1], '', 'Service template path should be empty');
+        });
+    });
 });

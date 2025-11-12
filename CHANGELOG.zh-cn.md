@@ -6,6 +6,37 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.1] - 2025-11-12
+
+### 新增
+
+- ✨ **自定义模板路径支持**：用户现在可以指定自定义 EJS 模板文件用于代码生成
+  - 新增自定义模板路径配置选项：
+    - `mybatis-boost.generator.template-path.entity`：实体类生成的自定义模板
+    - `mybatis-boost.generator.template-path.mapper`：Mapper 接口生成的自定义模板
+    - `mybatis-boost.generator.template-path.mapper-xml`：Mapper XML 生成的自定义模板
+    - `mybatis-boost.generator.template-path.service`：Service 类生成的自定义模板
+  - 所有模板路径默认为空字符串，使用内置模板
+  - 如果提供了自定义路径，则会覆盖默认模板
+  - 在生成器设置 UI 中新增"自定义模板路径"部分
+  - 完全支持项目级别和全局级别的模板配置
+
+### 技术细节
+
+- 更新 `SettingsConfig` 接口，新增 4 个模板路径字段
+- 修改 `GeneratorViewProvider._getSettings()` 从配置中加载模板路径
+- 修改 `GeneratorViewProvider._handleSaveSettings()` 以持久化模板路径
+- 增强 `GeneratorViewProvider._handlePreview()` 在生成代码时使用自定义模板
+- 为自定义模板路径功能添加 4 个全面的单元测试
+- 所有 114 个单元测试成功通过
+
+### 优势
+
+- **灵活性**：团队可以自定义代码生成模板以匹配其编码标准
+- **可重用性**：自定义模板可以通过项目设置在团队成员之间共享
+- **向后兼容**：空模板路径自动回退到内置模板
+- **无破坏性变更**：现有用户无需任何配置即可继续使用默认模板
+
 ## [0.3.0] - 2025-11-11
 
 ### 新增
