@@ -6,6 +6,106 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.2] - 2025-11-12
+
+### Added
+
+- ✨ **MyBatis XML Formatter**: Professional SQL formatting for MyBatis Mapper XML files
+  - **Trigger**: Press `Alt+Shift+F` (Windows/Linux) or `Cmd+Shift+F` (Mac) to format XML files
+  - **Intelligent Formatting**:
+    - Formats SQL content in `<select>`, `<insert>`, `<update>`, `<delete>` tags
+    - Preserves all MyBatis dynamic SQL tags (`<if>`, `<foreach>`, `<where>`, `<set>`, `<trim>`, `<bind>`, `<include>`, `<choose>`, `<when>`, `<otherwise>`)
+    - Handles nested dynamic tags recursively (innermost to outermost)
+    - Skips `<sql>` fragment tags (preserves original formatting)
+    - Skips CDATA blocks (preserves original formatting)
+  - **IDEA-Style Formatting**: Matches IntelliJ IDEA's default SQL formatting behavior
+    - Keywords (SELECT, FROM, WHERE, AND, SET) on separate lines
+    - Proper indentation after keywords (2 spaces by default)
+    - Logical operators (AND/OR) with newline before condition
+    - Each column/condition on separate line for readability
+  - **MyBatis Parameter Preservation**:
+    - Fully preserves `#{paramName}` and `${paramName}` syntax
+    - Maintains parameter order and content
+    - Converts parameters to `?` placeholders during formatting for better SQL structure recognition
+    - Restores original MyBatis parameters after formatting
+  - **Auto-Detection**: Automatically detects SQL dialect (MySQL, PostgreSQL, Oracle, SQL Server)
+
+- ⚙️ **Configuration Options** (`mybatis-boost.formatter.*`):
+  - `enabled` (default: `true`): Enable/disable XML formatter (changes take effect immediately)
+  - `language` (default: `auto`): SQL dialect for formatting
+    - Options: `auto`, `mysql`, `postgresql`, `plsql`, `tsql`, `db2`, `hive`, `mariadb`, `n1ql`, `redshift`, `spark`, `snowflake`, `bigquery`
+  - `keywordCase` (default: `upper`): Keyword case transformation (upper/lower/preserve)
+  - `tabWidth` (default: `2`): Indentation width (IDEA default: 2 spaces)
+  - `indentStyle` (default: `standard`): Indentation style (standard/tabularLeft/tabularRight)
+  - `denseOperators` (default: `false`): Remove spaces around operators
+
+### Fixed
+
+- 🐛 **Formatter Spacing Issues**: Resolved extra blank lines and indentation problems
+  - Fixed: Extra blank line between keywords and dynamic tags (e.g., `SELECT` and `<include>`)
+  - Fixed: Extra blank line between keywords and content (e.g., `VALUES` and `<foreach>`)
+  - Fixed: Missing indentation inside dynamic tags
+  - **Solution**: Detect if placeholder is alone on line and skip adding leading newline
+  - **Result**: Clean formatting without unnecessary empty lines and proper indentation (Style A: extra 2-space indent inside dynamic tags)
+
+### Technical Details
+
+- **5-Step Formatting Process**:
+  1. Extract dynamic tags → replace with placeholders
+  2. Replace MyBatis parameters (`#{name}`, `${param}`) → `?` placeholders (NEW)
+  3. Format SQL using sql-formatter library
+  4. Restore MyBatis parameters from `?` back to original (NEW)
+  5. Restore dynamic tags with proper indentation
+
+- **Core Components**:
+  - `MybatisSqlFormatter`: Core formatting engine with placeholder replacement strategy
+    - `extractDynamicTags()`: Recursive tag extraction (handles nested tags)
+    - `replaceMyBatisParams()`: Converts MyBatis params to `?` for better formatting
+    - `restoreMyBatisParams()`: Restores original MyBatis parameters
+    - `restoreDynamicTags()`: Restores tags with proper indentation (Style A)
+    - `detectDialect()`: Auto-detects SQL dialect from syntax patterns
+  - `MybatisXmlFormattingProvider`: VS Code DocumentFormattingEditProvider
+    - Implements `provideDocumentFormattingEdits()` interface
+    - Detects MyBatis mapper XML files by namespace attribute
+    - Applies formatting only to statement tags
+    - Preserves XML structure and attributes
+
+- **Dynamic Configuration**:
+  - Configuration changes take effect immediately without extension reload
+  - Listens to `onDidChangeConfiguration` events
+  - Dynamically registers/unregisters formatter provider
+  - Shows user notification on state change
+
+### Performance
+
+- **Efficient Processing**: Fast regex-based extraction and replacement
+- **Error Handling**: Returns original content if formatting fails (graceful degradation)
+- **All Tests Pass**: 42 formatter unit tests + 201 existing tests = 243 total tests passing
+
+### Example
+
+**Before Formatting:**
+```xml
+<update id="updateById">
+    UPDATE `user` SET `name` = #{name}, age = #{age}, update_time = #{updateTime}, version = version + 1 WHERE id = #{id} AND version = #{version}
+</update>
+```
+
+**After Formatting (IDEA Style):**
+```xml
+<update id="updateById">
+    UPDATE `user`
+    SET
+      `name` = #{name},
+      age = #{age},
+      update_time = #{updateTime},
+      version = version + 1
+    WHERE
+      id = #{id}
+      AND version = #{version}
+</update>
+```
+
 ## [0.3.1] - 2025-11-12
 
 ### Added

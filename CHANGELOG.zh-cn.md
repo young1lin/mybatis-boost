@@ -6,6 +6,106 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.2] - 2025-11-12
+
+### 新增
+
+- ✨ **MyBatis XML 格式化器**：为 MyBatis Mapper XML 文件提供专业的 SQL 格式化
+  - **触发方式**：按 `Alt+Shift+F`（Windows/Linux）或 `Cmd+Shift+F`（Mac）格式化 XML 文件
+  - **智能格式化**：
+    - 格式化 `<select>`、`<insert>`、`<update>`、`<delete>` 标签中的 SQL 内容
+    - 保留所有 MyBatis 动态 SQL 标签（`<if>`、`<foreach>`、`<where>`、`<set>`、`<trim>`、`<bind>`、`<include>`、`<choose>`、`<when>`、`<otherwise>`）
+    - 递归处理嵌套动态标签（从内到外）
+    - 跳过 `<sql>` 片段标签（保留原始格式）
+    - 跳过 CDATA 块（保留原始格式）
+  - **IDEA 风格格式化**：匹配 IntelliJ IDEA 的默认 SQL 格式化行为
+    - 关键字（SELECT、FROM、WHERE、AND、SET）独占一行
+    - 关键字后正确缩进（默认 2 个空格）
+    - 逻辑运算符（AND/OR）在条件前换行
+    - 每列/条件单独一行以提高可读性
+  - **MyBatis 参数保留**：
+    - 完全保留 `#{paramName}` 和 `${paramName}` 语法
+    - 维护参数顺序和内容
+    - 格式化期间将参数转换为 `?` 占位符以更好地识别 SQL 结构
+    - 格式化后还原原始 MyBatis 参数
+  - **自动检测**：自动检测 SQL 方言（MySQL、PostgreSQL、Oracle、SQL Server）
+
+- ⚙️ **配置选项**（`mybatis-boost.formatter.*`）：
+  - `enabled`（默认：`true`）：启用/禁用 XML 格式化器（更改立即生效）
+  - `language`（默认：`auto`）：SQL 方言用于格式化
+    - 选项：`auto`、`mysql`、`postgresql`、`plsql`、`tsql`、`db2`、`hive`、`mariadb`、`n1ql`、`redshift`、`spark`、`snowflake`、`bigquery`
+  - `keywordCase`（默认：`upper`）：关键字大小写转换（upper/lower/preserve）
+  - `tabWidth`（默认：`2`）：缩进宽度（IDEA 默认：2 个空格）
+  - `indentStyle`（默认：`standard`）：缩进风格（standard/tabularLeft/tabularRight）
+  - `denseOperators`（默认：`false`）：移除操作符周围的空格
+
+### 修复
+
+- 🐛 **格式化器间距问题**：解决多余空行和缩进问题
+  - 修复：关键字和动态标签之间的多余空行（例如 `SELECT` 和 `<include>`）
+  - 修复：关键字和内容之间的多余空行（例如 `VALUES` 和 `<foreach>`）
+  - 修复：动态标签内缺少缩进
+  - **解决方案**：检测占位符是否独占一行，跳过添加前导换行符
+  - **结果**：干净的格式化，没有不必要的空行，并具有正确的缩进（风格 A：动态标签内额外 2 个空格缩进）
+
+### 技术细节
+
+- **5 步格式化流程**：
+  1. 提取动态标签 → 替换为占位符
+  2. 替换 MyBatis 参数（`#{name}`、`${param}`）→ `?` 占位符（新增）
+  3. 使用 sql-formatter 库格式化 SQL
+  4. 将 `?` 还原为原始 MyBatis 参数（新增）
+  5. 还原动态标签并正确缩进
+
+- **核心组件**：
+  - `MybatisSqlFormatter`：采用占位符替换策略的核心格式化引擎
+    - `extractDynamicTags()`：递归标签提取（处理嵌套标签）
+    - `replaceMyBatisParams()`：将 MyBatis 参数转换为 `?` 以实现更好的格式化
+    - `restoreMyBatisParams()`：还原原始 MyBatis 参数
+    - `restoreDynamicTags()`：还原标签并正确缩进（风格 A）
+    - `detectDialect()`：从语法模式自动检测 SQL 方言
+  - `MybatisXmlFormattingProvider`：VS Code DocumentFormattingEditProvider
+    - 实现 `provideDocumentFormattingEdits()` 接口
+    - 通过 namespace 属性检测 MyBatis mapper XML 文件
+    - 仅对语句标签应用格式化
+    - 保留 XML 结构和属性
+
+- **动态配置**：
+  - 配置更改立即生效，无需重新加载扩展
+  - 监听 `onDidChangeConfiguration` 事件
+  - 动态注册/取消注册格式化器提供程序
+  - 状态更改时显示用户通知
+
+### 性能
+
+- **高效处理**：基于正则表达式的快速提取和替换
+- **错误处理**：格式化失败时返回原始内容（优雅降级）
+- **所有测试通过**：42 个格式化器单元测试 + 201 个现有测试 = 243 个测试全部通过
+
+### 示例
+
+**格式化前：**
+```xml
+<update id="updateById">
+    UPDATE `user` SET `name` = #{name}, age = #{age}, update_time = #{updateTime}, version = version + 1 WHERE id = #{id} AND version = #{version}
+</update>
+```
+
+**格式化后（IDEA 风格）：**
+```xml
+<update id="updateById">
+    UPDATE `user`
+    SET
+      `name` = #{name},
+      age = #{age},
+      update_time = #{updateTime},
+      version = version + 1
+    WHERE
+      id = #{id}
+      AND version = #{version}
+</update>
+```
+
 ## [0.3.1] - 2025-11-12
 
 ### 新增
