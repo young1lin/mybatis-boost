@@ -1,6 +1,6 @@
 {
   "displayName": "MyBatis Boost",
-  "description": "High-performance bidirectional navigation between MyBatis mapper interfaces and XML files with sub-100ms latency",
+  "description": "A one-stop MyBatis plugin that supports Mapper navigation, Mapper generation (with Cursor MCP enabled by default and VSCode Copilot MCP support), SQL interception and logging, SQL formatting, and viewing complete SQL in XML. TODO: XML Dynamic SQL syntax highlighting.",
 
   "command.clearCache": "Clear Cache and Rebuild",
   "command.refreshMappings": "Refresh Mappings",
