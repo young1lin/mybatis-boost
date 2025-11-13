@@ -65,6 +65,19 @@ export async function extractParameterReferences(
 }
 
 /**
+ * Remove XML comments from a string
+ * Handles both single-line and multi-line comments
+ *
+ * @param content - Content that may contain XML comments
+ * @returns Content with all XML comments removed
+ */
+function removeXmlComments(content: string): string {
+    // Replace all XML comments (<!-- ... -->) with empty string
+    // The regex handles multi-line comments using the 's' flag (dotAll)
+    return content.replace(/<!--[\s\S]*?-->/g, '');
+}
+
+/**
  * Extract parameter references from a single line
  * Parameters are extracted in the order they appear (left to right)
  *
@@ -75,11 +88,14 @@ export async function extractParameterReferences(
 function extractParametersFromLine(line: string, lineNumber: number): ParameterReference[] {
     const parameters: ParameterReference[] = [];
 
+    // Remove XML comments before extracting parameters
+    const lineWithoutComments = removeXmlComments(line);
+
     // Match both #{param} and ${param}
     const combinedRegex = /(#\{([^}]+)\})|(\$\{([^}]+)\})/g;
     let match: RegExpExecArray | null;
 
-    while ((match = combinedRegex.exec(line)) !== null) {
+    while ((match = combinedRegex.exec(lineWithoutComments)) !== null) {
         const isPrepared = match[1] !== undefined; // #{param}
         const isSubstitution = match[3] !== undefined; // ${param}
 
@@ -295,9 +311,10 @@ export async function extractLocalVariables(
         }
     }
 
-    // Extract local variables from the complete statement content
+    // Remove XML comments before extracting local variables
     if (statementContent) {
-        extractLocalVariablesFromContent(statementContent, localVars);
+        const contentWithoutComments = removeXmlComments(statementContent);
+        extractLocalVariablesFromContent(contentWithoutComments, localVars);
     }
 
     return localVars;
@@ -358,9 +375,10 @@ export async function extractAttributeReferences(
         }
     }
 
-    // Extract attribute references from the complete statement content
+    // Remove XML comments before extracting attribute references
     if (statementContent) {
-        extractAttributeReferencesFromContent(statementContent, attrRefs);
+        const contentWithoutComments = removeXmlComments(statementContent);
+        extractAttributeReferencesFromContent(contentWithoutComments, attrRefs);
     }
 
     return attrRefs;
