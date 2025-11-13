@@ -23,50 +23,85 @@ export class SqlOutputChannel {
      * Show converted SQL in output channel
      */
     public show(result: ConvertedSql): void {
-        // Don't auto-show the output channel - let users manually open it if needed
-        // this.outputChannel.show(true);
-
         // Get formatSql configuration
         const config = vscode.workspace.getConfiguration('mybatis-boost.console');
         const shouldFormat = config.get<boolean>('formatSql', true);
 
         const lines: string[] = [];
 
-        // Timestamp
-        lines.push(`[${result.timestamp}]`);
-
-        // Mapper (if available)
+        // Mapper info as SQL comment
         if (result.mapper) {
-            lines.push(`Mapper: ${result.mapper}`);
+            lines.push(`-- Mapper: ${result.mapper}`);
         }
 
-        // Thread info (if available)
+        // Thread info as SQL comment (extract thread name only)
         if (result.threadInfo) {
-            lines.push(`Thread: ${result.threadInfo}`);
+            const threadName = this.extractThreadName(result.threadInfo);
+            lines.push(`-- Thread: [${threadName}]`);
         }
+
+        // Execution time as SQL comment
+        if (result.executionTime !== undefined && result.executionTime >= 0) {
+            lines.push(`-- Execution Time: ${result.executionTime}ms`);
+        }
+
+        // Rows affected as SQL comment (extract from totalLine)
+        if (result.totalLine) {
+            const rowsAffected = this.extractRowsAffected(result.totalLine);
+            if (rowsAffected !== null) {
+                lines.push(`-- Rows Affected: ${rowsAffected}`);
+            }
+        }
+
+        // Empty line separator between metadata and SQL
+        lines.push('');
 
         // Format SQL if enabled
         const displaySql = shouldFormat
             ? SqlConverter.formatSql(result.convertedSql, result.database)
             : result.convertedSql;
 
-        // Converted SQL (no length limit)
-        lines.push(`SQL:\n${displaySql}`);
+        // Converted SQL without "SQL:" label
+        lines.push(displaySql);
 
-        // Execution time (if available)
-        if (result.executionTime !== undefined && result.executionTime >= 0) {
-            lines.push(`Time: ${result.executionTime}ms`);
-        }
-
-        lines.push(''); // Empty line separator
-        lines.push('─'.repeat(80)); // Visual separator
-        lines.push(''); // Empty line
+        // Visual separator
+        lines.push('');
+        lines.push('─'.repeat(80));
+        lines.push('');
 
         const output = lines.join('\n');
         this.outputChannel.appendLine(output);
 
         // Save to history for export
         this.logHistory.push(output);
+    }
+
+    /**
+     * Extract thread name from thread info string
+     * Input formats: "166244 [main]" or "[main]" or "166244"
+     * Output: thread name only (e.g., "main")
+     */
+    private extractThreadName(threadInfo: string): string {
+        // Match thread name in brackets: [name]
+        const bracketMatch = threadInfo.match(/\[([^\]]+)\]/);
+        if (bracketMatch) {
+            return bracketMatch[1];
+        }
+
+        // If no brackets found, remove leading numbers and whitespace
+        const cleanName = threadInfo.replace(/^\d+\s*/, '').trim();
+        return cleanName || threadInfo;
+    }
+
+    /**
+     * Extract rows affected from total line
+     * Input formats: "Total: 5" or "Updates: 1"
+     * Output: number of rows affected or null if not found
+     */
+    private extractRowsAffected(totalLine: string): number | null {
+        // Match "Total: N" or "Updates: N"
+        const match = totalLine.match(/(?:Total|Updates):\s*(\d+)/i);
+        return match ? parseInt(match[1], 10) : null;
     }
 
     /**
