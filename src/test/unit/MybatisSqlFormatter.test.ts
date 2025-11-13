@@ -604,6 +604,131 @@ describe('MybatisSqlFormatter', () => {
         });
     });
 
+    describe('Comma Placement', () => {
+        it('should not place commas on separate lines in UPDATE statements', () => {
+            const input = `UPDATE user SET name =#{name}, age =#{age}, update_time =#{updateTime}, version = version + 1 WHERE id =#{id} AND version =#{version}`;
+            const result = formatter.format(input);
+
+            // Commas should not be on their own line
+            const lines = result.split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                // A line should not start with just a comma
+                assert.ok(!trimmedLine.match(/^,\s*$/), `Found comma on separate line: "${line}"`);
+            }
+
+            // Verify parameters are preserved
+            assert.ok(result.includes('#{name}'));
+            assert.ok(result.includes('#{age}'));
+            assert.ok(result.includes('#{updateTime}'));
+            assert.ok(result.includes('#{id}'));
+            assert.ok(result.includes('#{version}'));
+        });
+
+        it('should not place commas on separate lines in SELECT statements', () => {
+            const input = `SELECT id, name, age, email FROM users WHERE status = 1`;
+            const result = formatter.format(input);
+
+            // Commas should not be on their own line
+            const lines = result.split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                assert.ok(!trimmedLine.match(/^,\s*$/), `Found comma on separate line: "${line}"`);
+            }
+        });
+
+        it('should not place commas on separate lines in INSERT statements', () => {
+            const input = `INSERT INTO users (id, name, age, email) VALUES (#{id}, #{name}, #{age}, #{email})`;
+            const result = formatter.format(input);
+
+            // Commas should not be on their own line
+            const lines = result.split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                assert.ok(!trimmedLine.match(/^,\s*$/), `Found comma on separate line: "${line}"`);
+            }
+        });
+
+        it('should fix existing SQL with commas on separate lines', () => {
+            // This is the actual bug scenario - input already has commas on separate lines
+            const input = `UPDATE \`user\`
+SET
+    \`name\` =#{name}
+,
+age =#{age}
+,
+update_time =#{updateTime}
+,
+version = version + 1
+WHERE
+    id =#{id}
+AND version =#{version}`;
+
+            const result = formatter.format(input);
+
+            // After formatting, commas should NOT be on their own line
+            const lines = result.split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                assert.ok(!trimmedLine.match(/^,\s*$/), `Found comma on separate line after preprocessing: "${line}"`);
+            }
+
+            // Verify parameters are preserved
+            assert.ok(result.includes('#{name}'));
+            assert.ok(result.includes('#{age}'));
+            assert.ok(result.includes('#{updateTime}'));
+            assert.ok(result.includes('#{id}'));
+            assert.ok(result.includes('#{version}'));
+
+            // Verify SQL keywords are formatted
+            assert.ok(result.includes('UPDATE'));
+            assert.ok(result.includes('SET'));
+            assert.ok(result.includes('WHERE'));
+        });
+
+        it('should handle multiple commas on separate lines correctly', () => {
+            const input = `SELECT
+id
+,
+name
+,
+age
+,
+email
+FROM users`;
+
+            const result = formatter.format(input);
+
+            // No commas should be on their own line
+            const lines = result.split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                assert.ok(!trimmedLine.match(/^,\s*$/), `Found comma on separate line: "${line}"`);
+            }
+
+            // Result should still contain all fields
+            assert.ok(result.includes('id'));
+            assert.ok(result.includes('name'));
+            assert.ok(result.includes('age'));
+            assert.ok(result.includes('email'));
+        });
+
+        it('should preserve commas that are part of content (not on separate lines)', () => {
+            const input = `INSERT INTO users (id, name, age) VALUES (#{id}, #{name}, #{age})`;
+            const result = formatter.format(input);
+
+            // Should still have commas in the output (as part of column list)
+            assert.ok(result.includes(','));
+
+            // But no comma should be on its own line
+            const lines = result.split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                assert.ok(!trimmedLine.match(/^,\s*$/), `Found comma on separate line: "${line}"`);
+            }
+        });
+    });
+
     describe('Proper Nested Tag Indentation with Custom Tab Width', () => {
         it('should properly indent <trim> and <if> tags with 4-space indentation', () => {
             const input = `INSERT INTO user_table <trim prefix="(" suffix=")" suffixOverrides=","><if test="id != null">id,</if><if test="name != null">user_name,</if><if test="age != null">age,</if></trim>`;

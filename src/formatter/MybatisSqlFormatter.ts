@@ -407,7 +407,9 @@ class MybatisCstFormatter {
         const indent = this.getIndent(depth, options.tabWidth || 4);
         const sql = node.content.trim();
 
-        if (!sql) return '';
+        if (!sql) {
+            return '';
+        }
 
         try {
             // Format SQL using sql-formatter
@@ -538,7 +540,55 @@ export class MybatisSqlFormatter {
         // Remove trailing spaces on each line
         result = result.split('\n').map(line => line.trimEnd()).join('\n');
 
+        // Fix comma placement: move leading commas to end of previous line
+        result = this.postprocessCommas(result);
+
         return result;
+    }
+
+    /**
+     * Postprocess SQL to fix comma placement after formatting
+     * sql-formatter may create leading commas (commas at start of line)
+     * This method moves them to the end of the previous line (trailing commas)
+     *
+     * @param sql - Formatted SQL content
+     * @returns Postprocessed SQL with commas at end of lines instead of beginning
+     */
+    private postprocessCommas(sql: string): string {
+        const lines = sql.split('\n');
+        const result: string[] = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            // Check if this line starts with a comma (leading comma style)
+            if (trimmed.startsWith(',')) {
+                // Move comma to end of previous line
+                if (result.length > 0) {
+                    // Add comma to previous line if it doesn't already have one
+                    const lastLine = result[result.length - 1];
+                    if (!lastLine.trim().endsWith(',')) {
+                        result[result.length - 1] = lastLine + ',';
+                    }
+
+                    // Get rest of content after comma (if any)
+                    const restOfLine = trimmed.substring(1).trim();
+                    if (restOfLine.length > 0) {
+                        // Preserve indentation from original line
+                        const leadingSpaces = line.match(/^\s*/)?.[0] || '';
+                        result.push(leadingSpaces + restOfLine);
+                    }
+                } else {
+                    // Keep line as-is if there's no previous line
+                    result.push(line);
+                }
+            } else {
+                result.push(line);
+            }
+        }
+
+        return result.join('\n');
     }
 
     /**
