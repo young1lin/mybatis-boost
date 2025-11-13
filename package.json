@@ -231,6 +231,13 @@
           "default": true,
           "description": "Format SQL output for better readability"
         },
+        "mybatis-boost.console.historyLimit": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 100,
+          "maximum": 50000,
+          "description": "Maximum number of SQL logs to keep in history (for export feature)"
+        },
         "mybatis-boost.formatter.enabled": {
           "type": "boolean",
           "default": true,

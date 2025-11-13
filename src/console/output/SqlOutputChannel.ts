@@ -72,8 +72,8 @@ export class SqlOutputChannel {
         const output = lines.join('\n');
         this.outputChannel.appendLine(output);
 
-        // Save to history for export
-        this.logHistory.push(output);
+        // Save to history for export (with size limit)
+        this.addToHistory(output);
     }
 
     /**
@@ -105,12 +105,29 @@ export class SqlOutputChannel {
     }
 
     /**
+     * Add entry to history with size limit enforcement
+     * Removes oldest entries if history exceeds configured limit
+     */
+    private addToHistory(entry: string): void {
+        const config = vscode.workspace.getConfiguration('mybatis-boost.console');
+        const historyLimit = config.get<number>('historyLimit', 5000);
+
+        this.logHistory.push(entry);
+
+        // Remove oldest entries if exceeds limit
+        if (this.logHistory.length > historyLimit) {
+            const excessCount = this.logHistory.length - historyLimit;
+            this.logHistory.splice(0, excessCount);
+        }
+    }
+
+    /**
      * Show error message
      */
     public showError(message: string): void {
         const output = `[ERROR] ${message}`;
         this.outputChannel.appendLine(output);
-        this.logHistory.push(output);
+        this.addToHistory(output);
     }
 
     /**
@@ -119,7 +136,7 @@ export class SqlOutputChannel {
     public showInfo(message: string): void {
         const output = `[INFO] ${message}`;
         this.outputChannel.appendLine(output);
-        this.logHistory.push(output);
+        this.addToHistory(output);
     }
 
     /**
