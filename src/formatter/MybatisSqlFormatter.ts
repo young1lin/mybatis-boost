@@ -360,9 +360,42 @@ class MybatisCstFormatter {
     }
 
     private formatRoot(node: RootNode, depth: number, options: FormatOptionsWithLanguage): string {
-        return node.children
-            .map(child => this.formatNode(child, depth, options))
-            .join('');
+        return this.formatChildren(node.children, depth, options);
+    }
+
+    /**
+     * Format array of child nodes with proper spacing between SQL and Param nodes
+     * Ensures space exists between SQL operators/identifiers and MyBatis parameters
+     *
+     * @param children - Array of child nodes to format
+     * @param depth - Current indentation depth
+     * @param options - Formatting options
+     * @returns Formatted string with proper spacing
+     */
+    private formatChildren(children: CSTNode[], depth: number, options: FormatOptionsWithLanguage): string {
+        const formatted: string[] = [];
+
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const formattedChild = this.formatNode(child, depth, options);
+
+            // Add space between SQL node and Param node if needed
+            // This ensures "id = #{id}" instead of "id =#{id}"
+            if (i > 0 && child.type === 'param') {
+                const prevChild = children[i - 1];
+                if (prevChild.type === 'sql' && formatted.length > 0) {
+                    const lastFormatted = formatted[formatted.length - 1];
+                    // Check if last character is not whitespace
+                    if (lastFormatted && !/\s$/.test(lastFormatted)) {
+                        formatted[formatted.length - 1] = lastFormatted + ' ';
+                    }
+                }
+            }
+
+            formatted.push(formattedChild);
+        }
+
+        return formatted.join('');
     }
 
     private formatTag(node: TagNode, depth: number, options: FormatOptionsWithLanguage): string {
@@ -379,10 +412,8 @@ class MybatisCstFormatter {
             return `\n${indent}<${tagName}${attrString}/>`;
         }
 
-        // Format children with increased depth
-        const childrenFormatted = node.children
-            .map(child => this.formatNode(child, depth + 1, options))
-            .join('');
+        // Format children with increased depth using helper method
+        const childrenFormatted = this.formatChildren(node.children, depth + 1, options);
 
         // Check if children contain only inline content (no nested tags)
         const hasNestedTags = node.children.some(child => child.type === 'tag');
