@@ -366,7 +366,7 @@ class MybatisCstFormatter {
     }
 
     private formatTag(node: TagNode, depth: number, options: FormatOptionsWithLanguage): string {
-        const indent = this.getIndent(depth, options.tabWidth || 2);
+        const indent = this.getIndent(depth, options.tabWidth || 4);
         const tagName = node.tagName;
 
         // Format attributes
@@ -395,7 +395,7 @@ class MybatisCstFormatter {
             const trimmedChildren = childrenFormatted.trim();
             if (trimmedChildren.length < 80) {
                 // Short inline content
-                return `\n${indent}<${tagName}${attrString}>\n${this.getIndent(depth + 1, options.tabWidth || 2)}${trimmedChildren}\n${indent}</${tagName}>`;
+                return `\n${indent}<${tagName}${attrString}>\n${this.getIndent(depth + 1, options.tabWidth || 4)}${trimmedChildren}\n${indent}</${tagName}>`;
             } else {
                 // Long content
                 return `\n${indent}<${tagName}${attrString}>${childrenFormatted}\n${indent}</${tagName}>`;
@@ -404,7 +404,7 @@ class MybatisCstFormatter {
     }
 
     private formatSql(node: SqlNode, depth: number, options: FormatOptionsWithLanguage): string {
-        const indent = this.getIndent(depth, options.tabWidth || 2);
+        const indent = this.getIndent(depth, options.tabWidth || 4);
         const sql = node.content.trim();
 
         if (!sql) return '';
@@ -457,7 +457,7 @@ export class MybatisSqlFormatter {
     private readonly DEFAULT_OPTIONS: FormatOptionsWithLanguage = {
         language: 'mysql',
         keywordCase: 'upper',
-        tabWidth: 2,
+        tabWidth: 4,
         indentStyle: 'standard',
         logicalOperatorNewline: 'before',
         denseOperators: false,
