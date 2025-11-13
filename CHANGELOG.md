@@ -51,10 +51,34 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
       - Ensures sql-formatter receives completely clean input without pre-existing indentation
       - sql-formatter then applies its own consistent indentation rules
 
+  - **Issue #4: Missing Space Between SQL Operators and MyBatis Parameters**
+    - **Problem**: SQL formatted as `id =#{id}` instead of `id = #{id}` (missing space before parameter)
+      ```sql
+      WHERE
+          id =#{id}
+      AND name =#{name}
+      ```
+    - **Root Cause**:
+      - CST parser creates separate nodes for SQL text (`"WHERE id ="`) and parameters (`"#{id}"`)
+      - `formatRoot()` and `formatTag()` joined nodes directly without checking for needed spacing
+      - Result: concatenation produced `"WHERE id =#{id}"` without space
+    - **Solution**: Created `formatChildren()` helper method with intelligent spacing logic
+      - When current node is 'param' type AND previous node is 'sql' type
+      - Check if previous node doesn't end with whitespace
+      - Add space before parameter: `"WHERE id =" + " " + "#{id}" = "WHERE id = #{id}"`
+      - Applied in both `formatRoot()` and `formatTag()`
+    - **Result**: Proper spacing between operators and parameters
+      ```sql
+      WHERE
+          id = #{id}
+      AND name = #{name}
+      ```
+
   - **Implementation Details**:
     - **MybatisSqlFormatter.postprocessCommas()**: Converts leading comma style to trailing comma style
     - **MybatisXmlFormattingProvider.normalizeIndentation()**: Removes baseline indentation from extracted XML content
     - **MybatisCstFormatter.normalizeSqlIndentation()**: Removes ALL leading spaces before sql-formatter processing
+    - **MybatisCstFormatter.formatChildren()**: Ensures proper spacing between SQL nodes and parameter nodes
 
   - **Testing**:
     - ✅ Manual verification: 10 repeated formats maintain stable spacing (max 4 spaces)

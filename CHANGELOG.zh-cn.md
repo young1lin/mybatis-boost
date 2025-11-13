@@ -51,10 +51,34 @@
       - 确保 sql-formatter 接收完全干净的输入，没有预先存在的缩进
       - sql-formatter 然后应用其自己的一致缩进规则
 
+  - **问题 #4：SQL 操作符和 MyBatis 参数之间缺少空格**
+    - **问题描述**：SQL 格式化为 `id =#{id}` 而不是 `id = #{id}`（参数前缺少空格）
+      ```sql
+      WHERE
+          id =#{id}
+      AND name =#{name}
+      ```
+    - **根本原因**：
+      - CST parser 为 SQL 文本（`"WHERE id ="`）和参数（`"#{id}"`）创建独立的节点
+      - `formatRoot()` 和 `formatTag()` 直接拼接节点，未检查是否需要空格
+      - 结果：拼接产生 `"WHERE id =#{id}"`，缺少空格
+    - **解决方案**：创建 `formatChildren()` 辅助方法，包含智能空格处理逻辑
+      - 当前节点为 'param' 类型且前一个节点为 'sql' 类型时
+      - 检查前一个节点是否以空白字符结尾
+      - 在参数前添加空格：`"WHERE id =" + " " + "#{id}" = "WHERE id = #{id}"`
+      - 应用于 `formatRoot()` 和 `formatTag()`
+    - **效果**：操作符和参数之间有正确的空格
+      ```sql
+      WHERE
+          id = #{id}
+      AND name = #{name}
+      ```
+
   - **实现细节**：
     - **MybatisSqlFormatter.postprocessCommas()**：将 leading comma 风格转换为 trailing comma 风格
     - **MybatisXmlFormattingProvider.normalizeIndentation()**：从提取的 XML 内容中移除基线缩进
     - **MybatisCstFormatter.normalizeSqlIndentation()**：在 sql-formatter 处理前移除所有前导空格
+    - **MybatisCstFormatter.formatChildren()**：确保 SQL 节点和参数节点之间有正确的空格
 
   - **测试**：
     - ✅ 手动验证：10 次重复格式化保持稳定的空格（最多 4 个空格）
