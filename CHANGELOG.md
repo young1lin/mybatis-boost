@@ -6,6 +6,45 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.3] - 2025-11-13
+
+### Fixed
+
+- 🐛 **Parameter Validation in XML Comments**: Fixed incorrect parameter validation inside XML comments
+  - **Issue**: The parameter validator was incorrectly checking parameters inside XML comments (`<!-- -->`), causing false error diagnostics for commented-out code
+  - **Solution**: Added `removeXmlComments()` function to strip all XML comments before parameter extraction
+  - **Implementation**:
+    - Regex pattern `<!--[\s\S]*?-->` removes both single-line and multi-line XML comments
+    - Applied comment removal in `extractParametersFromLine()`, `extractLocalVariables()`, and `extractAttributeReferences()`
+    - Handles CDATA sections inside comments correctly
+  - **Result**: Parameters like `#{startDate}` and `#{endTime}` inside commented sections are no longer validated
+  - **Testing**: Added comprehensive unit tests in `parameterParser.xmlComments.test.ts` covering various comment scenarios
+  - **All Tests Pass**: 243 unit tests passing
+
+### Example
+
+**Before Fix:**
+```xml
+<select id="selectAgeByUserId" resultType="java.math.BigDecimal">
+    select sum(age) from user where id = #{id}
+    <!-- <if test="startDate != null ">
+        <![CDATA[AND close_time >= #{startDate}]]>
+    </if> -->
+</select>
+```
+❌ Error: Parameter 'startDate' is not defined (even though it's commented out)
+
+**After Fix:**
+```xml
+<select id="selectAgeByUserId" resultType="java.math.BigDecimal">
+    select sum(age) from user where id = #{id}
+    <!-- <if test="startDate != null ">
+        <![CDATA[AND close_time >= #{startDate}]]>
+    </if> -->
+</select>
+```
+✅ No error: Commented parameters are correctly ignored
+
 ## [0.3.2] - 2025-11-12
 
 ### Added

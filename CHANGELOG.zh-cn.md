@@ -6,6 +6,45 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.3] - 2025-11-13
+
+### 修复
+
+- 🐛 **XML 注释中的参数校验问题**：修复 XML 注释内参数错误校验的问题
+  - **问题**：参数校验器错误地检查 XML 注释（`<!-- -->`）内的参数，导致被注释的代码出现错误的诊断提示
+  - **解决方案**：添加 `removeXmlComments()` 函数，在参数提取前移除所有 XML 注释
+  - **实现细节**：
+    - 使用正则表达式 `<!--[\s\S]*?-->` 移除单行和多行 XML 注释
+    - 在 `extractParametersFromLine()`、`extractLocalVariables()` 和 `extractAttributeReferences()` 中应用注释移除
+    - 正确处理注释内的 CDATA 部分
+  - **结果**：注释内的参数（如 `#{startDate}` 和 `#{endTime}`）不再被校验
+  - **测试**：在 `parameterParser.xmlComments.test.ts` 中添加全面的单元测试，覆盖各种注释场景
+  - **所有测试通过**：243 个单元测试全部通过
+
+### 示例
+
+**修复前：**
+```xml
+<select id="selectAgeByUserId" resultType="java.math.BigDecimal">
+    select sum(age) from user where id = #{id}
+    <!-- <if test="startDate != null ">
+        <![CDATA[AND close_time >= #{startDate}]]>
+    </if> -->
+</select>
+```
+❌ 错误提示：参数 'startDate' 未定义（即使它已被注释）
+
+**修复后：**
+```xml
+<select id="selectAgeByUserId" resultType="java.math.BigDecimal">
+    select sum(age) from user where id = #{id}
+    <!-- <if test="startDate != null ">
+        <![CDATA[AND close_time >= #{startDate}]]>
+    </if> -->
+</select>
+```
+✅ 无错误：注释的参数被正确忽略
+
 ## [0.3.2] - 2025-11-12
 
 ### 新增
