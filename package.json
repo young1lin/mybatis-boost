@@ -2,7 +2,7 @@
   "name": "mybatis-boost",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "publisher": "young1lin",
   "license": "MIT",
   "packageManager": "pnpm@10.19.0",
@@ -230,6 +230,13 @@
           "type": "boolean",
           "default": true,
           "description": "Format SQL output for better readability"
+        },
+        "mybatis-boost.console.historyLimit": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 100,
+          "maximum": 50000,
+          "description": "Maximum number of SQL logs to keep in history (for export feature)"
         },
         "mybatis-boost.formatter.enabled": {
           "type": "boolean",

@@ -6,6 +6,68 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.6] - 2025-11-13
+
+### 变更
+
+- 🎨 **MyBatis SQL 控制台输出格式重构**：现代化 SQL 日志输出为 SQL 注释风格
+  - **之前的格式**：
+    ```
+    [2025-11-13T20:29:01.648+08:00]
+    Mapper: c.y.m.b.i.t.m.U.listAllByUserId
+    Thread: 166244 [main]
+    SQL:
+    SELECT ...
+    Time: 0ms
+    ```
+  - **新格式**（SQL 注释风格）：
+    ```sql
+    -- Mapper: com.example.mapper.UserMapper.updateById
+    -- Thread: [http-nio-8080-exec-1]
+    -- Execution Time: 12ms
+    -- Rows Affected: 1
+
+    UPDATE `user_info`
+    SET `username` = 'john_doe',
+        `email` = 'john@example.com'
+    WHERE `id` = 123;
+    ```
+  - **改动点**：
+    - 所有元数据现在格式化为 SQL 注释（`--` 前缀）
+    - 移除了时间戳（更简洁的显示）
+    - 线程信息简化为仅显示线程名（用方括号包围）
+    - 将 "Time" 重命名为 "Execution Time"（更清晰）
+    - 添加了 "Rows Affected" 字段（从 Total/Updates 行提取）
+    - 在元数据和 SQL 之间添加了空行分隔符
+    - 移除了 "SQL:" 标签（SQL 本身就能说明）
+  - **实现细节**：
+    - 添加了 `extractThreadName()` 辅助方法来解析线程信息
+    - 添加了 `extractRowsAffected()` 辅助方法从 Total/Updates 行提取行数
+    - 更新了 `SqlOutputChannel.ts` 中的 `show()` 方法以使用新格式
+  - **优势**：
+    - 更专业的 SQL 注释风格
+    - 复制 SQL 到数据库工具时可读性更好
+    - 与行业标准 SQL 日志记录实践保持一致
+    - 元数据不会干扰 SQL 语法高亮
+
+### 新增
+
+- ⚙️ **可配置的历史记录大小限制**：为 SQL 日志历史添加内存管理
+  - **配置项**：`mybatis-boost.console.historyLimit`
+    - **类型**：number
+    - **默认值**：5000
+    - **范围**：100 - 50000
+    - **说明**：历史记录中保留的最大 SQL 日志条数（用于导出功能）
+  - **实现细节**：
+    - 添加了私有方法 `addToHistory()` 来集中管理历史记录
+    - 当超过限制时自动删除最旧的条目（先进先出）
+    - 更新了 `show()`、`showError()` 和 `showInfo()` 以使用 `addToHistory()`
+  - **优势**：
+    - 防止长时间运行会话中的内存无限增长
+    - 可配置的限制允许用户在内存使用和历史深度之间取得平衡
+    - 在控制资源消耗的同时保持导出功能
+  - **测试**：所有 243 个单元测试通过
+
 ## [0.3.4] - 2025-11-13
 
 ### 修复

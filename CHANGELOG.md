@@ -6,6 +6,68 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.6] - 2025-11-13
+
+### Changed
+
+- 🎨 **MyBatis SQL Console Output Format Refactoring**: Modernized SQL log output to SQL comment style
+  - **Previous Format**:
+    ```
+    [2025-11-13T20:29:01.648+08:00]
+    Mapper: c.y.m.b.i.t.m.U.listAllByUserId
+    Thread: 166244 [main]
+    SQL:
+    SELECT ...
+    Time: 0ms
+    ```
+  - **New Format** (SQL comment style):
+    ```sql
+    -- Mapper: com.example.mapper.UserMapper.updateById
+    -- Thread: [http-nio-8080-exec-1]
+    -- Execution Time: 12ms
+    -- Rows Affected: 1
+
+    UPDATE `user_info`
+    SET `username` = 'john_doe',
+        `email` = 'john@example.com'
+    WHERE `id` = 123;
+    ```
+  - **Changes**:
+    - All metadata now formatted as SQL comments with `--` prefix
+    - Removed timestamp from output (cleaner display)
+    - Thread info simplified to show only thread name in brackets
+    - Renamed "Time" to "Execution Time" for clarity
+    - Added "Rows Affected" field extracted from Total/Updates lines
+    - Added empty line separator between metadata and SQL
+    - Removed "SQL:" label (SQL speaks for itself)
+  - **Implementation**:
+    - Added `extractThreadName()` helper method to parse thread info
+    - Added `extractRowsAffected()` helper method to extract row count from Total/Updates lines
+    - Updated `show()` method in `SqlOutputChannel.ts` to use new format
+  - **Benefits**:
+    - More professional SQL comment style
+    - Better readability when copying SQL to database tools
+    - Consistent with industry-standard SQL logging practices
+    - Metadata doesn't interfere with SQL syntax highlighting
+
+### Added
+
+- ⚙️ **Configurable History Size Limit**: Added memory management for SQL log history
+  - **Configuration**: `mybatis-boost.console.historyLimit`
+    - **Type**: number
+    - **Default**: 5000
+    - **Range**: 100 - 50000
+    - **Description**: Maximum number of SQL logs to keep in history (for export feature)
+  - **Implementation**:
+    - Added private method `addToHistory()` to centralize history management
+    - Automatic pruning of oldest entries when limit is exceeded (FIFO)
+    - Updated `show()`, `showError()`, and `showInfo()` to use `addToHistory()`
+  - **Benefits**:
+    - Prevents unbounded memory growth in long-running sessions
+    - Configurable limit allows users to balance memory usage vs. history depth
+    - Maintains export functionality while controlling resource consumption
+  - **Testing**: All 243 unit tests passing
+
 ## [0.3.4] - 2025-11-13
 
 ### Fixed
