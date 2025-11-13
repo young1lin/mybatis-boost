@@ -405,11 +405,15 @@ class MybatisCstFormatter {
 
     private formatSql(node: SqlNode, depth: number, options: FormatOptionsWithLanguage): string {
         const indent = this.getIndent(depth, options.tabWidth || 4);
-        const sql = node.content.trim();
+        let sql = node.content.trim();
 
         if (!sql) {
             return '';
         }
+
+        // Normalize indentation to prevent spacing accumulation on repeated formatting
+        // SQL content may contain indentation from previous formatting cycles
+        sql = this.normalizeSqlIndentation(sql);
 
         try {
             // Format SQL using sql-formatter
@@ -429,6 +433,40 @@ class MybatisCstFormatter {
             // If formatting fails, just indent the original content
             return `\n${indent}${sql}`;
         }
+    }
+
+    /**
+     * Normalize SQL indentation to prevent spacing accumulation
+     * Removes baseline indentation while preserving relative indentation
+     *
+     * @param sql - SQL content that may contain indentation
+     * @returns Normalized SQL with baseline indentation removed
+     */
+    private normalizeSqlIndentation(sql: string): string {
+        const lines = sql.split('\n');
+
+        // Find minimum indentation across all non-empty lines
+        let minIndent = Infinity;
+        for (const line of lines) {
+            if (line.trim().length > 0) {
+                const leadingSpaces = line.match(/^\s*/)?.[0].length || 0;
+                minIndent = Math.min(minIndent, leadingSpaces);
+            }
+        }
+
+        if (minIndent === Infinity || minIndent === 0) {
+            return sql;
+        }
+
+        // Remove baseline indentation from all lines
+        const normalized = lines.map(line => {
+            if (line.trim().length === 0) {
+                return '';
+            }
+            return line.substring(minIndent);
+        });
+
+        return normalized.join('\n');
     }
 
     private formatParam(node: ParamNode): string {
