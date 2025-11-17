@@ -60,8 +60,147 @@ describe('DynamicSqlHighlighter Unit Tests', () => {
         });
     });
 
+    describe('SQL Keyword Detection in Statement Tags', () => {
+        it('should find SQL keywords in <select> tag', async () => {
+            const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.mapper.RoleMapper">
+    <select id="getById" resultMap="RoleResultMap">
+        SELECT * FROM role
+        WHERE id = #{id}
+    </select>
+</mapper>`;
+
+            const doc = await createMockDocument('test.xml', xmlContent);
+            const decorations = (highlighter as any).findSqlKeywords(doc);
+
+            // Should find "SELECT", "FROM", "WHERE" keywords
+            const hasSelect = decorations.some((d: any) => doc.getText(d.range) === 'SELECT');
+            const hasFrom = decorations.some((d: any) => doc.getText(d.range) === 'FROM');
+            const hasWhere = decorations.some((d: any) => doc.getText(d.range) === 'WHERE');
+
+            assert.ok(hasSelect, 'Should find "SELECT" keyword in <select> tag');
+            assert.ok(hasFrom, 'Should find "FROM" keyword in <select> tag');
+            assert.ok(hasWhere, 'Should find "WHERE" keyword in <select> tag');
+        });
+
+        it('should find SQL keywords in <update> tag', async () => {
+            const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.mapper.RoleMapper">
+    <update id="updateById" parameterType="com.example.Role">
+        UPDATE role
+        SET role_name = #{roleName}
+        WHERE id = #{id}
+    </update>
+</mapper>`;
+
+            const doc = await createMockDocument('test.xml', xmlContent);
+            const decorations = (highlighter as any).findSqlKeywords(doc);
+
+            // Should find "UPDATE", "SET", "WHERE" keywords
+            const hasUpdate = decorations.some((d: any) => doc.getText(d.range) === 'UPDATE');
+            const hasSet = decorations.some((d: any) => doc.getText(d.range) === 'SET');
+            const hasWhere = decorations.some((d: any) => doc.getText(d.range) === 'WHERE');
+
+            assert.ok(hasUpdate, 'Should find "UPDATE" keyword in <update> tag');
+            assert.ok(hasSet, 'Should find "SET" keyword in <update> tag');
+            assert.ok(hasWhere, 'Should find "WHERE" keyword in <update> tag');
+        });
+
+        it('should find SQL keywords in <delete> tag', async () => {
+            const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.mapper.RoleMapper">
+    <delete id="deleteById">
+        DELETE FROM role
+        WHERE id = #{id}
+    </delete>
+</mapper>`;
+
+            const doc = await createMockDocument('test.xml', xmlContent);
+            const decorations = (highlighter as any).findSqlKeywords(doc);
+
+            // Should find "DELETE", "FROM", "WHERE" keywords
+            const hasDelete = decorations.some((d: any) => doc.getText(d.range) === 'DELETE');
+            const hasFrom = decorations.some((d: any) => doc.getText(d.range) === 'FROM');
+            const hasWhere = decorations.some((d: any) => doc.getText(d.range) === 'WHERE');
+
+            assert.ok(hasDelete, 'Should find "DELETE" keyword in <delete> tag');
+            assert.ok(hasFrom, 'Should find "FROM" keyword in <delete> tag');
+            assert.ok(hasWhere, 'Should find "WHERE" keyword in <delete> tag');
+        });
+
+        it('should find SQL keywords in <insert> tag', async () => {
+            const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.mapper.RoleMapper">
+    <insert id="insert" parameterType="com.example.Role">
+        INSERT INTO role (id, role_name)
+        VALUES (#{id}, #{roleName})
+    </insert>
+</mapper>`;
+
+            const doc = await createMockDocument('test.xml', xmlContent);
+            const decorations = (highlighter as any).findSqlKeywords(doc);
+
+            // Should find "INSERT", "INTO", "VALUES" keywords
+            const hasInsert = decorations.some((d: any) => doc.getText(d.range) === 'INSERT');
+            const hasInto = decorations.some((d: any) => doc.getText(d.range) === 'INTO');
+            const hasValues = decorations.some((d: any) => doc.getText(d.range) === 'VALUES');
+
+            assert.ok(hasInsert, 'Should find "INSERT" keyword in <insert> tag');
+            assert.ok(hasInto, 'Should find "INTO" keyword in <insert> tag');
+            assert.ok(hasValues, 'Should find "VALUES" keyword in <insert> tag');
+        });
+
+        it('should find SQL keywords in user provided XML example', async () => {
+            const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.young1lin.mybatis.boost.integration.test.mapper.RoleMapper">
+    <resultMap id="RoleResultMap" type="com.young1lin.mybatis.boost.integration.test.domain.Role">
+        <id property="id" column="id"/>
+        <result property="roleName" column="role_name"/>
+    </resultMap>
+
+    <select id="getById" resultMap="RoleResultMap">
+        SELECT * FROM role
+        WHERE id = #{id}
+    </select>
+
+    <update id="updateById" parameterType="com.young1lin.mybatis.boost.integration.test.domain.Role">
+        UPDATE role
+        SET role_name = #{roleName}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM role
+        WHERE id = #{id}
+    </delete>
+</mapper>`;
+
+            const doc = await createMockDocument('test.xml', xmlContent);
+            const decorations = (highlighter as any).findSqlKeywords(doc);
+
+            // Should find multiple SQL keywords
+            assert.ok(decorations.length > 0, 'Should find SQL keywords in the document');
+
+            // Verify specific keywords from different statement types
+            const hasSelect = decorations.some((d: any) => doc.getText(d.range) === 'SELECT');
+            const hasUpdate = decorations.some((d: any) => doc.getText(d.range) === 'UPDATE');
+            const hasDelete = decorations.some((d: any) => doc.getText(d.range) === 'DELETE');
+            const hasFrom = decorations.some((d: any) => doc.getText(d.range) === 'FROM');
+            const hasSet = decorations.some((d: any) => doc.getText(d.range) === 'SET');
+            const hasWhere = decorations.some((d: any) => doc.getText(d.range) === 'WHERE');
+
+            assert.ok(hasSelect, 'Should find "SELECT" keyword');
+            assert.ok(hasUpdate, 'Should find "UPDATE" keyword');
+            assert.ok(hasDelete, 'Should find "DELETE" keyword');
+            assert.ok(hasFrom, 'Should find "FROM" keyword');
+            assert.ok(hasSet, 'Should find "SET" keyword');
+            assert.ok(hasWhere, 'Should find "WHERE" keyword');
+        });
+    });
+
     describe('SQL Keyword Detection in Dynamic Tags', () => {
-        it('should find SQL keywords in <if> tag', async () => {
+        it('should find SQL keywords in <if> tag nested inside <select>', async () => {
             const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <mapper namespace="com.example.mapper.UserMapper">
     <select id="selectById">
@@ -75,7 +214,7 @@ describe('DynamicSqlHighlighter Unit Tests', () => {
             const doc = await createMockDocument('test.xml', xmlContent);
             const decorations = (highlighter as any).findSqlKeywords(doc);
 
-            // Should find "SELECT", "FROM", "AND" keywords
+            // Should find keywords in both <select> and <if> tags
             assert.ok(decorations.length > 0, 'Should find SQL keywords');
 
             // Check that "AND" inside <if> tag is found
@@ -84,9 +223,15 @@ describe('DynamicSqlHighlighter Unit Tests', () => {
                 return text === 'AND';
             });
             assert.ok(andKeyword, 'Should find "AND" keyword inside <if> tag');
+
+            // Check that keywords in <select> are also found
+            const hasSelect = decorations.some((d: any) => doc.getText(d.range) === 'SELECT');
+            const hasFrom = decorations.some((d: any) => doc.getText(d.range) === 'FROM');
+            assert.ok(hasSelect, 'Should find "SELECT" keyword in <select> tag');
+            assert.ok(hasFrom, 'Should find "FROM" keyword in <select> tag');
         });
 
-        it('should find SQL keywords in <where> tag', async () => {
+        it('should find SQL keywords in <where> tag nested inside <select>', async () => {
             const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <mapper namespace="com.example.mapper.UserMapper">
     <select id="selectUsers">
@@ -103,17 +248,21 @@ describe('DynamicSqlHighlighter Unit Tests', () => {
             const doc = await createMockDocument('test.xml', xmlContent);
             const decorations = (highlighter as any).findSqlKeywords(doc);
 
-            // Should find keywords in <where> tag
+            // Should find keywords in <where>, <if>, and <select> tags
             const hasAndKeyword = decorations.some((d: any) => doc.getText(d.range) === 'AND');
             const hasOrKeyword = decorations.some((d: any) => doc.getText(d.range) === 'OR');
             const hasLikeKeyword = decorations.some((d: any) => doc.getText(d.range) === 'LIKE');
+            const hasSelect = decorations.some((d: any) => doc.getText(d.range) === 'SELECT');
+            const hasFrom = decorations.some((d: any) => doc.getText(d.range) === 'FROM');
 
             assert.ok(hasAndKeyword, 'Should find "AND" keyword');
             assert.ok(hasOrKeyword, 'Should find "OR" keyword');
             assert.ok(hasLikeKeyword, 'Should find "LIKE" keyword');
+            assert.ok(hasSelect, 'Should find "SELECT" keyword');
+            assert.ok(hasFrom, 'Should find "FROM" keyword');
         });
 
-        it('should find SQL keywords in <set> tag', async () => {
+        it('should find SQL keywords in <set> tag nested inside <update>', async () => {
             const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <mapper namespace="com.example.mapper.UserMapper">
     <update id="updateUser">
@@ -129,15 +278,15 @@ describe('DynamicSqlHighlighter Unit Tests', () => {
             const doc = await createMockDocument('test.xml', xmlContent);
             const decorations = (highlighter as any).findSqlKeywords(doc);
 
-            // Should find "UPDATE", "WHERE" keywords
+            // Should find keywords in both <update> and <set> tags
             const hasUpdateKeyword = decorations.some((d: any) => doc.getText(d.range) === 'UPDATE');
             const hasWhereKeyword = decorations.some((d: any) => doc.getText(d.range) === 'WHERE');
 
-            assert.ok(hasUpdateKeyword, 'Should find "UPDATE" keyword');
-            assert.ok(hasWhereKeyword, 'Should find "WHERE" keyword');
+            assert.ok(hasUpdateKeyword, 'Should find "UPDATE" keyword in <update> tag');
+            assert.ok(hasWhereKeyword, 'Should find "WHERE" keyword in <update> tag');
         });
 
-        it('should find SQL keywords in <foreach> tag', async () => {
+        it('should find SQL keywords in <foreach> tag nested inside <select>', async () => {
             const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <mapper namespace="com.example.mapper.UserMapper">
     <select id="selectByIds">
@@ -152,16 +301,16 @@ describe('DynamicSqlHighlighter Unit Tests', () => {
             const doc = await createMockDocument('test.xml', xmlContent);
             const decorations = (highlighter as any).findSqlKeywords(doc);
 
-            // Should find "SELECT", "FROM", "WHERE", "IN" keywords
+            // Should find keywords in both <select> and <foreach> tags
             const hasSelectKeyword = decorations.some((d: any) => doc.getText(d.range) === 'SELECT');
             const hasFromKeyword = decorations.some((d: any) => doc.getText(d.range) === 'FROM');
             const hasWhereKeyword = decorations.some((d: any) => doc.getText(d.range) === 'WHERE');
             const hasInKeyword = decorations.some((d: any) => doc.getText(d.range) === 'IN');
 
-            assert.ok(hasSelectKeyword, 'Should find "SELECT" keyword');
-            assert.ok(hasFromKeyword, 'Should find "FROM" keyword');
-            assert.ok(hasWhereKeyword, 'Should find "WHERE" keyword');
-            assert.ok(hasInKeyword, 'Should find "IN" keyword');
+            assert.ok(hasSelectKeyword, 'Should find "SELECT" keyword in <select> tag');
+            assert.ok(hasFromKeyword, 'Should find "FROM" keyword in <select> tag');
+            assert.ok(hasWhereKeyword, 'Should find "WHERE" keyword in <select> tag');
+            assert.ok(hasInKeyword, 'Should find "IN" keyword in <select> tag');
         });
     });
 

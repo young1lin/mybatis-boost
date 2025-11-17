@@ -26,6 +26,13 @@ const DYNAMIC_SQL_TAGS = [
 ];
 
 /**
+ * MyBatis SQL statement tags to process
+ */
+const SQL_STATEMENT_TAGS = [
+    'select', 'insert', 'update', 'delete', 'sql'
+];
+
+/**
  * Highlighter for SQL keywords in dynamic SQL tags
  */
 export class DynamicSqlHighlighter {
@@ -118,15 +125,16 @@ export class DynamicSqlHighlighter {
     }
 
     /**
-     * Find SQL keywords inside dynamic SQL tags
+     * Find SQL keywords inside dynamic SQL tags and statement tags
+     * Made public for testing purposes
      */
-    private findSqlKeywords(document: vscode.TextDocument): vscode.DecorationOptions[] {
+    public findSqlKeywords(document: vscode.TextDocument): vscode.DecorationOptions[] {
         const decorations: vscode.DecorationOptions[] = [];
         const text = document.getText();
-        const lines = text.split('\n');
 
-        // Build regex pattern for dynamic SQL tags
-        const tagPattern = DYNAMIC_SQL_TAGS.join('|');
+        // Process both SQL statement tags and dynamic SQL tags
+        const allTags = [...SQL_STATEMENT_TAGS, ...DYNAMIC_SQL_TAGS];
+        const tagPattern = allTags.join('|');
         const tagRegex = new RegExp(`<(${tagPattern})([^>]*)>([\\s\\S]*?)<\\/\\1>`, 'gi');
 
         let match;
@@ -154,8 +162,9 @@ export class DynamicSqlHighlighter {
 
     /**
      * Find SQL keywords in content and return decoration options
+     * Made public for testing purposes
      */
-    private findKeywordsInContent(
+    public findKeywordsInContent(
         content: string,
         startOffset: number,
         document: vscode.TextDocument
@@ -191,8 +200,9 @@ export class DynamicSqlHighlighter {
 
     /**
      * Check if position is inside OGNL expression (#{...} or ${...})
+     * Made public for testing purposes
      */
-    private isInsideOgnlExpression(content: string, position: number): boolean {
+    public isInsideOgnlExpression(content: string, position: number): boolean {
         // Find all OGNL expressions before this position
         const beforeContent = content.substring(0, position);
 
