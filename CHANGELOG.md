@@ -6,6 +6,21 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [Unreleased]
+
+### Added
+
+- ✨ **Dynamic SQL Syntax Highlighting**: SQL keywords in MyBatis XML mapper files are now highlighted with IntelliJ IDEA-style colors
+  - Highlights SQL keywords in both **SQL statement tags** (`<select>`, `<insert>`, `<update>`, `<delete>`, `<sql>`) and **dynamic SQL tags** (`<if>`, `<where>`, `<set>`, `<foreach>`, etc.)
+  - Default color: `#CC7832` (IntelliJ IDEA style orange)
+  - Keywords: `SELECT`, `FROM`, `WHERE`, `AND`, `OR`, `JOIN`, `UPDATE`, `DELETE`, `INSERT`, `FOR`, `NULL`, etc.
+  - **Smart filtering**: Excludes keywords in XML tag attributes (e.g., `test="category != null"`) and OGNL expressions (e.g., `#{name and value}`)
+  - **Configurable**:
+    - `mybatis-boost.highlightDynamicSql`: Enable/disable highlighting (default: `true`)
+    - `mybatis-boost.dynamicSqlKeywordColor`: Customize keyword color (default: `#CC7832`)
+  - Automatically updates when configuration changes
+  - Supports `FOR UPDATE` clause for row locking in MySQL/PostgreSQL/Oracle
+
 ## [0.3.7] - 2025-11-13
 
 ### Fixed

@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-一站式 MyBatis 插件，支持 Mapper navigation，Mapper 生成（支持Cursor MCP 默认开启，支持 VSCode Copilot MCP），SQL 拦截输出，SQL 格式化，XML 查看完整 SQL。TODO XML Dynamic SQL 高亮显示
+一站式 MyBatis 插件，支持 Mapper navigation，Mapper 生成（支持Cursor MCP 默认开启，支持 VSCode Copilot MCP），SQL 拦截输出，SQL 格式化，XML Dynamic SQL 语法高亮，XML 查看完整 SQL。
 导航
 ![demo](images/demo.gif)
 

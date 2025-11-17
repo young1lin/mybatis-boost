@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-cn.md)
 
-A one-stop MyBatis plugin that supports Mapper navigation, Mapper generation (with Cursor MCP enabled by default and VSCode Copilot MCP support), SQL interception and logging, SQL formatting, and viewing complete SQL in XML. TODO: XML Dynamic SQL syntax highlighting.
+A one-stop MyBatis plugin that supports Mapper navigation, Mapper generation (with Cursor MCP enabled by default and VSCode Copilot MCP support), SQL interception and logging, SQL formatting, XML Dynamic SQL syntax highlighting, and viewing complete SQL in XML.
 
 Navigation
 ![demo](images/demo.gif)

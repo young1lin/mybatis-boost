@@ -115,6 +115,13 @@
           "default": true,
           "description": "%config.highlightDynamicSql.description%"
         },
+        "mybatis-boost.dynamicSqlKeywordColor": {
+          "type": "string",
+          "default": "#CC7832",
+          "description": "%config.dynamicSqlKeywordColor.description%",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "patternErrorMessage": "Please enter a valid hex color code (e.g., #CC7832)"
+        },
         "mybatis-boost.useDefinitionProvider": {
           "type": "boolean",
           "default": false,

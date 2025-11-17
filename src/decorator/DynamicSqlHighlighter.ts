@@ -40,9 +40,13 @@ export class DynamicSqlHighlighter {
     private disposables: vscode.Disposable[] = [];
 
     constructor() {
-        // Create decoration type with orange color (similar to IDEA)
+        // Get color from configuration (default: IDEA style orange)
+        const config = vscode.workspace.getConfiguration('mybatis-boost');
+        const keywordColor = config.get<string>('dynamicSqlKeywordColor') || '#CC7832';
+
+        // Create decoration type with configured color
         this.decorationType = vscode.window.createTextEditorDecorationType({
-            color: '#CC7832', // Orange color for SQL keywords
+            color: keywordColor,
             fontWeight: 'bold'
         });
 
@@ -84,6 +88,29 @@ export class DynamicSqlHighlighter {
         this.disposables.push(
             vscode.window.onDidChangeVisibleTextEditors(editors => {
                 editors.forEach(editor => this.highlightEditor(editor));
+            })
+        );
+
+        // Re-create decoration type when configuration changes
+        this.disposables.push(
+            vscode.workspace.onDidChangeConfiguration(event => {
+                if (event.affectsConfiguration('mybatis-boost.dynamicSqlKeywordColor')) {
+                    // Dispose old decoration type
+                    this.decorationType.dispose();
+
+                    // Get new color from configuration
+                    const config = vscode.workspace.getConfiguration('mybatis-boost');
+                    const keywordColor = config.get<string>('dynamicSqlKeywordColor') || '#CC7832';
+
+                    // Create new decoration type with updated color
+                    this.decorationType = vscode.window.createTextEditorDecorationType({
+                        color: keywordColor,
+                        fontWeight: 'bold'
+                    });
+
+                    // Refresh all visible editors
+                    this.refresh();
+                }
             })
         );
     }

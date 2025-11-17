@@ -6,6 +6,21 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [未发布]
+
+### 新增
+
+- ✨ **动态 SQL 语法高亮**：MyBatis XML 映射文件中的 SQL 关键字现在使用 IntelliJ IDEA 风格的颜色高亮显示
+  - 在 **SQL 语句标签**（`<select>`、`<insert>`、`<update>`、`<delete>`、`<sql>`）和**动态 SQL 标签**（`<if>`、`<where>`、`<set>`、`<foreach>` 等）中高亮显示 SQL 关键字
+  - 默认颜色：`#CC7832`（IntelliJ IDEA 风格橙色）
+  - 关键字：`SELECT`、`FROM`、`WHERE`、`AND`、`OR`、`JOIN`、`UPDATE`、`DELETE`、`INSERT`、`FOR`、`NULL` 等
+  - **智能过滤**：排除 XML 标签属性中的关键字（如 `test="category != null"`）和 OGNL 表达式（如 `#{name and value}`）
+  - **可配置**：
+    - `mybatis-boost.highlightDynamicSql`：启用/禁用高亮显示（默认：`true`）
+    - `mybatis-boost.dynamicSqlKeywordColor`：自定义关键字颜色（默认：`#CC7832`）
+  - 配置更改时自动更新
+  - 支持 MySQL/PostgreSQL/Oracle 中用于行锁定的 `FOR UPDATE` 子句
+
 ## [0.3.7] - 2025-11-13
 
 ### 修复
