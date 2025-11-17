@@ -19,7 +19,7 @@ import {
     ParameterValidator
 } from './navigator';
 import { XmlSqlHoverProvider, JavaSqlHoverProvider } from './hover';
-import { MybatisBindingDecorator } from './decorator';
+import { MybatisBindingDecorator, DynamicSqlHighlighter } from './decorator';
 import { findProjectFileInParents } from './utils/projectDetector';
 import { GeneratorViewProvider } from './webview/GeneratorViewProvider';
 import { MCPManager } from './mcp/MCPManager';
@@ -28,6 +28,7 @@ import { MybatisXmlFormattingProvider } from './formatter';
 
 let fileMapper: FileMapper;
 let bindingDecorator: MybatisBindingDecorator;
+let dynamicSqlHighlighter: DynamicSqlHighlighter;
 let parameterValidator: ParameterValidator;
 let mcpManager: MCPManager;
 let consoleInterceptor: ConsoleInterceptor;
@@ -121,6 +122,16 @@ export async function activate(context: vscode.ExtensionContext) {
         console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.bindingDecoratorDisabled')}`);
     }
 
+    // Initialize dynamic SQL highlighter if enabled
+    const highlightDynamicSql = config.get<boolean>('highlightDynamicSql', true);
+    if (highlightDynamicSql) {
+        dynamicSqlHighlighter = new DynamicSqlHighlighter();
+        context.subscriptions.push(dynamicSqlHighlighter);
+        console.log('[MyBatis Boost] Dynamic SQL highlighter initialized');
+    } else {
+        console.log('[MyBatis Boost] Dynamic SQL highlighter disabled');
+    }
+
     // Listen for configuration changes
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(async (e) => {
@@ -167,6 +178,31 @@ export async function activate(context: vscode.ExtensionContext) {
                         vscode.window.showInformationMessage('MyBatis Boost MCP disabled');
                     } catch (error) {
                         console.error('[MyBatis Boost] Failed to disable MCP:', error);
+                    }
+                }
+            }
+
+            // Handle dynamic SQL highlighting configuration changes
+            if (e.affectsConfiguration('mybatis-boost.highlightDynamicSql')) {
+                const enabled = vscode.workspace
+                    .getConfiguration('mybatis-boost')
+                    .get<boolean>('highlightDynamicSql', true);
+
+                console.log(`[MyBatis Boost] Dynamic SQL highlighting configuration changed: ${enabled}`);
+
+                if (enabled) {
+                    // Enable highlighter
+                    if (!dynamicSqlHighlighter) {
+                        dynamicSqlHighlighter = new DynamicSqlHighlighter();
+                        context.subscriptions.push(dynamicSqlHighlighter);
+                        console.log('[MyBatis Boost] Dynamic SQL highlighter enabled');
+                    }
+                } else {
+                    // Disable highlighter
+                    if (dynamicSqlHighlighter) {
+                        dynamicSqlHighlighter.dispose();
+                        dynamicSqlHighlighter = undefined as any;
+                        console.log('[MyBatis Boost] Dynamic SQL highlighter disabled');
                     }
                 }
             }

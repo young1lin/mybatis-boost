@@ -110,6 +110,11 @@
           "default": true,
           "description": "%config.showBindingIcons.description%"
         },
+        "mybatis-boost.highlightDynamicSql": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.highlightDynamicSql.description%"
+        },
         "mybatis-boost.useDefinitionProvider": {
           "type": "boolean",
           "default": false,

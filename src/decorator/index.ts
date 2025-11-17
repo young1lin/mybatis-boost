@@ -3,3 +3,4 @@
  */
 
 export { MybatisBindingDecorator } from './MybatisBindingDecorator';
+export { DynamicSqlHighlighter } from './DynamicSqlHighlighter';

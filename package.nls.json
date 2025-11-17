@@ -1,6 +1,6 @@
 {
   "displayName": "MyBatis Boost",
-  "description": "A one-stop MyBatis plugin that supports Mapper navigation, Mapper generation (with Cursor MCP enabled by default and VSCode Copilot MCP support), SQL interception and logging, SQL formatting, and viewing complete SQL in XML. TODO: XML Dynamic SQL syntax highlighting.",
+  "description": "A one-stop MyBatis plugin that supports Mapper navigation, Mapper generation (with Cursor MCP enabled by default and VSCode Copilot MCP support), SQL interception and logging, SQL formatting, XML Dynamic SQL syntax highlighting, and viewing complete SQL in XML.",
 
   "command.clearCache": "Clear Cache and Rebuild",
   "command.refreshMappings": "Refresh Mappings",
@@ -11,6 +11,7 @@
   "config.customXmlDirectories.description": "Custom directories to search for XML mapper files, relative to workspace root",
   "config.javaParseLines.description": "Number of lines to read from Java files for namespace extraction",
   "config.showBindingIcons.description": "Show gutter icons for MyBatis bindings between Java methods and XML statements",
+  "config.highlightDynamicSql.description": "Highlight SQL keywords inside MyBatis dynamic SQL tags (if, where, set, foreach, etc.) in XML files",
   "config.useDefinitionProvider.description": "Enable Go-to-Definition (F12) for Java-to-XML navigation. When false (default), use CodeLens instead to preserve native Java definition behavior",
   "config.generator.datetime.description": "Java type to use for SQL DATETIME/TIMESTAMP columns when parsing DDL statements (DATE always maps to LocalDate, TIME always maps to LocalTime)",
   "config.generator.basePackage.description": "Base package for generated Java code",
