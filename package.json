@@ -2,7 +2,7 @@
   "name": "mybatis-boost",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "publisher": "young1lin",
   "license": "MIT",
   "packageManager": "pnpm@10.19.0",
