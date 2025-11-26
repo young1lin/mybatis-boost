@@ -5,6 +5,20 @@
 import * as assert from 'assert';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+const mockRequire = require('mock-require');
+
+// Mock fs module before importing GeneratorViewProvider
+mockRequire('fs', {
+    ...fs,
+    readFileSync: ((filePath: string, encoding?: string) => {
+        // Return mock HTML content
+        return '<html><head><title>Mock Generator</title></head><body>Mock Content</body></html>';
+    }) as typeof fs.readFileSync
+});
+
+import { GeneratorViewProvider } from '../../webview/GeneratorViewProvider';
 
 describe('GeneratorViewProvider', () => {
 
@@ -18,15 +32,13 @@ describe('GeneratorViewProvider', () => {
         sandbox.restore();
     });
 
-    it('should have correct viewType', async () => {
-        const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
+    it('should have correct viewType', () => {
         assert.strictEqual(GeneratorViewProvider.viewType, 'mybatis-boost.generatorView');
     });
 
-    it('should register with correct view type in extension', async () => {
+    it('should register with correct view type in extension', () => {
         // This test verifies the integration point
         // The actual WebView Provider will be tested in integration tests
-        const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
         // Mock extension context
         const mockContext = {
@@ -46,13 +58,11 @@ describe('GeneratorViewProvider', () => {
         assert.ok(provider, 'Provider should be created successfully');
     });
 
-    it('should handle history storage key correctly', async () => {
+    it('should handle history storage key correctly', () => {
         // Verify the storage key constant is defined
-        const module = await import('../../webview/GeneratorViewProvider.js');
-
         // The storage key should be accessible through the module
         // In actual usage, it's a private constant, but we verify through behavior
-        assert.ok(module.GeneratorViewProvider, 'GeneratorViewProvider should be exported');
+        assert.ok(GeneratorViewProvider, 'GeneratorViewProvider should be exported');
     });
 
     describe('Configuration Scope Management', () => {
@@ -66,6 +76,8 @@ describe('GeneratorViewProvider', () => {
         let workspaceFoldersStub: sinon.SinonStub;
 
         beforeEach(() => {
+            // fs.readFileSync is already mocked at module level using mock-require
+
             // Mock configuration methods
             updateStub = sandbox.stub().resolves();
             getStub = sandbox.stub();
@@ -111,7 +123,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should detect workspace scope when workspace config exists', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             // Setup: workspace folder exists
             workspaceFoldersStub.value([{ uri: vscode.Uri.file('/workspace'), name: 'test', index: 0 }]);
@@ -140,7 +151,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should detect global scope when no workspace folder exists', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             // Setup: no workspace folder
             workspaceFoldersStub.value(undefined);
@@ -161,7 +171,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should default to workspace scope when workspace exists but no config set', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             // Setup: workspace folder exists
             workspaceFoldersStub.value([{ uri: vscode.Uri.file('/workspace'), name: 'test', index: 0 }]);
@@ -190,7 +199,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should save settings to workspace when configScope is workspace', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             // Setup: workspace folder exists
             workspaceFoldersStub.value([{ uri: vscode.Uri.file('/workspace'), name: 'test', index: 0 }]);
@@ -231,7 +239,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should save settings to global when configScope is global', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             // Setup: workspace folder exists
             workspaceFoldersStub.value([{ uri: vscode.Uri.file('/workspace'), name: 'test', index: 0 }]);
@@ -272,7 +279,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should fallback to global when saving to workspace but no workspace exists', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             // Setup: no workspace folder
             workspaceFoldersStub.value(undefined);
@@ -332,6 +338,8 @@ describe('GeneratorViewProvider', () => {
         let workspaceFoldersStub: sinon.SinonStub;
 
         beforeEach(() => {
+            // fs.readFileSync is already mocked at module level using mock-require
+
             // Mock configuration methods
             updateStub = sandbox.stub().resolves();
             getStub = sandbox.stub();
@@ -377,7 +385,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should load template paths from configuration with default empty values', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             // Setup: default empty template paths
             getStub.withArgs('template-path.entity', '').returns('');
@@ -405,7 +412,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should load custom template paths from configuration', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             // Setup: custom template paths
             getStub.withArgs('template-path.entity', '').returns('/custom/entity.ejs');
@@ -433,7 +439,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should save template paths to workspace configuration', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             const provider = new GeneratorViewProvider(mockContext.extensionUri, mockContext);
             provider.resolveWebviewView(mockWebviewView, {} as any, {} as any);
@@ -488,7 +493,6 @@ describe('GeneratorViewProvider', () => {
         });
 
         it('should save empty template paths to use built-in defaults', async () => {
-            const { GeneratorViewProvider } = await import('../../webview/GeneratorViewProvider.js');
 
             const provider = new GeneratorViewProvider(mockContext.extensionUri, mockContext);
             provider.resolveWebviewView(mockWebviewView, {} as any, {} as any);

@@ -595,16 +595,7 @@ describe('DynamicSqlHighlighter Unit Tests', () => {
  * Helper function to create a mock VS Code document
  */
 async function createMockDocument(fileName: string, content: string): Promise<vscode.TextDocument> {
-    // Create a temporary file in the workspace
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-        throw new Error('No workspace folder found');
-    }
-
-    const filePath = path.join(workspaceFolder.uri.fsPath, 'test-fixtures', fileName);
-    const uri = vscode.Uri.file(filePath);
-
-    // Use VS Code API to create a text document
+    // Use VS Code API to create a text document with content
     const doc = await vscode.workspace.openTextDocument({
         content,
         language: 'xml'
