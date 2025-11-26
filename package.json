@@ -2,7 +2,7 @@
   "name": "mybatis-boost",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "publisher": "young1lin",
   "license": "MIT",
   "packageManager": "pnpm@10.19.0",
@@ -40,6 +40,13 @@
           "title": "MyBatis Generator",
           "icon": "images/icons/MyBatis.svg"
         }
+      ],
+      "panel": [
+        {
+          "id": "mybatis-log-panel",
+          "title": "MyBatis Log",
+          "icon": "images/icons/MyBatis.svg"
+        }
       ]
     },
     "views": {
@@ -47,6 +54,13 @@
         {
           "id": "mybatis-boost.generatorView",
           "name": "Code Generator",
+          "type": "webview"
+        }
+      ],
+      "mybatis-log-panel": [
+        {
+          "id": "mybatis-boost.logView",
+          "name": "SQL Logs",
           "type": "webview"
         }
       ]
@@ -341,6 +355,7 @@
     "esbuild": "^0.25.10",
     "eslint": "^9.36.0",
     "mocha": "^10.8.2",
+    "mock-require": "^3.0.3",
     "npm-run-all": "^4.1.5",
     "sinon": "^19.0.2",
     "ts-node": "^10.9.2",

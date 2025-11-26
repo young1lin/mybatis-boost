@@ -22,10 +22,12 @@ export async function extractParameterReferences(
 
     const parameters: ParameterReference[] = [];
 
-    // Find the statement in the file
+    // Find the statement in the file and accumulate its content
     let inStatement = false;
     let braceLevel = 0;
     let statementStartLine = -1;
+    let statementContent = '';
+    const statementLines: { line: number; content: string }[] = [];
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -42,6 +44,10 @@ export async function extractParameterReferences(
         }
 
         if (inStatement) {
+            // Accumulate statement content and track line numbers
+            statementContent += line + '\n';
+            statementLines.push({ line: i, content: line });
+
             // Track opening tags
             const openTags = (line.match(new RegExp(`<${statement.type}(?:\\s|>)`, 'g')) || []).length;
             braceLevel += openTags;
@@ -50,14 +56,26 @@ export async function extractParameterReferences(
             const closeTags = (line.match(new RegExp(`</${statement.type}>`, 'g')) || []).length;
             braceLevel -= closeTags;
 
-            // Extract parameters from this line
-            const lineParams = extractParametersFromLine(line, i);
-            parameters.push(...lineParams);
-
             // Check if we've exited the statement
             if (braceLevel === 0 && i > statementStartLine) {
                 break;
             }
+        }
+    }
+
+    // Remove XML comments before extracting parameters
+    if (statementContent) {
+        const contentWithoutComments = removeXmlComments(statementContent);
+        const linesWithoutComments = contentWithoutComments.split('\n');
+
+        // Extract parameters from each line after removing comments
+        for (let i = 0; i < linesWithoutComments.length && i < statementLines.length; i++) {
+            const lineWithoutComments = linesWithoutComments[i];
+            const originalLineInfo = statementLines[i];
+
+            // Extract parameters from this line
+            const lineParams = extractParametersFromLine(lineWithoutComments, originalLineInfo.line);
+            parameters.push(...lineParams);
         }
     }
 
@@ -67,14 +85,59 @@ export async function extractParameterReferences(
 /**
  * Remove XML comments from a string
  * Handles both single-line and multi-line comments
+ * Properly handles cases where comment-like syntax appears inside comments
+ * Note: XML comments cannot be nested, but this function handles edge cases
+ * where comment-like syntax appears inside comments by finding the last -->
+ * within the comment's scope (before the next <!--)
  *
  * @param content - Content that may contain XML comments
  * @returns Content with all XML comments removed
  */
 function removeXmlComments(content: string): string {
-    // Replace all XML comments (<!-- ... -->) with empty string
-    // The regex handles multi-line comments using the 's' flag (dotAll)
-    return content.replace(/<!--[\s\S]*?-->/g, '');
+    let result = '';
+    let i = 0;
+
+    while (i < content.length) {
+        // Look for comment start: <!--
+        if (i < content.length - 4 && content.substring(i, i + 4) === '<!--') {
+            // Found comment start, find the matching end: -->
+            let j = i + 4;
+            let lastEnd = -1;
+            let nextCommentStart = -1;
+
+            // First, find the next <!-- to limit our search scope
+            for (let k = i + 4; k < content.length - 4; k++) {
+                if (content.substring(k, k + 4) === '<!--') {
+                    nextCommentStart = k;
+                    break;
+                }
+            }
+
+            // Find the last --> before the next <!-- (or end of content)
+            const searchEnd = nextCommentStart !== -1 ? nextCommentStart : content.length - 2;
+            while (j <= searchEnd) {
+                if (j < content.length - 2 && content.substring(j, j + 3) === '-->') {
+                    lastEnd = j + 3;
+                }
+                j++;
+            }
+
+            if (lastEnd !== -1) {
+                // Skip the entire comment (from <!-- to last -->)
+                i = lastEnd;
+                continue;
+            } else {
+                // Comment start found but no end, treat as regular text
+                result += content[i];
+                i++;
+            }
+        } else {
+            result += content[i];
+            i++;
+        }
+    }
+
+    return result;
 }
 
 /**

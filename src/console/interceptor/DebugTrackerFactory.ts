@@ -8,20 +8,19 @@ import { ThreadSessionManager } from '../parser/ThreadSessionManager';
 import { ParameterParser } from '../parser/ParameterParser';
 import { SqlConverter } from '../converter/SqlConverter';
 import { DatabaseDialect } from '../converter/DatabaseDialect';
-import { SqlOutputChannel } from '../output/SqlOutputChannel';
 import { LogType, ConvertedSql } from '../types';
+import type { MybatisLogViewProvider } from '../../webview/MybatisLogViewProvider';
 
 /**
  * Factory for creating debug adapter trackers
  */
 export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
     private sessionManager: ThreadSessionManager;
-    private outputChannel: SqlOutputChannel;
+    private logViewProvider?: MybatisLogViewProvider;
     private enabled: boolean = true;
 
     constructor() {
         this.sessionManager = new ThreadSessionManager(5000);
-        this.outputChannel = new SqlOutputChannel();
     }
 
     /**
@@ -147,7 +146,7 @@ export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
     private lineCount = 0;
 
     /**
-     * Convert SQL and output to channel
+     * Convert SQL and output to WebView
      */
     private convertAndOutput(session: any, totalLine: string): void {
         if (!session.preparing || !session.parameters) {
@@ -160,8 +159,8 @@ export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
         // Validate parameter count
         const validation = SqlConverter.validateParameterCount(sql, params);
         if (!validation.valid) {
-            this.outputChannel.showError(
-                `Parameter count mismatch: expected ${validation.expected}, got ${validation.actual}`
+            console.error(
+                `[MyBatis Console] Parameter count mismatch: expected ${validation.expected}, got ${validation.actual}`
             );
             return;
         }
@@ -200,8 +199,19 @@ export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
             totalLine
         };
 
-        // Output to channel
-        this.outputChannel.show(result);
+        // Output to WebView
+        if (this.logViewProvider) {
+            this.logViewProvider.addRecord(result);
+        } else {
+            console.warn('[MyBatis Console] LogViewProvider not set, SQL record not displayed');
+        }
+    }
+
+    /**
+     * Set log view provider
+     */
+    public setLogViewProvider(provider: MybatisLogViewProvider): void {
+        this.logViewProvider = provider;
     }
 
     /**
@@ -219,17 +229,20 @@ export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
     }
 
     /**
-     * Clear output channel
+     * Clear all SQL records in WebView
      */
     public clearOutput(): void {
-        this.outputChannel.clear();
+        if (this.logViewProvider) {
+            this.logViewProvider.clear();
+        }
     }
 
     /**
-     * Export logs to file
+     * Export logs to file (removed - not needed for WebView)
+     * TODO: Implement export functionality in WebView if needed
      */
     public async exportLogs(): Promise<void> {
-        await this.outputChannel.exportLogs();
+        vscode.window.showWarningMessage('Export functionality will be implemented in future releases');
     }
 
     /**
@@ -237,6 +250,5 @@ export class DebugTrackerFactory implements vscode.DebugAdapterTrackerFactory {
      */
     public dispose(): void {
         this.sessionManager.dispose();
-        this.outputChannel.dispose();
     }
 }

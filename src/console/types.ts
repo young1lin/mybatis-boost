@@ -94,3 +94,18 @@ export interface ConsoleConfig {
     sessionTimeout: number;
     formatSql: boolean;
 }
+
+/**
+ * SQL record for WebView display
+ * Simplified version of ConvertedSql for table rendering
+ */
+export interface SqlRecord {
+    id: number;                    // Auto-increment ID for display
+    mapper: string;                // Mapper interface name
+    executionTime?: number;        // SQL execution time in milliseconds
+    rowsAffected?: number;         // Number of rows affected (extracted from totalLine)
+    sql: string;                   // Formatted SQL statement (convertedSql)
+    timestamp: Date;               // Execution timestamp
+    threadInfo?: string;           // Thread information
+    database: DatabaseType;        // Database type (for potential future filtering)
+}

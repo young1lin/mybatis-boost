@@ -6,6 +6,51 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.9] - 2025-11-26
+
+### 变更
+
+- 🎨 **SQL 日志显示重构**：用交互式 WebView 面板替换输出通道，提供更好的 SQL 日志查看体验
+  - **之前**：SQL 日志显示在 VS Code 输出通道中（纯文本，交互有限）
+  - **现在**：SQL 日志显示在专用的 WebView 侧边栏面板中，功能丰富
+  - **功能特性**：
+    - **卡片式布局**：每次 SQL 执行以卡片形式显示，视觉分离清晰
+    - **实时过滤**：按 Mapper 名称或 SQL 内容搜索/过滤 SQL 日志
+    - **自动滚动控制**：通过浮动按钮切换自动滚动到最新 SQL（默认启用）
+    - **一键复制**：一键复制 SQL 到剪贴板，带视觉反馈
+    - **执行元数据**：在卡片头部显示 Mapper 名称、执行时间和时间戳
+    - **慢查询高亮**：慢查询的视觉指示（执行时间显示）
+    - **清空所有记录**：一键清空所有 SQL 日志
+    - **空状态提示**：当没有捕获到 SQL 日志时显示友好的空状态消息
+  - **实现细节**：
+    - 创建 `MybatisLogViewProvider` 类，实现 `vscode.WebviewViewProvider`
+    - 移除 `SqlOutputChannel` 类（由 WebView 替代）
+    - 更新 `ConsoleInterceptor` 和 `DebugTrackerFactory` 以使用新的 WebView 提供程序
+    - 在 `extension.ts` 中添加 WebView 视图注册
+    - WebView 面板可通过侧边栏访问（视图类型：`mybatis-boost.logView`）
+  - **优势**：
+    - SQL 日志的视觉组织更好
+    - 搜索和过滤能力提升
+    - 更交互式和用户友好的界面
+    - 与现代 VS Code 扩展 UX 模式保持一致
+    - 处理大量 SQL 日志时性能更好
+
+### 修复
+
+- 🔧 **单元测试修复**：修复单元测试并改进代码质量
+  - 修复 `DynamicSqlHighlighter.test.ts` 测试用例
+  - 修复 `GeneratorViewProvider.test.ts` 测试用例
+  - 添加全面的 VS Code 模拟辅助工具（`vscode-mock.js`）以改善测试隔离
+  - 改进 `parameterParser.ts` 的注释和文档
+
+### 重构
+
+- 📁 **文档组织优化**：将文档文件移动到 `/docs` 目录，改善项目结构
+  - 移动 `CURSOR_MCP_SETUP.md` → `docs/CURSOR_MCP_SETUP.md`
+  - 移动 `MCP_SERVER.md` → `docs/MCP_SERVER.md`
+  - 移动 `PRD.md` → `docs/PRD.md`
+  - 改善项目组织和文档可发现性
+
 ## [0.3.8] - 2025-11-17
 
 ### 新增

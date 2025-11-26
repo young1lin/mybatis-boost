@@ -10,5 +10,4 @@ export { ParameterParser } from './parser/ParameterParser';
 export { ThreadSessionManager } from './parser/ThreadSessionManager';
 export { SqlConverter } from './converter/SqlConverter';
 export { DatabaseDialect } from './converter/DatabaseDialect';
-export { SqlOutputChannel } from './output/SqlOutputChannel';
 export * from './types';

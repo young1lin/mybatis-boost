@@ -22,6 +22,7 @@ import { XmlSqlHoverProvider, JavaSqlHoverProvider } from './hover';
 import { MybatisBindingDecorator, DynamicSqlHighlighter } from './decorator';
 import { findProjectFileInParents } from './utils/projectDetector';
 import { GeneratorViewProvider } from './webview/GeneratorViewProvider';
+import { MybatisLogViewProvider } from './webview/MybatisLogViewProvider';
 import { MCPManager } from './mcp/MCPManager';
 import { ConsoleInterceptor } from './console';
 import { MybatisXmlFormattingProvider } from './formatter';
@@ -32,6 +33,7 @@ let dynamicSqlHighlighter: DynamicSqlHighlighter;
 let parameterValidator: ParameterValidator;
 let mcpManager: MCPManager;
 let consoleInterceptor: ConsoleInterceptor;
+let logViewProvider: MybatisLogViewProvider;
 
 // Navigation providers (disposable based on configuration)
 let javaToXmlDefinitionProvider: vscode.Disposable | undefined;
@@ -54,6 +56,16 @@ export async function activate(context: vscode.ExtensionContext) {
     );
     console.log('[MyBatis Boost] Generator WebView Provider registered');
 
+    // Register WebView Provider for SQL log panel (always available)
+    logViewProvider = new MybatisLogViewProvider(context.extensionUri);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            MybatisLogViewProvider.viewType,
+            logViewProvider
+        )
+    );
+    console.log('[MyBatis Boost] Log WebView Provider registered');
+
     // Initialize MCP Manager for AI-powered code generation
     mcpManager = new MCPManager(context);
     try {
@@ -70,6 +82,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize console interceptor for SQL logging (always available)
     consoleInterceptor = new ConsoleInterceptor();
+    consoleInterceptor.setLogViewProvider(logViewProvider);
     consoleInterceptor.activate(context);
     console.log('[MyBatis Boost] Console interceptor initialized');
 

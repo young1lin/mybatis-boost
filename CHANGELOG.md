@@ -6,6 +6,51 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.9] - 2025-11-26
+
+### Changed
+
+- 🎨 **SQL Log Display Refactoring**: Replaced output channel with interactive WebView panel for better SQL log viewing experience
+  - **Previous**: SQL logs displayed in VS Code output channel (plain text, limited interaction)
+  - **New**: SQL logs displayed in dedicated WebView sidebar panel with rich features
+  - **Features**:
+    - **Card-based Layout**: Each SQL execution displayed as a card with clear visual separation
+    - **Real-time Filtering**: Search/filter SQL logs by mapper name or SQL content
+    - **Auto-scroll Control**: Toggle auto-scroll to latest SQL with floating button (enabled by default)
+    - **One-click Copy**: Copy SQL to clipboard with visual feedback
+    - **Execution Metadata**: Display mapper name, execution time, and timestamp in card header
+    - **Slow Query Highlighting**: Visual indication for slow queries (execution time display)
+    - **Clear All Records**: Clear all SQL logs with single button click
+    - **Empty State**: Friendly empty state message when no SQL logs are captured
+  - **Implementation**:
+    - Created `MybatisLogViewProvider` class implementing `vscode.WebviewViewProvider`
+    - Removed `SqlOutputChannel` class (replaced by WebView)
+    - Updated `ConsoleInterceptor` and `DebugTrackerFactory` to use new WebView provider
+    - Added WebView view registration in `extension.ts`
+    - WebView panel accessible via sidebar (view type: `mybatis-boost.logView`)
+  - **Benefits**:
+    - Better visual organization of SQL logs
+    - Improved searchability and filtering capabilities
+    - More interactive and user-friendly interface
+    - Consistent with modern VS Code extension UX patterns
+    - Better performance for large number of SQL logs
+
+### Fixed
+
+- 🔧 **Unit Test Fixes**: Fixed unit tests and improved code quality
+  - Fixed `DynamicSqlHighlighter.test.ts` test cases
+  - Fixed `GeneratorViewProvider.test.ts` test cases
+  - Added comprehensive VS Code mock helpers (`vscode-mock.js`) for better test isolation
+  - Improved `parameterParser.ts` comments and documentation
+
+### Refactored
+
+- 📁 **Documentation Organization**: Moved documentation files to `/docs` directory for better project structure
+  - Moved `CURSOR_MCP_SETUP.md` → `docs/CURSOR_MCP_SETUP.md`
+  - Moved `MCP_SERVER.md` → `docs/MCP_SERVER.md`
+  - Moved `PRD.md` → `docs/PRD.md`
+  - Improved project organization and documentation discoverability
+
 ## [0.3.8] - 2025-11-17
 
 ### Added

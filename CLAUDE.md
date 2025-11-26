@@ -220,6 +220,93 @@ File searches automatically skip: `node_modules`, `target`, `.git`, `.vscode`, `
 - Automatically updates when files change
 - Can be disabled via `mybatis-boost.showBindingIcons` setting
 
+### SQL Log WebView Panel
+
+**Location**: `src/webview/MybatisLogViewProvider.ts`, `src/console/`
+
+**Overview**:
+The SQL Log WebView provides real-time monitoring of MyBatis SQL execution during debug sessions. It intercepts debug console output, parses MyBatis logs, converts parameterized SQL to executable SQL, and displays them in an interactive panel at the bottom of VS Code (similar to Terminal/Output panels).
+
+**Architecture**:
+```
+ConsoleInterceptor (extension.ts)
+  ├── DebugTrackerFactory
+  │   ├── Debug Adapter Protocol Listener
+  │   ├── LogParser (detects MyBatis logs)
+  │   ├── ThreadSessionManager (tracks multi-line logs)
+  │   ├── ParameterParser (parses parameter values)
+  │   └── SqlConverter (replaces ? with actual values)
+  └── MybatisLogViewProvider
+      └── WebView Panel (displays SQL records)
+```
+
+**Data Flow**:
+1. User starts Java debug session
+2. DebugTrackerFactory intercepts debug console output
+3. LogParser identifies MyBatis log patterns (Preparing/Parameters/Total/Updates)
+4. ThreadSessionManager groups related log lines by thread ID
+5. SqlConverter replaces placeholders with actual parameter values
+6. MybatisLogViewProvider displays formatted SQL in WebView table
+
+**Key Features**:
+- **Real-time Display**: SQL appears instantly when MyBatis executes queries
+- **Fuzzy Search**: Filter by mapper name or SQL content (searches across all fields)
+- **Slow Query Highlighting**: Queries exceeding 100ms shown in red
+- **SQL Preview**: Hover over truncated SQL to view full statement
+- **History Limit**: Configurable via `mybatis-boost.console.historyLimit` (default: 5000)
+- **Clear Function**: Clear all records with confirmation dialog
+- **Copy Support**: WebView allows native text selection and copying (unlike OutputChannel)
+
+**SqlRecord Interface** (`src/console/types.ts`):
+```typescript
+interface SqlRecord {
+    id: number;                    // Auto-increment ID for display
+    mapper: string;                // Mapper interface name (e.g., "com.example.UserMapper.selectById")
+    executionTime?: number;        // SQL execution time in milliseconds
+    rowsAffected?: number;         // Number of rows affected (extracted from "Total: N" or "Updates: N")
+    sql: string;                   // Formatted SQL statement (converted with actual parameter values)
+    timestamp: Date;               // Execution timestamp
+    threadInfo?: string;           // Thread information (e.g., "12345 [main]")
+    database: DatabaseType;        // Database type (MySQL/PostgreSQL/Oracle/SQLServer)
+}
+```
+
+**Configuration** (`mybatis-boost.console.*`):
+- `enabled` (default: true): Enable SQL console interceptor
+- `autoDetectDatabase` (default: true): Auto-detect database type from SQL syntax
+- `defaultDatabase` (default: "mysql"): Fallback database type
+- `sessionTimeout` (default: 5000ms): Timeout for incomplete log sessions
+- `historyLimit` (default: 5000): Maximum number of SQL records to keep in memory
+
+**Panel Registration** (`package.json`):
+```json
+"viewsContainers": {
+  "panel": [{
+    "id": "mybatis-log-panel",
+    "title": "MyBatis Log",
+    "icon": "images/icons/MyBatis.svg"
+  }]
+},
+"views": {
+  "mybatis-log-panel": [{
+    "id": "mybatis-boost.logView",
+    "name": "SQL Logs",
+    "type": "webview"
+  }]
+}
+```
+
+**Commands**:
+- `mybatis-boost.clearSqlOutput`: Clear all SQL records in WebView
+- `mybatis-boost.toggleSqlConsole`: Enable/disable SQL interception
+- `mybatis-boost.exportSqlLogs`: (Placeholder) Export logs to file (future feature)
+
+**Technical Notes**:
+- Uses Debug Adapter Protocol to intercept console output (non-intrusive)
+- Parses MyBatis log format: `yyyy-MM-dd HH:mm:ss.SSS [thread] LEVEL mapper.method - Preparing: SQL`
+- Handles multi-line logs by session ID (thread ID + mapper + timestamp)
+- Replaces OutputChannel for better user experience (searchable, copyable, interactive)
+
 ### MyBatis Code Generator
 
 **Location**: `src/webview/GeneratorViewProvider.ts`, `src/generator/`

@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { DebugTrackerFactory } from './DebugTrackerFactory';
 import { ConsoleConfig, DatabaseType } from '../types';
+import type { MybatisLogViewProvider } from '../../webview/MybatisLogViewProvider';
 
 /**
  * Console interceptor entry point
@@ -15,6 +16,13 @@ export class ConsoleInterceptor {
 
     constructor() {
         this.trackerFactory = new DebugTrackerFactory();
+    }
+
+    /**
+     * Set log view provider for displaying SQL records
+     */
+    public setLogViewProvider(provider: MybatisLogViewProvider): void {
+        this.trackerFactory.setLogViewProvider(provider);
     }
 
     /**
