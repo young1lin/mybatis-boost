@@ -310,15 +310,28 @@ export class ParameterValidator {
                 }
             }
 
-            // 2.5. MyBatis 3.x+ single object parameter auto-mapping
-            // If there's only one parameter without @Param annotation, and it's not a primitive type,
-            // MyBatis will automatically map the object's fields
+            // 2.5. MyBatis 3.x+ single parameter auto-mapping
+            // If there's only one parameter without @Param annotation:
+            // - For built-in types (String, Integer, etc.): ANY parameter name is valid in XML
+            // - For DTO objects: MyBatis automatically maps the object's fields
             if (methodParams.length === 1 && !methodParams[0].hasParamAnnotation) {
                 const singleParam = methodParams[0];
                 const paramType = singleParam.paramType;
 
-                // Check if it's not a built-in type (primitives, String, Integer, etc.)
-                if (!this.isBuiltInType(paramType) && !this.isCollectionType(paramType)) {
+                // Check if it's a built-in type (primitives, String, Integer, etc.)
+                if (this.isBuiltInType(paramType)) {
+                    // MyBatis single parameter rule: when there's a single built-in type parameter
+                    // without @Param annotation, ANY parameter name is valid in XML
+                    // Example: int deleteByPrimaryKey(String accountNumber);
+                    //          WHERE id = #{id}           -- valid
+                    //          WHERE id = #{accountNumber} -- valid
+                    //          WHERE id = #{anything}      -- valid
+                    console.log(`[ParameterValidator] Single built-in type parameter (${paramType}) without @Param, skipping validation for statement ${statement.id}`);
+                    return diagnostics; // Return empty diagnostics, skip validation
+                }
+
+                // Check if it's not a collection type (for DTO objects)
+                if (!this.isCollectionType(paramType)) {
                     try {
                         // Try to get the fully qualified class name from the Java file
                         const fullyQualifiedType = await this.resolveFullyQualifiedType(javaPath, paramType);

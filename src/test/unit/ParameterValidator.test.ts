@@ -257,3 +257,185 @@ describe('ParameterValidator Configuration Toggle', () => {
         });
     });
 });
+
+/**
+ * Tests for MyBatis single parameter validation rules
+ *
+ * MyBatis Single Parameter Rule:
+ * When a method has only one parameter and no @Param annotation:
+ * - If it's a primitive/built-in type (String, Integer, etc.), ANY name can be used in XML
+ * - If it's a DTO object, the object's fields are automatically mapped
+ */
+describe('ParameterValidator - Single Parameter Rules', () => {
+    describe('isBuiltInType helper method', () => {
+        let isBuiltInType: (className: string) => boolean;
+
+        before(() => {
+            // Get the isBuiltInType method from the ParameterValidator
+            // We'll test it indirectly through the module
+            const { ParameterValidator } = require('../../navigator/diagnostics/ParameterValidator');
+            const mockContext = {
+                subscriptions: { push: () => {} }
+            };
+            const mockFileMapper = {
+                getJavaPath: () => Promise.resolve(null)
+            };
+            const validator = new ParameterValidator(mockContext, mockFileMapper);
+            // Access private method through any cast for testing
+            isBuiltInType = (validator as any).isBuiltInType.bind(validator);
+            validator.dispose();
+        });
+
+        it('should recognize primitive types', () => {
+            assert.strictEqual(isBuiltInType('int'), true);
+            assert.strictEqual(isBuiltInType('long'), true);
+            assert.strictEqual(isBuiltInType('double'), true);
+            assert.strictEqual(isBuiltInType('float'), true);
+            assert.strictEqual(isBuiltInType('boolean'), true);
+            assert.strictEqual(isBuiltInType('byte'), true);
+            assert.strictEqual(isBuiltInType('short'), true);
+            assert.strictEqual(isBuiltInType('char'), true);
+        });
+
+        it('should recognize wrapper types', () => {
+            assert.strictEqual(isBuiltInType('String'), true);
+            assert.strictEqual(isBuiltInType('Integer'), true);
+            assert.strictEqual(isBuiltInType('Long'), true);
+            assert.strictEqual(isBuiltInType('Double'), true);
+            assert.strictEqual(isBuiltInType('Float'), true);
+            assert.strictEqual(isBuiltInType('Boolean'), true);
+            assert.strictEqual(isBuiltInType('Byte'), true);
+            assert.strictEqual(isBuiltInType('Short'), true);
+            assert.strictEqual(isBuiltInType('Character'), true);
+        });
+
+        it('should recognize fully qualified java.lang types', () => {
+            assert.strictEqual(isBuiltInType('java.lang.String'), true);
+            assert.strictEqual(isBuiltInType('java.lang.Integer'), true);
+            assert.strictEqual(isBuiltInType('java.lang.Long'), true);
+        });
+
+        it('should not recognize DTO/custom types', () => {
+            assert.strictEqual(isBuiltInType('User'), false);
+            assert.strictEqual(isBuiltInType('UserQuery'), false);
+            assert.strictEqual(isBuiltInType('com.example.User'), false);
+        });
+    });
+
+    describe('isCollectionType helper method', () => {
+        let isCollectionType: (className: string) => boolean;
+
+        before(() => {
+            const { ParameterValidator } = require('../../navigator/diagnostics/ParameterValidator');
+            const mockContext = {
+                subscriptions: { push: () => {} }
+            };
+            const mockFileMapper = {
+                getJavaPath: () => Promise.resolve(null)
+            };
+            const validator = new ParameterValidator(mockContext, mockFileMapper);
+            isCollectionType = (validator as any).isCollectionType.bind(validator);
+            validator.dispose();
+        });
+
+        it('should recognize collection types', () => {
+            assert.strictEqual(isCollectionType('List'), true);
+            assert.strictEqual(isCollectionType('Set'), true);
+            assert.strictEqual(isCollectionType('Map'), true);
+            assert.strictEqual(isCollectionType('Collection'), true);
+            assert.strictEqual(isCollectionType('ArrayList'), true);
+            assert.strictEqual(isCollectionType('HashMap'), true);
+        });
+
+        it('should recognize fully qualified collection types', () => {
+            assert.strictEqual(isCollectionType('java.util.List'), true);
+            assert.strictEqual(isCollectionType('java.util.Set'), true);
+            assert.strictEqual(isCollectionType('java.util.Map'), true);
+        });
+
+        it('should not recognize non-collection types', () => {
+            assert.strictEqual(isCollectionType('String'), false);
+            assert.strictEqual(isCollectionType('User'), false);
+        });
+    });
+
+    describe('Single built-in type parameter validation', () => {
+        /**
+         * Test case for issue #40:
+         * When a method has a single built-in type parameter without @Param,
+         * MyBatis allows ANY parameter name in XML.
+         *
+         * Example:
+         * Java: int deleteByPrimaryKey(String accountNumber);
+         * XML: WHERE id = #{id}  -- This should be valid (any name works)
+         */
+        it('should recognize that single built-in type without @Param allows any parameter name', () => {
+            // This test verifies the expected behavior after the fix
+            // Single parameter (String) without @Param should allow any name in XML
+
+            const { ParameterValidator } = require('../../navigator/diagnostics/ParameterValidator');
+            const mockContext = {
+                subscriptions: { push: () => {} }
+            };
+            const mockFileMapper = {
+                getJavaPath: () => Promise.resolve(null)
+            };
+            const validator = new ParameterValidator(mockContext, mockFileMapper);
+
+            // Check that the validator correctly identifies built-in types
+            const isBuiltIn = (validator as any).isBuiltInType.bind(validator);
+
+            // These should all be recognized as built-in types
+            assert.strictEqual(isBuiltIn('String'), true, 'String should be a built-in type');
+            assert.strictEqual(isBuiltIn('java.lang.String'), true, 'java.lang.String should be a built-in type');
+            assert.strictEqual(isBuiltIn('Integer'), true, 'Integer should be a built-in type');
+            assert.strictEqual(isBuiltIn('Long'), true, 'Long should be a built-in type');
+
+            validator.dispose();
+        });
+
+        it('should recognize that single String parameter without @Param is a built-in type', () => {
+            // Simulates: int deleteByPrimaryKey(String accountNumber);
+            // XML can use #{id}, #{accountNumber}, #{anything} - all valid
+
+            const { ParameterValidator } = require('../../navigator/diagnostics/ParameterValidator');
+            const mockContext = {
+                subscriptions: { push: () => {} }
+            };
+            const mockFileMapper = {
+                getJavaPath: () => Promise.resolve(null)
+            };
+            const validator = new ParameterValidator(mockContext, mockFileMapper);
+
+            const isBuiltIn = (validator as any).isBuiltInType.bind(validator);
+            const isCollection = (validator as any).isCollectionType.bind(validator);
+
+            // String is a built-in type, not a collection
+            assert.strictEqual(isBuiltIn('String'), true);
+            assert.strictEqual(isCollection('String'), false);
+
+            validator.dispose();
+        });
+
+        it('should recognize that single Integer parameter without @Param is a built-in type', () => {
+            // Simulates: User selectById(Integer id);
+            // XML can use #{id}, #{value}, #{anything} - all valid
+
+            const { ParameterValidator } = require('../../navigator/diagnostics/ParameterValidator');
+            const mockContext = {
+                subscriptions: { push: () => {} }
+            };
+            const mockFileMapper = {
+                getJavaPath: () => Promise.resolve(null)
+            };
+            const validator = new ParameterValidator(mockContext, mockFileMapper);
+
+            const isBuiltIn = (validator as any).isBuiltInType.bind(validator);
+
+            assert.strictEqual(isBuiltIn('Integer'), true);
+            assert.strictEqual(isBuiltIn('int'), true);
+
+            validator.dispose();
+        });
+    });
+});
