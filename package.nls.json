@@ -14,6 +14,7 @@
   "config.highlightDynamicSql.description": "Highlight SQL keywords inside MyBatis dynamic SQL tags (if, where, set, foreach, etc.) and SQL statement tags (select, insert, update, delete) in XML files",
   "config.dynamicSqlKeywordColor.description": "Color for SQL keywords in MyBatis XML files (default: #CC7832, IntelliJ IDEA style). Supports hex color codes",
   "config.useDefinitionProvider.description": "Enable Go-to-Definition (F12) for Java-to-XML navigation. When false (default), use CodeLens instead to preserve native Java definition behavior",
+  "config.enableParameterValidation.description": "Enable real-time parameter validation in MyBatis XML files. When enabled, validates #{param} and ${param} references against Java method parameters and entity fields. Changes take effect immediately.",
   "config.generator.datetime.description": "Java type to use for SQL DATETIME/TIMESTAMP columns when parsing DDL statements (DATE always maps to LocalDate, TIME always maps to LocalTime)",
   "config.generator.basePackage.description": "Base package for generated Java code",
   "config.generator.author.description": "Author name in generated file headers",

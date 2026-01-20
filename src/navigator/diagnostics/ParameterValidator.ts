@@ -72,6 +72,7 @@ export class ParameterValidator {
     private fieldCache: FieldCache;
     private readonly DEBOUNCE_DELAY = 500; // 500ms debounce for text changes
     private readonly FIELD_CACHE_SIZE = 200; // Cache up to 200 classes
+    private enabled: boolean;
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -83,6 +84,18 @@ export class ParameterValidator {
 
         // Initialize field cache
         this.fieldCache = new FieldCache(this.FIELD_CACHE_SIZE);
+
+        // Read initial configuration
+        this.enabled = this.isValidationEnabled();
+
+        // Listen for configuration changes
+        this.disposables.push(
+            vscode.workspace.onDidChangeConfiguration(event => {
+                if (event.affectsConfiguration('mybatis-boost.enableParameterValidation')) {
+                    this.handleConfigurationChange();
+                }
+            })
+        );
 
         // Validate on file open (immediate)
         this.disposables.push(
@@ -136,12 +149,48 @@ export class ParameterValidator {
             })
         );
 
-        // Validate all open XML documents
-        vscode.workspace.textDocuments.forEach(doc => {
-            if (doc.languageId === 'xml') {
-                this.validateDocument(doc);
+        // Validate all open XML documents if validation is enabled
+        if (this.enabled) {
+            vscode.workspace.textDocuments.forEach(doc => {
+                if (doc.languageId === 'xml') {
+                    this.validateDocument(doc);
+                }
+            });
+        }
+    }
+
+    /**
+     * Check if parameter validation is enabled in configuration
+     */
+    private isValidationEnabled(): boolean {
+        return vscode.workspace.getConfiguration('mybatis-boost').get<boolean>('enableParameterValidation', true);
+    }
+
+    /**
+     * Handle configuration change for enableParameterValidation
+     */
+    private handleConfigurationChange(): void {
+        const newEnabled = this.isValidationEnabled();
+
+        if (newEnabled !== this.enabled) {
+            this.enabled = newEnabled;
+            console.log(`[ParameterValidator] Parameter validation ${this.enabled ? 'enabled' : 'disabled'}`);
+
+            if (this.enabled) {
+                // Re-validate all open XML documents when enabled
+                vscode.workspace.textDocuments.forEach(doc => {
+                    if (doc.languageId === 'xml') {
+                        this.validateDocument(doc);
+                    }
+                });
+            } else {
+                // Clear all diagnostics when disabled
+                this.diagnosticCollection.clear();
+                // Also clear any pending validation timers
+                this.validationTimers.forEach(timer => clearTimeout(timer));
+                this.validationTimers.clear();
             }
-        });
+        }
     }
 
     /**
@@ -169,6 +218,11 @@ export class ParameterValidator {
      * Validate a single XML document
      */
     async validateDocument(document: vscode.TextDocument): Promise<void> {
+        // Skip validation if disabled
+        if (!this.enabled) {
+            return;
+        }
+
         const diagnostics: vscode.Diagnostic[] = [];
 
         try {
@@ -574,6 +628,14 @@ export class ParameterValidator {
             console.error(`[ParameterValidator] Error resolving type ${simpleTypeName}:`, error);
             return null;
         }
+    }
+
+    /**
+     * Check if validation is currently enabled
+     * Useful for testing and debugging
+     */
+    public isEnabled(): boolean {
+        return this.enabled;
     }
 
     /**

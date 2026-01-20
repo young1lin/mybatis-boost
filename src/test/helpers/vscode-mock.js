@@ -98,6 +98,20 @@ const vscode = {
             return {
                 dispose: () => {}
             };
+        },
+        onDidOpenTextDocument: function(callback) {
+            return {
+                dispose: () => {}
+            };
+        },
+        onDidSaveTextDocument: function(callback) {
+            return {
+                dispose: () => {}
+            };
+        },
+        textDocuments: [],
+        findFiles: function(include, exclude, maxResults) {
+            return Promise.resolve([]);
         }
     },
 
@@ -172,6 +186,36 @@ const vscode = {
         Global: 1,
         Workspace: 2,
         WorkspaceFolder: 3
+    },
+
+    languages: {
+        createDiagnosticCollection: function(name) {
+            return {
+                name: name,
+                set: function() {},
+                clear: function() {},
+                dispose: function() {},
+                delete: function() {},
+                forEach: function() {},
+                get: function() { return []; },
+                has: function() { return false; }
+            };
+        }
+    },
+
+    Diagnostic: class Diagnostic {
+        constructor(range, message, severity) {
+            this.range = range;
+            this.message = message;
+            this.severity = severity;
+        }
+    },
+
+    DiagnosticSeverity: {
+        Error: 0,
+        Warning: 1,
+        Information: 2,
+        Hint: 3
     }
 };
 
