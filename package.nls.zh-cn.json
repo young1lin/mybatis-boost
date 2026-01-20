@@ -14,6 +14,7 @@
   "config.highlightDynamicSql.description": "在 XML 文件中高亮显示 MyBatis 动态 SQL 标签（if、where、set、foreach 等）和 SQL 语句标签（select、insert、update、delete）内的 SQL 关键字",
   "config.dynamicSqlKeywordColor.description": "MyBatis XML 文件中 SQL 关键字的颜色（默认：#CC7832，IntelliJ IDEA 风格）。支持十六进制颜色代码",
   "config.useDefinitionProvider.description": "启用 Java 到 XML 导航的跳转到定义（F12）功能。当设为 false（默认）时，使用 CodeLens 以保留原生 Java 定义行为",
+  "config.enableParameterValidation.description": "启用 MyBatis XML 文件中的实时参数验证。启用后，将验证 #{param} 和 ${param} 引用是否与 Java 方法参数和实体字段匹配。更改立即生效。",
   "config.generator.datetime.description": "解析 DDL 语句时用于 SQL DATETIME/TIMESTAMP 列的 Java 类型（DATE 始终映射为 LocalDate，TIME 始终映射为 LocalTime）",
   "config.generator.basePackage.description": "生成的 Java 代码的基础包名",
   "config.generator.author.description": "生成的文件头中的作者名称",

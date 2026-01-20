@@ -6,6 +6,20 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.11] - 2026-01-20
+
+### Added
+
+- ⚙️ **Parameter Validation Toggle**: Added new configuration option `mybatis-boost.enableParameterValidation` to enable/disable real-time parameter validation in MyBatis XML files
+  - **Default**: `true` (enabled)
+  - **Real-time Toggle**: Configuration changes take effect immediately without requiring extension reload
+  - **Behavior when enabled**: Validates `#{param}` and `${param}` references against Java method parameters and entity fields
+  - **Behavior when disabled**: Clears all parameter validation diagnostics and skips validation
+  - **Use case**: Useful for projects with custom parameter patterns or when validation causes performance issues
+  - Listens to `onDidChangeConfiguration` events for instant updates
+  - Added public `isEnabled()` method for debugging and testing
+  - Added 8 comprehensive unit tests for the configuration toggle feature
+
 ## [0.3.9] - 2025-11-26
 
 ### Changed
