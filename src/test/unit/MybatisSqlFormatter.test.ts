@@ -604,6 +604,268 @@ describe('MybatisSqlFormatter', () => {
         });
     });
 
+    describe('SET Clause Indentation with MyBatis Parameters', () => {
+        it('should maintain consistent indentation for all SET clause columns', () => {
+            const input = `UPDATE deep_chain_url
+SET
+  ckey = #{ckey,jdbcType=VARCHAR},
+  url = #{url,jdbcType=VARCHAR},
+  pkg_id = #{pkgId,jdbcType=VARCHAR},
+  remark = #{remark,jdbcType=VARCHAR},
+  create_time = #{createTime,jdbcType=TIMESTAMP},
+  update_time = #{updateTime,jdbcType=TIMESTAMP}
+WHERE
+  id = #{id,jdbcType=BIGINT}`;
+            const result = formatter.format(input);
+
+            // Parse lines and check indentation
+            const lines = result.split('\n');
+            const setIndex = lines.findIndex(l => l.trim() === 'SET');
+            const whereIndex = lines.findIndex(l => l.trim() === 'WHERE');
+
+            // All lines between SET and WHERE should have the same indentation (4 spaces)
+            const setClauseLines = lines.slice(setIndex + 1, whereIndex);
+            for (const line of setClauseLines) {
+                if (line.trim().length > 0) {
+                    const indent = (line.match(/^\s*/) || [''])[0].length;
+                    assert.strictEqual(indent, 4, `Line "${line}" should have 4 spaces indentation`);
+                }
+            }
+
+            // Verify all parameters are preserved
+            assert.ok(result.includes('#{ckey,jdbcType=VARCHAR}'));
+            assert.ok(result.includes('#{url,jdbcType=VARCHAR}'));
+            assert.ok(result.includes('#{pkgId,jdbcType=VARCHAR}'));
+            assert.ok(result.includes('#{id,jdbcType=BIGINT}'));
+        });
+
+        it('should format simple UPDATE with MyBatis parameters correctly', () => {
+            const input = `UPDATE users SET name = #{name}, age = #{age} WHERE id = #{id}`;
+            const result = formatter.format(input);
+
+            // Check keywords are uppercase
+            assert.ok(result.includes('UPDATE'));
+            assert.ok(result.includes('SET'));
+            assert.ok(result.includes('WHERE'));
+
+            // Check all SET columns have the same indentation
+            const lines = result.split('\n');
+            const setIndex = lines.findIndex(l => l.trim() === 'SET');
+            const whereIndex = lines.findIndex(l => l.trim() === 'WHERE');
+
+            const setClauseLines = lines.slice(setIndex + 1, whereIndex);
+            const indents = setClauseLines.filter(l => l.trim().length > 0).map(l => (l.match(/^\s*/) || [''])[0].length);
+
+            // All indents should be the same
+            assert.ok(indents.every(i => i === indents[0]), 'All SET clause columns should have same indentation');
+        });
+    });
+
+    describe('INSERT Statement Formatting', () => {
+        it('should format INSERT with MyBatis parameters with uppercase keywords', () => {
+            const input = `insert into deep_chain_url (id, ckey, url) values (#{id}, #{ckey}, #{url})`;
+            const result = formatter.format(input);
+
+            // Keywords should be uppercase
+            assert.ok(result.includes('INSERT INTO') || result.includes('INSERT\n'), 'INSERT keyword should be uppercase');
+            assert.ok(result.includes('VALUES'), 'VALUES keyword should be uppercase');
+
+            // Parameters should be preserved
+            assert.ok(result.includes('#{id}'));
+            assert.ok(result.includes('#{ckey}'));
+            assert.ok(result.includes('#{url}'));
+        });
+
+        it('should format INSERT with multiple columns properly', () => {
+            const input = `insert into deep_chain_url (id, ckey, url, pkg_id, remark) values (#{id}, #{ckey}, #{url}, #{pkgId}, #{remark})`;
+            const result = formatter.format(input);
+
+            // Keywords should be uppercase
+            assert.ok(result.toUpperCase().includes('INSERT'));
+            assert.ok(result.toUpperCase().includes('VALUES'));
+
+            // All parameters should be preserved
+            assert.ok(result.includes('#{id}'));
+            assert.ok(result.includes('#{ckey}'));
+            assert.ok(result.includes('#{url}'));
+            assert.ok(result.includes('#{pkgId}'));
+            assert.ok(result.includes('#{remark}'));
+        });
+    });
+
+    describe('XML Comment Preservation', () => {
+        it('should preserve XML comments without corruption', () => {
+            const input = `SELECT * FROM t_data
+<!-- WHERE status = 1 -->
+ORDER BY id`;
+            const result = formatter.format(input);
+
+            // Comment should be preserved intact (not corrupted to "< ! --")
+            assert.ok(result.includes('<!--'), 'Comment opening should be preserved');
+            assert.ok(result.includes('-->'), 'Comment closing should be preserved');
+            assert.ok(!result.includes('< ! --'), 'Comment should not be corrupted');
+            assert.ok(!result.includes('< !--'), 'Comment should not be corrupted');
+        });
+
+        it('should preserve multiple XML comments', () => {
+            const input = `<!--<select id="test">-->
+<!--SELECT * FROM t_data-->
+<!--</select>-->`;
+            const result = formatter.format(input);
+
+            // All comments should be preserved
+            const commentMatches = result.match(/<!--[\s\S]*?-->/g) || [];
+            assert.strictEqual(commentMatches.length, 3, 'Should have 3 comments');
+
+            // No corruption
+            assert.ok(!result.includes('< ! --'), 'Comments should not be corrupted');
+        });
+
+        it('should preserve XML comment content exactly', () => {
+            const input = `SELECT id FROM users
+<!-- AND deleted = 0 -->
+WHERE status = 1`;
+            const result = formatter.format(input);
+
+            // Comment content should be preserved exactly
+            assert.ok(result.includes('<!-- AND deleted = 0 -->'), 'Comment content should be preserved');
+        });
+
+        it('should handle commented out SQL statements', () => {
+            const input = `<!--<include refid="Base_Column_List"/>-->
+<!--ORDER BY id DESC LIMIT 10;-->`;
+            const result = formatter.format(input);
+
+            // Comments should be intact
+            assert.ok(result.includes('<!--<include refid="Base_Column_List"/>-->'));
+            assert.ok(result.includes('<!--ORDER BY id DESC LIMIT 10;-->'));
+        });
+    });
+
+    describe('CDATA Block Preservation', () => {
+        it('should preserve CDATA block content without formatting', () => {
+            const input = `SELECT total FROM t_records
+WHERE status = 1 AND
+<![CDATA[ created_at >= #{start} AND created_at < #{end} ]]>
+AND type = #{type}`;
+            const result = formatter.format(input);
+
+            // CDATA block should be preserved as single line
+            const cdataMatch = result.match(/<!\[CDATA\[[\s\S]*?\]\]>/);
+            assert.ok(cdataMatch, 'CDATA block should be present');
+            assert.strictEqual(cdataMatch![0].split('\n').length, 1, 'CDATA should be on single line');
+
+            // Original content should be preserved
+            assert.ok(result.includes('created_at >= #{start}'));
+            assert.ok(result.includes('created_at < #{end}'));
+        });
+
+        it('should preserve CDATA block inside dynamic tags', () => {
+            const input = `SELECT * FROM t_data WHERE id = #{id}
+<if test="dateRange != null">
+  AND
+  <![CDATA[ record_time >= #{dateRange.start} AND record_time <= #{dateRange.end} ]]>
+</if>`;
+            const result = formatter.format(input);
+
+            // CDATA should be preserved
+            const cdataMatch = result.match(/<!\[CDATA\[[\s\S]*?\]\]>/);
+            assert.ok(cdataMatch, 'CDATA block should be present');
+            assert.strictEqual(cdataMatch![0].split('\n').length, 1, 'CDATA should be on single line');
+
+            // Dynamic tag structure should be preserved
+            assert.ok(result.includes('<if test="dateRange != null">'));
+            assert.ok(result.includes('</if>'));
+        });
+
+        it('should preserve multiple CDATA blocks', () => {
+            const input = `SELECT * FROM t_data
+WHERE
+<![CDATA[ price > #{minPrice} ]]>
+AND
+<![CDATA[ price < #{maxPrice} ]]>`;
+            const result = formatter.format(input);
+
+            // Both CDATA blocks should be preserved
+            const cdataMatches = result.match(/<!\[CDATA\[[\s\S]*?\]\]>/g) || [];
+            assert.strictEqual(cdataMatches.length, 2, 'Should have 2 CDATA blocks');
+
+            // Each should be on single line
+            cdataMatches.forEach(match => {
+                assert.strictEqual(match.split('\n').length, 1, 'Each CDATA should be on single line');
+            });
+        });
+
+        it('should preserve CDATA with comparison operators', () => {
+            const input = `SELECT * FROM t_data WHERE <![CDATA[ value >= 100 AND value <= 200 ]]>`;
+            const result = formatter.format(input);
+
+            // CDATA should be preserved exactly
+            assert.ok(result.includes('<![CDATA[ value >= 100 AND value <= 200 ]]>'));
+        });
+    });
+
+    describe('Parenthesis Alignment with Dynamic Tags', () => {
+        it('should align parenthesis with AND keyword in dynamic SQL', () => {
+            const input = `SELECT id FROM t_order WHERE status = 1
+<if test="dateRanges != null">
+  AND
+  (
+  <trim prefixOverrides="OR">
+    <foreach collection="dateRanges" item="range">
+      OR (created_at BETWEEN #{range.start} AND #{range.end})
+    </foreach>
+  </trim>
+  )
+</if>`;
+            const result = formatter.format(input);
+
+            // Parse lines and find AND and ( lines
+            const lines = result.split('\n');
+            const andLineIdx = lines.findIndex(l => l.trim() === 'AND');
+            const openParenLineIdx = lines.findIndex((l, i) => i > andLineIdx && l.trim() === '(');
+
+            assert.ok(andLineIdx >= 0, 'Should find AND line');
+            assert.ok(openParenLineIdx >= 0, 'Should find ( line');
+
+            // Both should have the same indentation
+            const andIndent = (lines[andLineIdx].match(/^\s*/) || [''])[0].length;
+            const parenIndent = (lines[openParenLineIdx].match(/^\s*/) || [''])[0].length;
+            assert.strictEqual(andIndent, parenIndent, 'Parenthesis should be aligned with AND');
+        });
+
+        it('should properly indent incomplete SQL fragments inside dynamic tags', () => {
+            const input = `SELECT * FROM users
+<if test="condition">
+  AND name = #{name}
+  OR
+  (
+  <foreach collection="items" item="item">
+    item_id = #{item.id}
+  </foreach>
+  )
+</if>`;
+            const result = formatter.format(input);
+
+            // Verify structure is preserved
+            assert.ok(result.includes('<if test="condition">'));
+            assert.ok(result.includes('<foreach'));
+            assert.ok(result.includes('#{name}'));
+            assert.ok(result.includes('#{item.id}'));
+
+            // Verify OR and ( have same indentation
+            const lines = result.split('\n');
+            const orLineIdx = lines.findIndex(l => l.trim() === 'OR');
+            const parenLineIdx = lines.findIndex((l, i) => i > orLineIdx && l.trim() === '(');
+
+            if (orLineIdx >= 0 && parenLineIdx >= 0) {
+                const orIndent = (lines[orLineIdx].match(/^\s*/) || [''])[0].length;
+                const parenIndent = (lines[parenLineIdx].match(/^\s*/) || [''])[0].length;
+                assert.strictEqual(orIndent, parenIndent, 'Parenthesis should be aligned with OR');
+            }
+        });
+    });
+
     describe('Comma Placement', () => {
         it('should not place commas on separate lines in UPDATE statements', () => {
             const input = `UPDATE user SET name =#{name}, age =#{age}, update_time =#{updateTime}, version = version + 1 WHERE id =#{id} AND version =#{version}`;

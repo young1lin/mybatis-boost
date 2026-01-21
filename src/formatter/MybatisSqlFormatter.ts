@@ -455,19 +455,36 @@ class MybatisCstFormatter {
             const formatted = format(sql, options);
 
             // Add indentation to each line
-            const lines = formatted.split('\n');
-            const indentedLines = lines.map((line, index) => {
-                if (index === 0) {
-                    return `\n${indent}${line}`;
-                }
-                return `${indent}${line}`;
-            });
-
-            return indentedLines.join('\n');
+            return this.indentAllLines(formatted, indent);
         } catch (error) {
-            // If formatting fails, just indent the original content
-            return `\n${indent}${sql}`;
+            // If formatting fails, indent all lines of the original content
+            // This handles incomplete SQL fragments like "AND\n(" inside dynamic tags
+            return this.indentAllLines(sql, indent);
         }
+    }
+
+    /**
+     * Add indentation to all lines of content
+     * First line gets a leading newline, all lines get the specified indent
+     *
+     * @param content - Multi-line content to indent
+     * @param indent - Indentation string to prepend to each line
+     * @returns Indented content with leading newline
+     */
+    private indentAllLines(content: string, indent: string): string {
+        const lines = content.split('\n');
+        const indentedLines = lines.map((line, index) => {
+            // Skip empty lines (preserve them without adding trailing spaces)
+            if (line.trim().length === 0) {
+                return index === 0 ? '\n' : '';
+            }
+            if (index === 0) {
+                return `\n${indent}${line}`;
+            }
+            return `${indent}${line}`;
+        });
+
+        return indentedLines.join('\n');
     }
 
     /**
@@ -558,19 +575,158 @@ export class MybatisSqlFormatter {
             // Build formatter options
             const formatterOptions = this.buildFormatterOptions(options);
 
-            // Step 1: Parse SQL content into CST
-            const cst = this.parser.parse(sqlContent);
+            // Step 1: Extract XML comments and replace with placeholders
+            // XML comments should be preserved exactly as-is without any formatting
+            const { content: contentWithoutComments, comments } = this.extractXmlComments(sqlContent);
 
-            // Step 2: Format CST to string with proper indentation
+            // Step 2: Extract CDATA blocks and replace with placeholders
+            // CDATA content should be preserved as-is without formatting
+            const { content: contentWithoutCdata, cdataBlocks } = this.extractCdataBlocks(contentWithoutComments);
+
+            // Step 3: Extract MyBatis parameters and replace with placeholders
+            // This ensures sql-formatter sees complete SQL structure
+            const { content: contentWithPlaceholders, params } = this.extractParameters(contentWithoutCdata);
+
+            // Step 4: Parse SQL content into CST (now without params splitting SQL)
+            const cst = this.parser.parse(contentWithPlaceholders);
+
+            // Step 5: Format CST to string with proper indentation
             const formatted = this.cstFormatter.format(cst, formatterOptions);
 
-            // Step 3: Clean up formatting
-            return this.cleanupFormatting(formatted);
+            // Step 6: Restore MyBatis parameters from placeholders
+            const restoredParams = this.restoreParameters(formatted, params);
+
+            // Step 7: Restore CDATA blocks from placeholders
+            const restoredCdata = this.restoreCdataBlocks(restoredParams, cdataBlocks);
+
+            // Step 8: Restore XML comments from placeholders
+            const restoredComments = this.restoreXmlComments(restoredCdata, comments);
+
+            // Step 9: Clean up formatting
+            return this.cleanupFormatting(restoredComments);
         } catch (error) {
             // If formatting fails, return original content
             console.error('[MyBatis SQL Formatter] Failed to format SQL:', error);
             return sqlContent;
         }
+    }
+
+    /**
+     * Extract XML comments and replace with placeholders
+     * XML comments should be preserved exactly as-is without any formatting
+     *
+     * @param content - SQL content that may contain XML comments
+     * @returns Object with placeholder-replaced content and comment map
+     */
+    private extractXmlComments(content: string): { content: string; comments: Map<string, string> } {
+        const comments = new Map<string, string>();
+        let commentIndex = 0;
+
+        // Match XML comments: <!-- ... -->
+        // Use non-greedy match to handle multiple comments
+        const commentRegex = /<!--[\s\S]*?-->/g;
+
+        const newContent = content.replace(commentRegex, (match) => {
+            const placeholder = `__MYBATIS_COMMENT_${commentIndex}__`;
+            comments.set(placeholder, match);
+            commentIndex++;
+            return placeholder;
+        });
+
+        return { content: newContent, comments };
+    }
+
+    /**
+     * Restore XML comments from placeholders
+     *
+     * @param content - Content with placeholders
+     * @param comments - Map of placeholders to original XML comments
+     * @returns Content with original XML comments restored
+     */
+    private restoreXmlComments(content: string, comments: Map<string, string>): string {
+        let result = content;
+        for (const [placeholder, original] of comments) {
+            result = result.replace(placeholder, original);
+        }
+        return result;
+    }
+
+    /**
+     * Extract CDATA blocks and replace with placeholders
+     * CDATA content should be preserved exactly as-is without formatting
+     *
+     * @param content - SQL content that may contain CDATA blocks
+     * @returns Object with placeholder-replaced content and CDATA block map
+     */
+    private extractCdataBlocks(content: string): { content: string; cdataBlocks: Map<string, string> } {
+        const cdataBlocks = new Map<string, string>();
+        let cdataIndex = 0;
+
+        // Match CDATA blocks: <![CDATA[ ... ]]>
+        const cdataRegex = /<!\[CDATA\[[\s\S]*?\]\]>/g;
+
+        const newContent = content.replace(cdataRegex, (match) => {
+            const placeholder = `__MYBATIS_CDATA_${cdataIndex}__`;
+            cdataBlocks.set(placeholder, match);
+            cdataIndex++;
+            return placeholder;
+        });
+
+        return { content: newContent, cdataBlocks };
+    }
+
+    /**
+     * Restore CDATA blocks from placeholders
+     *
+     * @param content - Content with placeholders
+     * @param cdataBlocks - Map of placeholders to original CDATA blocks
+     * @returns Content with original CDATA blocks restored
+     */
+    private restoreCdataBlocks(content: string, cdataBlocks: Map<string, string>): string {
+        let result = content;
+        for (const [placeholder, original] of cdataBlocks) {
+            result = result.replace(placeholder, original);
+        }
+        return result;
+    }
+
+    /**
+     * Extract MyBatis parameters (#{...} and ${...}) and replace with placeholders
+     * This allows sql-formatter to see the complete SQL structure
+     *
+     * @param content - SQL content with MyBatis parameters
+     * @returns Object with placeholder-replaced content and parameter map
+     */
+    private extractParameters(content: string): { content: string; params: Map<string, string> } {
+        const params = new Map<string, string>();
+        let paramIndex = 0;
+
+        // Match #{...} and ${...} patterns, including nested braces
+        const paramRegex = /([#$])\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g;
+
+        const newContent = content.replace(paramRegex, (match, prefix, expression) => {
+            const placeholder = `__MYBATIS_PARAM_${paramIndex}__`;
+            params.set(placeholder, match);
+            paramIndex++;
+            return placeholder;
+        });
+
+        return { content: newContent, params };
+    }
+
+    /**
+     * Restore MyBatis parameters from placeholders
+     *
+     * @param content - Content with placeholders
+     * @param params - Map of placeholders to original parameters
+     * @returns Content with original parameters restored
+     */
+    private restoreParameters(content: string, params: Map<string, string>): string {
+        let result = content;
+        for (const [placeholder, original] of params) {
+            result = result.replace(placeholder, original);
+        }
+        return result;
     }
 
     /**
