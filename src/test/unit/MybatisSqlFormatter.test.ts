@@ -693,6 +693,55 @@ WHERE
         });
     });
 
+    describe('XML Comment Preservation', () => {
+        it('should preserve XML comments without corruption', () => {
+            const input = `SELECT * FROM t_data
+<!-- WHERE status = 1 -->
+ORDER BY id`;
+            const result = formatter.format(input);
+
+            // Comment should be preserved intact (not corrupted to "< ! --")
+            assert.ok(result.includes('<!--'), 'Comment opening should be preserved');
+            assert.ok(result.includes('-->'), 'Comment closing should be preserved');
+            assert.ok(!result.includes('< ! --'), 'Comment should not be corrupted');
+            assert.ok(!result.includes('< !--'), 'Comment should not be corrupted');
+        });
+
+        it('should preserve multiple XML comments', () => {
+            const input = `<!--<select id="test">-->
+<!--SELECT * FROM t_data-->
+<!--</select>-->`;
+            const result = formatter.format(input);
+
+            // All comments should be preserved
+            const commentMatches = result.match(/<!--[\s\S]*?-->/g) || [];
+            assert.strictEqual(commentMatches.length, 3, 'Should have 3 comments');
+
+            // No corruption
+            assert.ok(!result.includes('< ! --'), 'Comments should not be corrupted');
+        });
+
+        it('should preserve XML comment content exactly', () => {
+            const input = `SELECT id FROM users
+<!-- AND deleted = 0 -->
+WHERE status = 1`;
+            const result = formatter.format(input);
+
+            // Comment content should be preserved exactly
+            assert.ok(result.includes('<!-- AND deleted = 0 -->'), 'Comment content should be preserved');
+        });
+
+        it('should handle commented out SQL statements', () => {
+            const input = `<!--<include refid="Base_Column_List"/>-->
+<!--ORDER BY id DESC LIMIT 10;-->`;
+            const result = formatter.format(input);
+
+            // Comments should be intact
+            assert.ok(result.includes('<!--<include refid="Base_Column_List"/>-->'));
+            assert.ok(result.includes('<!--ORDER BY id DESC LIMIT 10;-->'));
+        });
+    });
+
     describe('CDATA Block Preservation', () => {
         it('should preserve CDATA block content without formatting', () => {
             const input = `SELECT total FROM t_records

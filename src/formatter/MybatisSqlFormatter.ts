@@ -575,33 +575,80 @@ export class MybatisSqlFormatter {
             // Build formatter options
             const formatterOptions = this.buildFormatterOptions(options);
 
-            // Step 1: Extract CDATA blocks and replace with placeholders
-            // CDATA content should be preserved as-is without formatting
-            const { content: contentWithoutCdata, cdataBlocks } = this.extractCdataBlocks(sqlContent);
+            // Step 1: Extract XML comments and replace with placeholders
+            // XML comments should be preserved exactly as-is without any formatting
+            const { content: contentWithoutComments, comments } = this.extractXmlComments(sqlContent);
 
-            // Step 2: Extract MyBatis parameters and replace with placeholders
+            // Step 2: Extract CDATA blocks and replace with placeholders
+            // CDATA content should be preserved as-is without formatting
+            const { content: contentWithoutCdata, cdataBlocks } = this.extractCdataBlocks(contentWithoutComments);
+
+            // Step 3: Extract MyBatis parameters and replace with placeholders
             // This ensures sql-formatter sees complete SQL structure
             const { content: contentWithPlaceholders, params } = this.extractParameters(contentWithoutCdata);
 
-            // Step 3: Parse SQL content into CST (now without params splitting SQL)
+            // Step 4: Parse SQL content into CST (now without params splitting SQL)
             const cst = this.parser.parse(contentWithPlaceholders);
 
-            // Step 4: Format CST to string with proper indentation
+            // Step 5: Format CST to string with proper indentation
             const formatted = this.cstFormatter.format(cst, formatterOptions);
 
-            // Step 5: Restore MyBatis parameters from placeholders
+            // Step 6: Restore MyBatis parameters from placeholders
             const restoredParams = this.restoreParameters(formatted, params);
 
-            // Step 6: Restore CDATA blocks from placeholders
+            // Step 7: Restore CDATA blocks from placeholders
             const restoredCdata = this.restoreCdataBlocks(restoredParams, cdataBlocks);
 
-            // Step 7: Clean up formatting
-            return this.cleanupFormatting(restoredCdata);
+            // Step 8: Restore XML comments from placeholders
+            const restoredComments = this.restoreXmlComments(restoredCdata, comments);
+
+            // Step 9: Clean up formatting
+            return this.cleanupFormatting(restoredComments);
         } catch (error) {
             // If formatting fails, return original content
             console.error('[MyBatis SQL Formatter] Failed to format SQL:', error);
             return sqlContent;
         }
+    }
+
+    /**
+     * Extract XML comments and replace with placeholders
+     * XML comments should be preserved exactly as-is without any formatting
+     *
+     * @param content - SQL content that may contain XML comments
+     * @returns Object with placeholder-replaced content and comment map
+     */
+    private extractXmlComments(content: string): { content: string; comments: Map<string, string> } {
+        const comments = new Map<string, string>();
+        let commentIndex = 0;
+
+        // Match XML comments: <!-- ... -->
+        // Use non-greedy match to handle multiple comments
+        const commentRegex = /<!--[\s\S]*?-->/g;
+
+        const newContent = content.replace(commentRegex, (match) => {
+            const placeholder = `__MYBATIS_COMMENT_${commentIndex}__`;
+            comments.set(placeholder, match);
+            commentIndex++;
+            return placeholder;
+        });
+
+        return { content: newContent, comments };
+    }
+
+    /**
+     * Restore XML comments from placeholders
+     *
+     * @param content - Content with placeholders
+     * @param comments - Map of placeholders to original XML comments
+     * @returns Content with original XML comments restored
+     */
+    private restoreXmlComments(content: string, comments: Map<string, string>): string {
+        let result = content;
+        for (const [placeholder, original] of comments) {
+            result = result.replace(placeholder, original);
+        }
+        return result;
     }
 
     /**
