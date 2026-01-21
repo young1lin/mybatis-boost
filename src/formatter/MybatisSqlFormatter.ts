@@ -558,19 +558,65 @@ export class MybatisSqlFormatter {
             // Build formatter options
             const formatterOptions = this.buildFormatterOptions(options);
 
-            // Step 1: Parse SQL content into CST
-            const cst = this.parser.parse(sqlContent);
+            // Step 1: Extract MyBatis parameters and replace with placeholders
+            // This ensures sql-formatter sees complete SQL structure
+            const { content: contentWithPlaceholders, params } = this.extractParameters(sqlContent);
 
-            // Step 2: Format CST to string with proper indentation
+            // Step 2: Parse SQL content into CST (now without params splitting SQL)
+            const cst = this.parser.parse(contentWithPlaceholders);
+
+            // Step 3: Format CST to string with proper indentation
             const formatted = this.cstFormatter.format(cst, formatterOptions);
 
-            // Step 3: Clean up formatting
-            return this.cleanupFormatting(formatted);
+            // Step 4: Restore MyBatis parameters from placeholders
+            const restored = this.restoreParameters(formatted, params);
+
+            // Step 5: Clean up formatting
+            return this.cleanupFormatting(restored);
         } catch (error) {
             // If formatting fails, return original content
             console.error('[MyBatis SQL Formatter] Failed to format SQL:', error);
             return sqlContent;
         }
+    }
+
+    /**
+     * Extract MyBatis parameters (#{...} and ${...}) and replace with placeholders
+     * This allows sql-formatter to see the complete SQL structure
+     *
+     * @param content - SQL content with MyBatis parameters
+     * @returns Object with placeholder-replaced content and parameter map
+     */
+    private extractParameters(content: string): { content: string; params: Map<string, string> } {
+        const params = new Map<string, string>();
+        let paramIndex = 0;
+
+        // Match #{...} and ${...} patterns, including nested braces
+        const paramRegex = /([#$])\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g;
+
+        const newContent = content.replace(paramRegex, (match, prefix, expression) => {
+            const placeholder = `__MYBATIS_PARAM_${paramIndex}__`;
+            params.set(placeholder, match);
+            paramIndex++;
+            return placeholder;
+        });
+
+        return { content: newContent, params };
+    }
+
+    /**
+     * Restore MyBatis parameters from placeholders
+     *
+     * @param content - Content with placeholders
+     * @param params - Map of placeholders to original parameters
+     * @returns Content with original parameters restored
+     */
+    private restoreParameters(content: string, params: Map<string, string>): string {
+        let result = content;
+        for (const [placeholder, original] of params) {
+            result = result.replace(placeholder, original);
+        }
+        return result;
     }
 
     /**

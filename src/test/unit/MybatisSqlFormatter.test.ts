@@ -604,6 +604,95 @@ describe('MybatisSqlFormatter', () => {
         });
     });
 
+    describe('SET Clause Indentation with MyBatis Parameters', () => {
+        it('should maintain consistent indentation for all SET clause columns', () => {
+            const input = `UPDATE deep_chain_url
+SET
+  ckey = #{ckey,jdbcType=VARCHAR},
+  url = #{url,jdbcType=VARCHAR},
+  pkg_id = #{pkgId,jdbcType=VARCHAR},
+  remark = #{remark,jdbcType=VARCHAR},
+  create_time = #{createTime,jdbcType=TIMESTAMP},
+  update_time = #{updateTime,jdbcType=TIMESTAMP}
+WHERE
+  id = #{id,jdbcType=BIGINT}`;
+            const result = formatter.format(input);
+
+            // Parse lines and check indentation
+            const lines = result.split('\n');
+            const setIndex = lines.findIndex(l => l.trim() === 'SET');
+            const whereIndex = lines.findIndex(l => l.trim() === 'WHERE');
+
+            // All lines between SET and WHERE should have the same indentation (4 spaces)
+            const setClauseLines = lines.slice(setIndex + 1, whereIndex);
+            for (const line of setClauseLines) {
+                if (line.trim().length > 0) {
+                    const indent = (line.match(/^\s*/) || [''])[0].length;
+                    assert.strictEqual(indent, 4, `Line "${line}" should have 4 spaces indentation`);
+                }
+            }
+
+            // Verify all parameters are preserved
+            assert.ok(result.includes('#{ckey,jdbcType=VARCHAR}'));
+            assert.ok(result.includes('#{url,jdbcType=VARCHAR}'));
+            assert.ok(result.includes('#{pkgId,jdbcType=VARCHAR}'));
+            assert.ok(result.includes('#{id,jdbcType=BIGINT}'));
+        });
+
+        it('should format simple UPDATE with MyBatis parameters correctly', () => {
+            const input = `UPDATE users SET name = #{name}, age = #{age} WHERE id = #{id}`;
+            const result = formatter.format(input);
+
+            // Check keywords are uppercase
+            assert.ok(result.includes('UPDATE'));
+            assert.ok(result.includes('SET'));
+            assert.ok(result.includes('WHERE'));
+
+            // Check all SET columns have the same indentation
+            const lines = result.split('\n');
+            const setIndex = lines.findIndex(l => l.trim() === 'SET');
+            const whereIndex = lines.findIndex(l => l.trim() === 'WHERE');
+
+            const setClauseLines = lines.slice(setIndex + 1, whereIndex);
+            const indents = setClauseLines.filter(l => l.trim().length > 0).map(l => (l.match(/^\s*/) || [''])[0].length);
+
+            // All indents should be the same
+            assert.ok(indents.every(i => i === indents[0]), 'All SET clause columns should have same indentation');
+        });
+    });
+
+    describe('INSERT Statement Formatting', () => {
+        it('should format INSERT with MyBatis parameters with uppercase keywords', () => {
+            const input = `insert into deep_chain_url (id, ckey, url) values (#{id}, #{ckey}, #{url})`;
+            const result = formatter.format(input);
+
+            // Keywords should be uppercase
+            assert.ok(result.includes('INSERT INTO') || result.includes('INSERT\n'), 'INSERT keyword should be uppercase');
+            assert.ok(result.includes('VALUES'), 'VALUES keyword should be uppercase');
+
+            // Parameters should be preserved
+            assert.ok(result.includes('#{id}'));
+            assert.ok(result.includes('#{ckey}'));
+            assert.ok(result.includes('#{url}'));
+        });
+
+        it('should format INSERT with multiple columns properly', () => {
+            const input = `insert into deep_chain_url (id, ckey, url, pkg_id, remark) values (#{id}, #{ckey}, #{url}, #{pkgId}, #{remark})`;
+            const result = formatter.format(input);
+
+            // Keywords should be uppercase
+            assert.ok(result.toUpperCase().includes('INSERT'));
+            assert.ok(result.toUpperCase().includes('VALUES'));
+
+            // All parameters should be preserved
+            assert.ok(result.includes('#{id}'));
+            assert.ok(result.includes('#{ckey}'));
+            assert.ok(result.includes('#{url}'));
+            assert.ok(result.includes('#{pkgId}'));
+            assert.ok(result.includes('#{remark}'));
+        });
+    });
+
     describe('Comma Placement', () => {
         it('should not place commas on separate lines in UPDATE statements', () => {
             const input = `UPDATE user SET name =#{name}, age =#{age}, update_time =#{updateTime}, version = version + 1 WHERE id =#{id} AND version =#{version}`;
