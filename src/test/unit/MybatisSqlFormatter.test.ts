@@ -693,6 +693,67 @@ WHERE
         });
     });
 
+    describe('Parenthesis Alignment with Dynamic Tags', () => {
+        it('should align parenthesis with AND keyword in dynamic SQL', () => {
+            const input = `SELECT id FROM t_order WHERE status = 1
+<if test="dateRanges != null">
+  AND
+  (
+  <trim prefixOverrides="OR">
+    <foreach collection="dateRanges" item="range">
+      OR (created_at BETWEEN #{range.start} AND #{range.end})
+    </foreach>
+  </trim>
+  )
+</if>`;
+            const result = formatter.format(input);
+
+            // Parse lines and find AND and ( lines
+            const lines = result.split('\n');
+            const andLineIdx = lines.findIndex(l => l.trim() === 'AND');
+            const openParenLineIdx = lines.findIndex((l, i) => i > andLineIdx && l.trim() === '(');
+
+            assert.ok(andLineIdx >= 0, 'Should find AND line');
+            assert.ok(openParenLineIdx >= 0, 'Should find ( line');
+
+            // Both should have the same indentation
+            const andIndent = (lines[andLineIdx].match(/^\s*/) || [''])[0].length;
+            const parenIndent = (lines[openParenLineIdx].match(/^\s*/) || [''])[0].length;
+            assert.strictEqual(andIndent, parenIndent, 'Parenthesis should be aligned with AND');
+        });
+
+        it('should properly indent incomplete SQL fragments inside dynamic tags', () => {
+            const input = `SELECT * FROM users
+<if test="condition">
+  AND name = #{name}
+  OR
+  (
+  <foreach collection="items" item="item">
+    item_id = #{item.id}
+  </foreach>
+  )
+</if>`;
+            const result = formatter.format(input);
+
+            // Verify structure is preserved
+            assert.ok(result.includes('<if test="condition">'));
+            assert.ok(result.includes('<foreach'));
+            assert.ok(result.includes('#{name}'));
+            assert.ok(result.includes('#{item.id}'));
+
+            // Verify OR and ( have same indentation
+            const lines = result.split('\n');
+            const orLineIdx = lines.findIndex(l => l.trim() === 'OR');
+            const parenLineIdx = lines.findIndex((l, i) => i > orLineIdx && l.trim() === '(');
+
+            if (orLineIdx >= 0 && parenLineIdx >= 0) {
+                const orIndent = (lines[orLineIdx].match(/^\s*/) || [''])[0].length;
+                const parenIndent = (lines[parenLineIdx].match(/^\s*/) || [''])[0].length;
+                assert.strictEqual(orIndent, parenIndent, 'Parenthesis should be aligned with OR');
+            }
+        });
+    });
+
     describe('Comma Placement', () => {
         it('should not place commas on separate lines in UPDATE statements', () => {
             const input = `UPDATE user SET name =#{name}, age =#{age}, update_time =#{updateTime}, version = version + 1 WHERE id =#{id} AND version =#{version}`;

@@ -455,19 +455,36 @@ class MybatisCstFormatter {
             const formatted = format(sql, options);
 
             // Add indentation to each line
-            const lines = formatted.split('\n');
-            const indentedLines = lines.map((line, index) => {
-                if (index === 0) {
-                    return `\n${indent}${line}`;
-                }
-                return `${indent}${line}`;
-            });
-
-            return indentedLines.join('\n');
+            return this.indentAllLines(formatted, indent);
         } catch (error) {
-            // If formatting fails, just indent the original content
-            return `\n${indent}${sql}`;
+            // If formatting fails, indent all lines of the original content
+            // This handles incomplete SQL fragments like "AND\n(" inside dynamic tags
+            return this.indentAllLines(sql, indent);
         }
+    }
+
+    /**
+     * Add indentation to all lines of content
+     * First line gets a leading newline, all lines get the specified indent
+     *
+     * @param content - Multi-line content to indent
+     * @param indent - Indentation string to prepend to each line
+     * @returns Indented content with leading newline
+     */
+    private indentAllLines(content: string, indent: string): string {
+        const lines = content.split('\n');
+        const indentedLines = lines.map((line, index) => {
+            // Skip empty lines (preserve them without adding trailing spaces)
+            if (line.trim().length === 0) {
+                return index === 0 ? '\n' : '';
+            }
+            if (index === 0) {
+                return `\n${indent}${line}`;
+            }
+            return `${indent}${line}`;
+        });
+
+        return indentedLines.join('\n');
     }
 
     /**
