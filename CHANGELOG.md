@@ -6,6 +6,26 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.12] - 2026-01-21
+
+### Fixed
+
+- 🔧 **SQL Formatting Improvements**: Fixed multiple SQL formatting issues in MyBatis XML files
+  - **SET Clause Indentation**: Fixed issue where only the first column after `SET` was properly indented while subsequent columns lost their indentation
+    - Root cause: CST parser was splitting SQL by MyBatis parameters (`#{...}`), causing each fragment to be formatted independently
+    - Solution: Use placeholder-based approach - extract parameters before formatting, format complete SQL, then restore parameters
+  - **Parenthesis Alignment**: Fixed parenthesis alignment issue in dynamic SQL with incomplete fragments
+    - Example: `AND\n(` inside `<if>` tags now maintains consistent indentation
+    - Root cause: When sql-formatter fails to parse incomplete SQL fragments, the error handler was only indenting the first line
+    - Solution: Apply proper indentation to ALL lines in both success and error paths
+  - **CDATA Block Preservation**: Fixed CDATA blocks being incorrectly formatted
+    - CDATA content like `<![CDATA[ date >= #{start} AND date < #{end} ]]>` is now preserved as single line
+    - Solution: Extract CDATA blocks before formatting and restore them after
+  - **XML Comment Preservation**: Fixed XML comments being corrupted during formatting
+    - Comments like `<!--SELECT * FROM t_data-->` were being broken into `< ! --SELECT...`
+    - Solution: Extract XML comments before any processing and restore them after formatting
+  - Added 12 new unit tests covering all formatting fixes
+
 ## [0.3.11] - 2026-01-20
 
 ### Added
