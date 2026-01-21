@@ -693,6 +693,69 @@ WHERE
         });
     });
 
+    describe('CDATA Block Preservation', () => {
+        it('should preserve CDATA block content without formatting', () => {
+            const input = `SELECT total FROM t_records
+WHERE status = 1 AND
+<![CDATA[ created_at >= #{start} AND created_at < #{end} ]]>
+AND type = #{type}`;
+            const result = formatter.format(input);
+
+            // CDATA block should be preserved as single line
+            const cdataMatch = result.match(/<!\[CDATA\[[\s\S]*?\]\]>/);
+            assert.ok(cdataMatch, 'CDATA block should be present');
+            assert.strictEqual(cdataMatch![0].split('\n').length, 1, 'CDATA should be on single line');
+
+            // Original content should be preserved
+            assert.ok(result.includes('created_at >= #{start}'));
+            assert.ok(result.includes('created_at < #{end}'));
+        });
+
+        it('should preserve CDATA block inside dynamic tags', () => {
+            const input = `SELECT * FROM t_data WHERE id = #{id}
+<if test="dateRange != null">
+  AND
+  <![CDATA[ record_time >= #{dateRange.start} AND record_time <= #{dateRange.end} ]]>
+</if>`;
+            const result = formatter.format(input);
+
+            // CDATA should be preserved
+            const cdataMatch = result.match(/<!\[CDATA\[[\s\S]*?\]\]>/);
+            assert.ok(cdataMatch, 'CDATA block should be present');
+            assert.strictEqual(cdataMatch![0].split('\n').length, 1, 'CDATA should be on single line');
+
+            // Dynamic tag structure should be preserved
+            assert.ok(result.includes('<if test="dateRange != null">'));
+            assert.ok(result.includes('</if>'));
+        });
+
+        it('should preserve multiple CDATA blocks', () => {
+            const input = `SELECT * FROM t_data
+WHERE
+<![CDATA[ price > #{minPrice} ]]>
+AND
+<![CDATA[ price < #{maxPrice} ]]>`;
+            const result = formatter.format(input);
+
+            // Both CDATA blocks should be preserved
+            const cdataMatches = result.match(/<!\[CDATA\[[\s\S]*?\]\]>/g) || [];
+            assert.strictEqual(cdataMatches.length, 2, 'Should have 2 CDATA blocks');
+
+            // Each should be on single line
+            cdataMatches.forEach(match => {
+                assert.strictEqual(match.split('\n').length, 1, 'Each CDATA should be on single line');
+            });
+        });
+
+        it('should preserve CDATA with comparison operators', () => {
+            const input = `SELECT * FROM t_data WHERE <![CDATA[ value >= 100 AND value <= 200 ]]>`;
+            const result = formatter.format(input);
+
+            // CDATA should be preserved exactly
+            assert.ok(result.includes('<![CDATA[ value >= 100 AND value <= 200 ]]>'));
+        });
+    });
+
     describe('Parenthesis Alignment with Dynamic Tags', () => {
         it('should align parenthesis with AND keyword in dynamic SQL', () => {
             const input = `SELECT id FROM t_order WHERE status = 1

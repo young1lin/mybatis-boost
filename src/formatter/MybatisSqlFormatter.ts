@@ -575,26 +575,72 @@ export class MybatisSqlFormatter {
             // Build formatter options
             const formatterOptions = this.buildFormatterOptions(options);
 
-            // Step 1: Extract MyBatis parameters and replace with placeholders
-            // This ensures sql-formatter sees complete SQL structure
-            const { content: contentWithPlaceholders, params } = this.extractParameters(sqlContent);
+            // Step 1: Extract CDATA blocks and replace with placeholders
+            // CDATA content should be preserved as-is without formatting
+            const { content: contentWithoutCdata, cdataBlocks } = this.extractCdataBlocks(sqlContent);
 
-            // Step 2: Parse SQL content into CST (now without params splitting SQL)
+            // Step 2: Extract MyBatis parameters and replace with placeholders
+            // This ensures sql-formatter sees complete SQL structure
+            const { content: contentWithPlaceholders, params } = this.extractParameters(contentWithoutCdata);
+
+            // Step 3: Parse SQL content into CST (now without params splitting SQL)
             const cst = this.parser.parse(contentWithPlaceholders);
 
-            // Step 3: Format CST to string with proper indentation
+            // Step 4: Format CST to string with proper indentation
             const formatted = this.cstFormatter.format(cst, formatterOptions);
 
-            // Step 4: Restore MyBatis parameters from placeholders
-            const restored = this.restoreParameters(formatted, params);
+            // Step 5: Restore MyBatis parameters from placeholders
+            const restoredParams = this.restoreParameters(formatted, params);
 
-            // Step 5: Clean up formatting
-            return this.cleanupFormatting(restored);
+            // Step 6: Restore CDATA blocks from placeholders
+            const restoredCdata = this.restoreCdataBlocks(restoredParams, cdataBlocks);
+
+            // Step 7: Clean up formatting
+            return this.cleanupFormatting(restoredCdata);
         } catch (error) {
             // If formatting fails, return original content
             console.error('[MyBatis SQL Formatter] Failed to format SQL:', error);
             return sqlContent;
         }
+    }
+
+    /**
+     * Extract CDATA blocks and replace with placeholders
+     * CDATA content should be preserved exactly as-is without formatting
+     *
+     * @param content - SQL content that may contain CDATA blocks
+     * @returns Object with placeholder-replaced content and CDATA block map
+     */
+    private extractCdataBlocks(content: string): { content: string; cdataBlocks: Map<string, string> } {
+        const cdataBlocks = new Map<string, string>();
+        let cdataIndex = 0;
+
+        // Match CDATA blocks: <![CDATA[ ... ]]>
+        const cdataRegex = /<!\[CDATA\[[\s\S]*?\]\]>/g;
+
+        const newContent = content.replace(cdataRegex, (match) => {
+            const placeholder = `__MYBATIS_CDATA_${cdataIndex}__`;
+            cdataBlocks.set(placeholder, match);
+            cdataIndex++;
+            return placeholder;
+        });
+
+        return { content: newContent, cdataBlocks };
+    }
+
+    /**
+     * Restore CDATA blocks from placeholders
+     *
+     * @param content - Content with placeholders
+     * @param cdataBlocks - Map of placeholders to original CDATA blocks
+     * @returns Content with original CDATA blocks restored
+     */
+    private restoreCdataBlocks(content: string, cdataBlocks: Map<string, string>): string {
+        let result = content;
+        for (const [placeholder, original] of cdataBlocks) {
+            result = result.replace(placeholder, original);
+        }
+        return result;
     }
 
     /**
