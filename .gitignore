@@ -9,3 +9,5 @@ node_modules
 # Test generated files
 src/test/unit/generator/generated-samples/
 src/output/
+
+TODO.md
