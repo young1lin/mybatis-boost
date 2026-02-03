@@ -243,5 +243,80 @@ public interface RoleMapper {
             assert.strictEqual(result[0].name, 'id', 'First parameter should be "id"');
             assert.strictEqual(result[1].name, 'version', 'Second parameter should be "version"');
         });
+
+        it('should correctly identify single primitive parameter without @Param', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+public interface AccountMapper {
+    int deleteByPrimaryKey(String accountNumber);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/AccountMapper.java', 'deleteByPrimaryKey');
+            assert.strictEqual(result.length, 1, 'Should extract 1 parameter');
+            assert.strictEqual(result[0].name, 'accountNumber', 'Parameter name should be accountNumber');
+            assert.strictEqual(result[0].paramType, 'String', 'Parameter type should be String');
+            assert.strictEqual(result[0].hasParamAnnotation, false, 'Should not have @Param annotation');
+        });
+
+        it('should correctly identify single object parameter without @Param', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import com.example.entity.UserInfo;
+
+public interface UserInfoMapper {
+    UserInfo selectInfoByUser(String userId);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/UserInfoMapper.java', 'selectInfoByUser');
+            assert.strictEqual(result.length, 1, 'Should extract 1 parameter');
+            assert.strictEqual(result[0].name, 'userId', 'Parameter name should be userId');
+            assert.strictEqual(result[0].paramType, 'String', 'Parameter type should be String');
+            assert.strictEqual(result[0].hasParamAnnotation, false, 'Should not have @Param annotation');
+        });
+
+        it('should handle single @Param annotated parameter', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+
+public interface CopyMapper {
+    List<TeamCopyPO> selectActiveByCopyUid(@Param("copyUid") String copyUid);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/CopyMapper.java', 'selectActiveByCopyUid');
+            assert.strictEqual(result.length, 1, 'Should extract 1 parameter');
+            assert.strictEqual(result[0].name, 'copyUid', 'Parameter name should be from @Param annotation');
+            assert.strictEqual(result[0].paramType, 'String', 'Parameter type should be String');
+            assert.strictEqual(result[0].hasParamAnnotation, true, 'Should have @Param annotation');
+        });
+
+        it('should handle two @Param annotated parameters', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+
+public interface CopyMapper {
+    List<TeamCopyPO> selectByCopyUidAndStatus(@Param("copyUid") String copyUid, @Param("status") Byte status);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/CopyMapper.java', 'selectByCopyUidAndStatus');
+            assert.strictEqual(result.length, 2, 'Should extract 2 parameters');
+            assert.strictEqual(result[0].name, 'copyUid', 'First parameter should be copyUid');
+            assert.strictEqual(result[0].hasParamAnnotation, true, 'First should have @Param');
+            assert.strictEqual(result[1].name, 'status', 'Second parameter should be status');
+            assert.strictEqual(result[1].hasParamAnnotation, true, 'Second should have @Param');
+        });
     });
 });

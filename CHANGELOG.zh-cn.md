@@ -6,6 +6,35 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.13] - 2026-02-03
+
+### 修复
+
+- 🔧 **XML 格式化 HTML 实体保留**：修复了 SQL 格式化时 HTML 实体（`&gt;`、`&lt;`、`&amp;` 等）被破坏的问题
+  - **问题**：像 `&gt;=` 和 `&lt;=` 这样的 HTML 实体被错误地拆分为 `& gt;` 和 `& lt;`，带有空格和换行
+  - **解决方案**：格式化前将 HTML 实体提取为占位符，格式化后恢复
+  - **支持的实体**：所有命名实体（`&gt;`、`&lt;`、`&amp;`、`&quot;`、`&apos;`）和数字实体（`&#60;`、`&#x3C;`）
+  - 添加了 7 个新的单元测试用于 HTML 实体保留
+
+- 🔧 **参数验证改进**：修复了 MyBatis 参数验证的多个问题
+  - **单个基本类型参数**：修复了单个基本/内置类型参数没有 `@Param` 注解时的验证错误
+    - 对于单个基本类型参数（如 `String`、`Integer`、`Long`），MyBatis 允许在 XML 中使用任意参数名
+    - 现在在允许任意名称时正确跳过验证
+  - **默认参数名称**：添加对 MyBatis 默认参数名称（`arg0`、`arg1`、`param1`、`param2`）的支持
+    - 当参数没有 `@Param` 注解时，MyBatis 提供这些默认名称
+    - 防止使用默认参数名称时出现误报错误
+  - **集合参数名称**：添加对单个集合参数默认名称的支持
+    - 对于单个集合参数，MyBatis 允许使用 `list`、`collection`、`array` 作为参数名
+  - 添加了 5 个新的单元测试用于参数验证场景
+
+### 技术细节
+
+- **HTML 实体提取**：在 `MybatisSqlFormatter.ts` 中添加了 `extractHtmlEntities()` 和 `restoreHtmlEntities()` 方法
+- **参数验证逻辑**：增强了 `ParameterValidator.ts` 中的 `validateStatement()` 以处理：
+  - 单个没有 `@Param` 的基本类型参数（跳过验证）
+  - MyBatis 默认参数名称（`arg0`、`param1` 等）
+  - 单个集合参数默认名称（`list`、`collection`、`array`）
+
 ## [0.3.12] - 2026-01-21
 
 ### 修复

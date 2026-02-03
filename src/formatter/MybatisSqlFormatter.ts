@@ -583,26 +583,33 @@ export class MybatisSqlFormatter {
             // CDATA content should be preserved as-is without formatting
             const { content: contentWithoutCdata, cdataBlocks } = this.extractCdataBlocks(contentWithoutComments);
 
-            // Step 3: Extract MyBatis parameters and replace with placeholders
-            // This ensures sql-formatter sees complete SQL structure
-            const { content: contentWithPlaceholders, params } = this.extractParameters(contentWithoutCdata);
+            // Step 3: Extract HTML entities and replace with placeholders
+            // HTML entities like &gt;, &lt;, &amp; should be preserved
+            const { content: contentWithoutEntities, entities } = this.extractHtmlEntities(contentWithoutCdata);
 
-            // Step 4: Parse SQL content into CST (now without params splitting SQL)
+            // Step 4: Extract MyBatis parameters and replace with placeholders
+            // This ensures sql-formatter sees complete SQL structure
+            const { content: contentWithPlaceholders, params } = this.extractParameters(contentWithoutEntities);
+
+            // Step 5: Parse SQL content into CST (now without params splitting SQL)
             const cst = this.parser.parse(contentWithPlaceholders);
 
-            // Step 5: Format CST to string with proper indentation
+            // Step 6: Format CST to string with proper indentation
             const formatted = this.cstFormatter.format(cst, formatterOptions);
 
-            // Step 6: Restore MyBatis parameters from placeholders
+            // Step 7: Restore MyBatis parameters from placeholders
             const restoredParams = this.restoreParameters(formatted, params);
 
-            // Step 7: Restore CDATA blocks from placeholders
-            const restoredCdata = this.restoreCdataBlocks(restoredParams, cdataBlocks);
+            // Step 8: Restore HTML entities from placeholders
+            const restoredEntities = this.restoreHtmlEntities(restoredParams, entities);
 
-            // Step 8: Restore XML comments from placeholders
+            // Step 9: Restore CDATA blocks from placeholders
+            const restoredCdata = this.restoreCdataBlocks(restoredEntities, cdataBlocks);
+
+            // Step 10: Restore XML comments from placeholders
             const restoredComments = this.restoreXmlComments(restoredCdata, comments);
 
-            // Step 9: Clean up formatting
+            // Step 11: Clean up formatting
             return this.cleanupFormatting(restoredComments);
         } catch (error) {
             // If formatting fails, return original content
@@ -685,6 +692,47 @@ export class MybatisSqlFormatter {
     private restoreCdataBlocks(content: string, cdataBlocks: Map<string, string>): string {
         let result = content;
         for (const [placeholder, original] of cdataBlocks) {
+            result = result.replace(placeholder, original);
+        }
+        return result;
+    }
+
+    /**
+     * Extract HTML entities and replace with placeholders
+     * HTML entities like &gt;, &lt;, &amp;, &quot;, &apos; should be preserved
+     * to prevent them from being broken during SQL formatting
+     *
+     * @param content - SQL content that may contain HTML entities
+     * @returns Object with placeholder-replaced content and entity map
+     */
+    private extractHtmlEntities(content: string): { content: string; entities: Map<string, string> } {
+        const entities = new Map<string, string>();
+        let entityIndex = 0;
+
+        // Match HTML entities: &name; or &#number; or &#xhex;
+        // Common entities: &gt; &lt; &amp; &quot; &apos; and numeric entities
+        const entityRegex = /&(?:[a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);/g;
+
+        const newContent = content.replace(entityRegex, (match) => {
+            const placeholder = `__MYBATIS_ENTITY_${entityIndex}__`;
+            entities.set(placeholder, match);
+            entityIndex++;
+            return placeholder;
+        });
+
+        return { content: newContent, entities };
+    }
+
+    /**
+     * Restore HTML entities from placeholders
+     *
+     * @param content - Content with placeholders
+     * @param entities - Map of placeholders to original HTML entities
+     * @returns Content with original HTML entities restored
+     */
+    private restoreHtmlEntities(content: string, entities: Map<string, string>): string {
+        let result = content;
+        for (const [placeholder, original] of entities) {
             result = result.replace(placeholder, original);
         }
         return result;
