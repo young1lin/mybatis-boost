@@ -291,6 +291,7 @@ export class ParameterValidator {
 
             // 1. Add parameters from @Param annotations in Java method
             let methodParams: any[] = [];
+            let skipValidation = false;
             try {
                 methodParams = await extractMethodParameters(javaPath, statement.id);
                 methodParams.forEach(p => validParams.add(p.name));
@@ -310,15 +311,42 @@ export class ParameterValidator {
                 }
             }
 
-            // 2.5. MyBatis 3.x+ single object parameter auto-mapping
-            // If there's only one parameter without @Param annotation, and it's not a primitive type,
-            // MyBatis will automatically map the object's fields
+            // 2.5. MyBatis parameter handling - add default argument names
+            // When parameters don't have @Param annotations, MyBatis provides default names:
+            // - arg0, arg1, arg2, ... (0-indexed)
+            // - param1, param2, param3, ... (1-indexed)
+            const hasAnyParamAnnotation = methodParams.some(p => p.hasParamAnnotation);
+            if (!hasAnyParamAnnotation && methodParams.length > 0) {
+                methodParams.forEach((p, index) => {
+                    // Add default MyBatis argument names
+                    validParams.add(`arg${index}`);
+                    validParams.add(`param${index + 1}`);
+                });
+                console.log(`[ParameterValidator] Added default MyBatis argument names for ${methodParams.length} parameters`);
+            }
+
+            // 2.6. MyBatis single parameter handling
+            // When there's exactly one parameter without @Param annotation:
+            // - For primitive/built-in types: MyBatis allows ANY parameter name in XML
+            // - For complex objects: MyBatis auto-maps the object's fields
+            // - For collections: MyBatis allows 'list', 'collection', 'array' as names
             if (methodParams.length === 1 && !methodParams[0].hasParamAnnotation) {
                 const singleParam = methodParams[0];
                 const paramType = singleParam.paramType;
 
-                // Check if it's not a built-in type (primitives, String, Integer, etc.)
-                if (!this.isBuiltInType(paramType) && !this.isCollectionType(paramType)) {
+                if (this.isBuiltInType(paramType)) {
+                    // For single primitive/built-in parameter without @Param,
+                    // MyBatis allows any parameter name, so skip validation entirely
+                    skipValidation = true;
+                    console.log(`[ParameterValidator] Single primitive parameter ${singleParam.name} (${paramType}): skipping validation (any name allowed)`);
+                } else if (this.isCollectionType(paramType)) {
+                    // For single collection parameter, MyBatis allows special names
+                    validParams.add('list');
+                    validParams.add('collection');
+                    validParams.add('array');
+                    console.log(`[ParameterValidator] Single collection parameter ${singleParam.name} (${paramType}): added default collection names`);
+                } else {
+                    // For complex objects, auto-map fields
                     try {
                         // Try to get the fully qualified class name from the Java file
                         const fullyQualifiedType = await this.resolveFullyQualifiedType(javaPath, paramType);
@@ -346,6 +374,12 @@ export class ParameterValidator {
             }
 
             // 4. TODO: Add parameters from parameterMap (future enhancement)
+
+            // Skip validation if single primitive parameter allows any name
+            if (skipValidation) {
+                console.log(`[ParameterValidator] Skipping validation for statement ${statement.id} (single primitive parameter)`);
+                return diagnostics;
+            }
 
             // Validate each parameter reference
             for (const param of allReferences) {

@@ -6,6 +6,35 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.13] - 2026-02-03
+
+### Fixed
+
+- 🔧 **XML Formatter HTML Entity Preservation**: Fixed issue where HTML entities (`&gt;`, `&lt;`, `&amp;`, etc.) were being broken during SQL formatting
+  - **Problem**: HTML entities like `&gt;=` and `&lt;=` were incorrectly split into `& gt;` and `& lt;` with spaces and newlines
+  - **Solution**: Extract HTML entities as placeholders before formatting and restore them after
+  - **Supported entities**: All named entities (`&gt;`, `&lt;`, `&amp;`, `&quot;`, `&apos;`) and numeric entities (`&#60;`, `&#x3C;`)
+  - Added 7 new unit tests for HTML entity preservation
+
+- 🔧 **Parameter Validation Improvements**: Fixed multiple issues with MyBatis parameter validation
+  - **Single Primitive Parameter**: Fixed validation error for single primitive/built-in type parameters without `@Param` annotation
+    - MyBatis allows any parameter name in XML for single primitive parameters (e.g., `String`, `Integer`, `Long`)
+    - Now correctly skips validation when any name is allowed
+  - **Default Argument Names**: Added support for MyBatis default argument names (`arg0`, `arg1`, `param1`, `param2`)
+    - When parameters don't have `@Param` annotations, MyBatis provides these default names
+    - Prevents false positive errors when using default argument names
+  - **Collection Parameter Names**: Added support for single collection parameter default names
+    - MyBatis allows `list`, `collection`, `array` as parameter names for single collection parameters
+  - Added 5 new unit tests for parameter validation scenarios
+
+### Technical Details
+
+- **HTML Entity Extraction**: Added `extractHtmlEntities()` and `restoreHtmlEntities()` methods in `MybatisSqlFormatter.ts`
+- **Parameter Validation Logic**: Enhanced `validateStatement()` in `ParameterValidator.ts` to handle:
+  - Single primitive parameters without `@Param` (skip validation)
+  - Default MyBatis argument names (`arg0`, `param1`, etc.)
+  - Single collection parameter default names (`list`, `collection`, `array`)
+
 ## [0.3.12] - 2026-01-21
 
 ### Fixed

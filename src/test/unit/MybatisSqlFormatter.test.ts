@@ -991,6 +991,79 @@ FROM users`;
         });
     });
 
+    describe('HTML Entity Preservation', () => {
+        it('should preserve &gt; and &lt; entities in SQL comparisons', () => {
+            const input = `SELECT * FROM orders WHERE create_time &gt;= #{startTime} AND create_time &lt;= #{endTime}`;
+            const result = formatter.format(input);
+
+            // HTML entities should be preserved intact
+            assert.ok(result.includes('&gt;'), 'Should preserve &gt; entity');
+            assert.ok(result.includes('&lt;'), 'Should preserve &lt; entity');
+            // Should not have spaces breaking up the entities
+            assert.ok(!result.includes('& gt;'), 'Should not break up &gt; entity');
+            assert.ok(!result.includes('& lt;'), 'Should not break up &lt; entity');
+            assert.ok(!result.includes('& amp;'), 'Should not break up &amp; entity');
+        });
+
+        it('should preserve &amp; entity', () => {
+            const input = `SELECT * FROM users WHERE name LIKE '%&amp;%'`;
+            const result = formatter.format(input);
+
+            assert.ok(result.includes('&amp;'), 'Should preserve &amp; entity');
+            assert.ok(!result.includes('& amp;'), 'Should not break up &amp; entity');
+        });
+
+        it('should preserve &quot; and &apos; entities', () => {
+            const input = `SELECT * FROM data WHERE value = &quot;test&quot;`;
+            const result = formatter.format(input);
+
+            assert.ok(result.includes('&quot;'), 'Should preserve &quot; entity');
+        });
+
+        it('should preserve numeric character references', () => {
+            const input = `SELECT * FROM data WHERE code = &#60; AND value = &#x3C;`;
+            const result = formatter.format(input);
+
+            assert.ok(result.includes('&#60;'), 'Should preserve decimal numeric reference');
+            assert.ok(result.includes('&#x3C;'), 'Should preserve hexadecimal numeric reference');
+        });
+
+        it('should preserve multiple HTML entities in complex query', () => {
+            const input = `SELECT * FROM records
+WHERE apply_time &gt;= #{startApplyTime,jdbcType=BIGINT}
+AND apply_time &lt;= #{endApplyTime,jdbcType=BIGINT}
+AND status &lt;&gt; 0`;
+            const result = formatter.format(input);
+
+            assert.ok(result.includes('&gt;'), 'Should preserve first &gt;');
+            assert.ok(result.includes('&lt;'), 'Should preserve first &lt;');
+            // All entities should remain intact
+            const gtCount = (result.match(/&gt;/g) || []).length;
+            const ltCount = (result.match(/&lt;/g) || []).length;
+            assert.ok(gtCount >= 1, 'Should have at least 1 &gt; entity');
+            assert.ok(ltCount >= 2, 'Should have at least 2 &lt; entities');
+        });
+
+        it('should preserve HTML entities inside dynamic tags', () => {
+            const input = `SELECT * FROM users WHERE 1=1 <if test="age != null">AND age &gt;= #{minAge}</if>`;
+            const result = formatter.format(input);
+
+            assert.ok(result.includes('&gt;'), 'Should preserve &gt; inside <if> tag');
+            assert.ok(result.includes('<if test="age != null">'));
+            assert.ok(result.includes('</if>'));
+        });
+
+        it('should preserve HTML entities with foreach tag', () => {
+            const input = `SELECT * FROM items
+WHERE price &gt;= #{minPrice}
+AND status IN <foreach collection="statusList" item="status" open="(" separator="," close=")">#{status}</foreach>`;
+            const result = formatter.format(input);
+
+            assert.ok(result.includes('&gt;'), 'Should preserve &gt; entity');
+            assert.ok(result.includes('<foreach'), 'Should preserve foreach tag');
+        });
+    });
+
     describe('Proper Nested Tag Indentation with Custom Tab Width', () => {
         it('should properly indent <trim> and <if> tags with 4-space indentation', () => {
             const input = `INSERT INTO user_table <trim prefix="(" suffix=")" suffixOverrides=","><if test="id != null">id,</if><if test="name != null">user_name,</if><if test="age != null">age,</if></trim>`;
