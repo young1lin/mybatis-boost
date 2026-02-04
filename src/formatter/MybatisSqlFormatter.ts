@@ -95,7 +95,22 @@ class MybatisSqlParser {
 
             if (char === '<') {
                 if (this.peek(1) === '/') {
-                    break; // Closing tag
+                    // Only break if closing tag matches a known dynamic tag.
+                    // This prevents losing content after unknown closing tags
+                    // (e.g., </selectKey> when selectKey was not yet in DYNAMIC_TAGS).
+                    const savedPos = this.position;
+                    this.position += 2;
+                    const closingTagName = this.parseTagName();
+                    this.position = savedPos;
+
+                    if (this.dynamicTags.includes(closingTagName.toLowerCase())) {
+                        break; // Known closing tag - return to parent parseTag()
+                    }
+
+                    // Unknown closing tag - consume as text
+                    const text = this.parseText();
+                    if (text) { nodes.push(text); }
+                    continue;
                 }
 
                 const tag = this.parseTag();
@@ -298,13 +313,27 @@ class MybatisSqlParser {
             const char = this.input[this.position];
 
             if (char === '<') {
-                if (this.peek(1) === '/') { break; } // Closing tag
-                // Check if it's a valid tag
-                const savedPos = this.position;
-                this.position++;
-                const tagName = this.parseTagName();
-                this.position = savedPos;
-                if (this.dynamicTags.includes(tagName.toLowerCase())) { break; };
+                if (this.peek(1) === '/') {
+                    // Only break for closing tags of known dynamic tags.
+                    // Unknown closing tags (e.g., custom XML tags) are consumed as text.
+                    const savedPos = this.position;
+                    this.position += 2;
+                    const closingTagName = this.parseTagName();
+                    this.position = savedPos;
+
+                    if (this.dynamicTags.includes(closingTagName.toLowerCase())) {
+                        break; // Known closing tag
+                    }
+                    // Unknown closing tag - consume as text (fall through)
+                } else {
+                    // Check if it's an opening tag of a known dynamic tag
+                    const savedPos = this.position;
+                    this.position++;
+                    const tagName = this.parseTagName();
+                    this.position = savedPos;
+                    if (this.dynamicTags.includes(tagName.toLowerCase())) { break; }
+                    // Unknown opening tag - consume as text (fall through)
+                }
             }
 
             if ((char === '#' || char === '$') && this.peek(1) === '{') {
@@ -315,7 +344,7 @@ class MybatisSqlParser {
             this.position++;
         }
 
-        if (content.length === 0) { return null; };
+        if (content.length === 0) { return null; }
 
         return {
             type: 'sql',
@@ -530,7 +559,8 @@ export class MybatisSqlFormatter {
      */
     private readonly DYNAMIC_TAGS = [
         'if', 'choose', 'when', 'otherwise', 'foreach',
-        'where', 'set', 'trim', 'bind', 'include', 'property'
+        'where', 'set', 'trim', 'bind', 'include', 'property',
+        'selectkey'
     ];
 
     /**
