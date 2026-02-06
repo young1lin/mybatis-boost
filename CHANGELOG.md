@@ -6,6 +6,23 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.14] - 2026-02-04
+
+### Fixed
+
+- 🔧 **XML Formatter selectKey Tag Support**: Fixed critical formatting bug where `<selectKey>` tags inside `<insert>` statements were completely destroyed during formatting
+  - **Problem**: `<selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">` was mangled to `< selectKey keyProperty = "id" ORDER = "AFTER"...>`, and all content after `</selectKey>` (including `<trim>` and `<if>` blocks) was lost entirely
+  - **Root Cause 1**: `selectKey` was missing from the CST parser's recognized dynamic tags list, causing it to be treated as raw SQL text and mangled by the SQL formatter
+  - **Root Cause 2**: The parser would break on ANY `</` closing tag sequence, not just known tags - so `</selectKey>` caused the parser to stop, losing all subsequent content
+  - **Solution**: Added `selectKey` to the recognized dynamic tags list and made the parser only break on closing tags of known dynamic tags
+  - Added 6 new unit tests for `<selectKey>` tag preservation and unknown closing tag robustness
+
+### Technical Details
+
+- **DYNAMIC_TAGS Update**: Added `selectkey` to the formatter's recognized tag list in `MybatisSqlFormatter.ts`
+- **Parser Robustness**: Updated `parseNodes()` and `parseText()` in the CST parser to peek ahead at closing tag names before breaking - unknown closing tags are now consumed as text instead of causing early termination
+- **Case Sensitivity**: Tag matching uses `.toLowerCase()` comparison, so `<selectKey>`, `<SelectKey>`, `<SELECTKEY>` all work correctly while preserving original case in output
+
 ## [0.3.13] - 2026-02-03
 
 ### Fixed

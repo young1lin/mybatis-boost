@@ -6,6 +6,23 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.14] - 2026-02-04
+
+### 修复
+
+- 🔧 **XML 格式化 selectKey 标签支持**：修复了 `<insert>` 语句中 `<selectKey>` 标签在格式化时被完全破坏的严重问题
+  - **问题**：`<selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">` 被格式化为 `< selectKey keyProperty = "id" ORDER = "AFTER"...>`，并且 `</selectKey>` 之后的所有内容（包括 `<trim>` 和 `<if>` 块）全部丢失
+  - **根本原因 1**：CST 解析器的已识别动态标签列表中缺少 `selectKey`，导致它被当作原始 SQL 文本处理并被 SQL 格式化器破坏
+  - **根本原因 2**：解析器会在遇到任何 `</` 闭合标签序列时停止解析，而不仅仅是已知标签——因此 `</selectKey>` 导致解析器停止，丢失了所有后续内容
+  - **解决方案**：将 `selectKey` 添加到已识别的动态标签列表中，并使解析器仅在已知动态标签的闭合标签处停止
+  - 添加了 6 个新的单元测试，用于 `<selectKey>` 标签保留和未知闭合标签健壮性
+
+### 技术细节
+
+- **DYNAMIC_TAGS 更新**：在 `MybatisSqlFormatter.ts` 的格式化器已识别标签列表中添加了 `selectkey`
+- **解析器健壮性**：更新了 CST 解析器中的 `parseNodes()` 和 `parseText()`，在停止前先检查闭合标签名称——未知的闭合标签现在被当作文本消费，而不是导致提前终止
+- **大小写敏感**：标签匹配使用 `.toLowerCase()` 比较，因此 `<selectKey>`、`<SelectKey>`、`<SELECTKEY>` 都能正确识别，同时在输出中保留原始大小写
+
 ## [0.3.13] - 2026-02-03
 
 ### 修复

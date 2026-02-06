@@ -1159,4 +1159,149 @@ AND status IN <foreach collection="statusList" item="status" open="(" separator=
             assert.ok(hasProperlyIndentedIf, '<if> tags should have proper indentation');
         });
     });
+
+    describe('selectKey Tag Preservation', () => {
+        it('should preserve <selectKey> tag inside INSERT statement', () => {
+            const input = `<selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">SELECT LAST_INSERT_ID()</selectKey>
+insert into user_account
+<trim prefix="(" suffix=")" suffixOverrides=",">
+<if test="id != null">id,</if>
+<if test="userName != null">user_name,</if>
+<if test="email != null">email,</if>
+</trim>
+<trim prefix="values (" suffix=")" suffixOverrides=",">
+<if test="id != null">#{id,jdbcType=BIGINT},</if>
+<if test="userName != null">#{userName,jdbcType=VARCHAR},</if>
+<if test="email != null">#{email,jdbcType=VARCHAR},</if>
+</trim>`;
+            const result = formatter.format(input);
+
+            // selectKey tag should be preserved intact
+            assert.ok(result.includes('<selectKey'), 'Should preserve <selectKey> opening tag');
+            assert.ok(result.includes('keyProperty="id"'), 'Should preserve keyProperty attribute');
+            assert.ok(result.includes('order="AFTER"'), 'Should preserve order attribute (not uppercased)');
+            assert.ok(result.includes('resultType="java.lang.Long"'), 'Should preserve resultType attribute');
+            assert.ok(result.includes('</selectKey>'), 'Should preserve </selectKey> closing tag');
+            assert.ok(result.includes('LAST_INSERT_ID()'), 'Should preserve SQL inside selectKey');
+
+            // Content after selectKey should NOT be lost
+            assert.ok(result.includes('<trim'), 'Should preserve <trim> tags after selectKey');
+            assert.ok(result.includes('<if test="id != null">'), 'Should preserve <if> tags after selectKey');
+            assert.ok(result.includes('#{id,jdbcType=BIGINT}'), 'Should preserve parameters after selectKey');
+            assert.ok(result.includes('#{userName,jdbcType=VARCHAR}'), 'Should preserve parameters after selectKey');
+
+            // Both trim tags should be present
+            const trimCount = (result.match(/<trim/g) || []).length;
+            assert.strictEqual(trimCount, 2, 'Should have 2 <trim> tags');
+
+            // All if tags should be present
+            const ifCount = (result.match(/<if test=/g) || []).length;
+            assert.strictEqual(ifCount, 6, 'Should have 6 <if> tags');
+        });
+
+        it('should preserve <selectKey> with order="BEFORE"', () => {
+            const input = `<selectKey keyProperty="id" order="BEFORE" resultType="java.lang.String">SELECT REPLACE(UUID(), '-', '')</selectKey>
+insert into sys_config (id, config_key, config_value)
+values (#{id,jdbcType=VARCHAR}, #{configKey,jdbcType=VARCHAR}, #{configValue,jdbcType=VARCHAR})`;
+            const result = formatter.format(input);
+
+            assert.ok(result.includes('<selectKey'), 'Should preserve <selectKey> tag');
+            assert.ok(result.includes('order="BEFORE"'), 'Should preserve order="BEFORE"');
+            assert.ok(result.includes('</selectKey>'), 'Should preserve closing tag');
+            assert.ok(result.includes('UUID()'), 'Should preserve UUID function');
+
+            // SQL after selectKey should be preserved
+            assert.ok(result.includes('INSERT INTO') || result.includes('insert into'), 'Should preserve INSERT statement');
+            assert.ok(result.includes('#{id,jdbcType=VARCHAR}'), 'Should preserve parameters');
+        });
+
+        it('should properly indent <selectKey> content', () => {
+            const input = `<selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">
+SELECT LAST_INSERT_ID()
+</selectKey>
+insert into demo_table (name, status) values (#{name}, #{status})`;
+            const result = formatter.format(input);
+
+            // selectKey should be on its own line with proper indentation
+            const lines = result.split('\n');
+            const selectKeyLine = lines.find(l => l.includes('<selectKey'));
+            const closingLine = lines.find(l => l.includes('</selectKey>'));
+
+            assert.ok(selectKeyLine, 'Should have <selectKey> line');
+            assert.ok(closingLine, 'Should have </selectKey> line');
+
+            // The SQL inside should exist
+            assert.ok(result.includes('LAST_INSERT_ID()'), 'Should preserve SQL content');
+        });
+
+        it('should handle <selectKey> with many following dynamic tags', () => {
+            const input = `<selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">SELECT LAST_INSERT_ID()</selectKey>
+insert into product
+<trim prefix="(" suffix=")" suffixOverrides=",">
+<if test="productName != null">product_name,</if>
+<if test="price != null">price,</if>
+<if test="category != null">category,</if>
+<if test="stock != null">stock,</if>
+<if test="createTime != null">create_time,</if>
+<if test="updateTime != null">update_time,</if>
+</trim>
+<trim prefix="values (" suffix=")" suffixOverrides=",">
+<if test="productName != null">#{productName,jdbcType=VARCHAR},</if>
+<if test="price != null">#{price,jdbcType=DECIMAL},</if>
+<if test="category != null">#{category,jdbcType=VARCHAR},</if>
+<if test="stock != null">#{stock,jdbcType=INTEGER},</if>
+<if test="createTime != null">#{createTime,jdbcType=TIMESTAMP},</if>
+<if test="updateTime != null">#{updateTime,jdbcType=TIMESTAMP},</if>
+</trim>`;
+            const result = formatter.format(input);
+
+            // selectKey should be preserved
+            assert.ok(result.includes('<selectKey'), 'Should preserve selectKey');
+            assert.ok(result.includes('</selectKey>'), 'Should preserve closing selectKey');
+
+            // ALL content after selectKey must be preserved
+            assert.ok(result.includes('#{productName,jdbcType=VARCHAR}'), 'Should preserve productName param');
+            assert.ok(result.includes('#{price,jdbcType=DECIMAL}'), 'Should preserve price param');
+            assert.ok(result.includes('#{createTime,jdbcType=TIMESTAMP}'), 'Should preserve createTime param');
+            assert.ok(result.includes('#{updateTime,jdbcType=TIMESTAMP}'), 'Should preserve updateTime param');
+
+            // Count all if tags - none should be lost
+            const ifCount = (result.match(/<if test=/g) || []).length;
+            assert.strictEqual(ifCount, 12, 'All 12 <if> tags should be preserved');
+
+            // Count closing if tags
+            const closeIfCount = (result.match(/<\/if>/g) || []).length;
+            assert.strictEqual(closeIfCount, 12, 'All 12 </if> tags should be preserved');
+        });
+    });
+
+    describe('Unknown Closing Tag Robustness', () => {
+        it('should not lose content after unknown closing tags', () => {
+            // Simulate an unknown XML tag that is not in DYNAMIC_TAGS
+            // The parser should consume it as text and continue parsing
+            const input = `SELECT * FROM users
+<customTag>some content</customTag>
+<where><if test="status != null">AND status = #{status}</if></where>`;
+            const result = formatter.format(input);
+
+            // Content after unknown closing tag should NOT be lost
+            assert.ok(result.includes('<where>'), 'Should preserve <where> after unknown tag');
+            assert.ok(result.includes('<if test="status != null">'), 'Should preserve <if> after unknown tag');
+            assert.ok(result.includes('#{status}'), 'Should preserve parameter after unknown tag');
+            assert.ok(result.includes('</where>'), 'Should preserve </where>');
+        });
+
+        it('should handle multiple unknown tags without losing subsequent content', () => {
+            const input = `<unknownA>content A</unknownA>
+<unknownB>content B</unknownB>
+SELECT id FROM demo_table
+<if test="name != null">WHERE name = #{name}</if>`;
+            const result = formatter.format(input);
+
+            // Known tags after unknown tags should be preserved
+            assert.ok(result.includes('<if test="name != null">'), 'Should preserve <if> tag');
+            assert.ok(result.includes('#{name}'), 'Should preserve parameter');
+            assert.ok(result.includes('</if>'), 'Should preserve </if>');
+        });
+    });
 });
