@@ -6,6 +6,43 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.15] - 2026-02-11
+
+### Added
+
+- 📚 **Claude Code Integration Documentation**: Added project-specific documentation for Claude Code AI assistant integration
+  - Added `.claude/commands/commit-push.md`: Custom command documentation for staging, committing, and pushing changes
+  - Added `.claude/rules/Code-Writer.md`: Project-specific code writing rules for MyBatis Boost development
+  - Includes AST-first parsing approach guidelines, performance requirements, and testing strategies
+  - Ensures consistent code quality and AI-assisted development practices
+
+### Refactored
+
+- 🔧 **Java Parser Migration to AST-Based Parsing**: Replaced regex-based Java parsing with tree-sitter WASM AST parser
+  - **New Parser**: Added `javaTreeSitterParser.ts` with singleton lazy WASM initialization
+    - AST-based extraction for methods, parameters, fields, namespace, and mapper detection
+    - WebAssembly performance for computationally intensive parsing tasks
+    - Lazy initialization pattern with graceful fallback
+  - **Fallback Mechanism**: Wrapped `javaParser.ts` and `javaFieldParser.ts` public APIs with try/catch
+    - Primary: tree-sitter AST parser (accurate syntax tree traversal)
+    - Fallback: Regex-based parser (when WASM initialization fails)
+  - **Bug Fixes**:
+    - Fixed regex fallback for annotation-prefixed methods (e.g., `@Nullable int count()`)
+    - Added `stripLeadingAnnotations()` to handle methods starting with annotations
+  - **Provider Updates**: Refactored `JavaToXmlCodeLensProvider` and `JavaToXmlDefinitionProvider`
+    - Use `extractJavaMethodsFromContent()` instead of inline regex patterns
+  - **Build System**: Updated `esbuild.js` to copy WASM files to `dist/wasm/`
+  - **Testing**: Fixed `GeneratorViewProvider.test.ts` fs mock to only intercept `.html` files
+    - Allows WASM to load properly during test suite (0 pending, was 37)
+    - Added 14 annotation-prefixed method tests + 37 tree-sitter AST tests
+
+### Technical Details
+
+- **tree-sitter WASM**: Uses `web-tree-sitter` with `tree-sitter-java` WASM grammar
+- **Error Handling**: AST failures log warnings and fall back to regex gracefully
+- **Performance**: WASM provides superior parsing performance for large Java files
+- **Compatibility**: Maintains backward compatibility through regex fallback
+
 ## [0.3.14] - 2026-02-04
 
 ### Fixed

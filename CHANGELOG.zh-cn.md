@@ -6,6 +6,43 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.15] - 2026-02-11
+
+### 新增
+
+- 📚 **Claude Code 集成文档**：添加 Claude Code AI 助手集成的项目专用文档
+  - 添加 `.claude/commands/commit-push.md`：暂存、提交和推送更改的自定义命令文档
+  - 添加 `.claude/rules/Code-Writer.md`：MyBatis Boost 开发的项目专用代码编写规则
+  - 包含 AST 优先解析方法指南、性能要求和测试策略
+  - 确保一致的代码质量和 AI 辅助开发实践
+
+### 重构
+
+- 🔧 **Java 解析器迁移至基于 AST 的解析**：将基于正则表达式的 Java 解析替换为 tree-sitter WASM AST 解析器
+  - **新解析器**：添加 `javaTreeSitterParser.ts`，具有单例延迟 WASM 初始化
+    - 基于 AST 的方法、参数、字段、命名空间和 Mapper 检测提取
+    - WebAssembly 性能用于计算密集型解析任务
+    - 延迟初始化模式，具有优雅降级机制
+  - **降级机制**：使用 try/catch 包装 `javaParser.ts` 和 `javaFieldParser.ts` 的公共 API
+    - 主要：tree-sitter AST 解析器（准确的语法树遍历）
+    - 降级：基于正则表达式的解析器（当 WASM 初始化失败时）
+  - **Bug 修复**：
+    - 修复了带注解前缀方法的正则降级（例如 `@Nullable int count()`）
+    - 添加 `stripLeadingAnnotations()` 来处理以注解开头的方法
+  - **提供程序更新**：重构 `JavaToXmlCodeLensProvider` 和 `JavaToXmlDefinitionProvider`
+    - 使用 `extractJavaMethodsFromContent()` 代替内联正则模式
+  - **构建系统**：更新 `esbuild.js` 以将 WASM 文件复制到 `dist/wasm/`
+  - **测试**：修复 `GeneratorViewProvider.test.ts` fs 模拟以仅拦截 `.html` 文件
+    - 允许 WASM 在测试套件期间正确加载（0 个待测试，之前为 37 个）
+    - 添加了 14 个注解前缀方法测试 + 37 个 tree-sitter AST 测试
+
+### 技术细节
+
+- **tree-sitter WASM**：使用带有 `tree-sitter-java` WASM 语法的 `web-tree-sitter`
+- **错误处理**：AST 失败记录警告并优雅降级到正则表达式
+- **性能**：WASM 为大型 Java 文件提供卓越的解析性能
+- **兼容性**：通过正则降级保持向后兼容
+
 ## [0.3.14] - 2026-02-04
 
 ### 修复
