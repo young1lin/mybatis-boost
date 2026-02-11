@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import { FileMapper } from '../core/FileMapper';
 import { extractXmlStatements } from '../parsers/xmlParser';
+import { extractJavaMethodsFromContent } from '../parsers/javaParser';
 
 /**
  * Provides CodeLens for:
@@ -53,7 +54,6 @@ export class JavaToXmlCodeLensProvider implements vscode.CodeLensProvider {
             // Match interface declaration (e.g., "public interface UserMapper")
             const interfaceMatch = line.match(/(?:public\s+)?interface\s+(\w+)/);
             if (interfaceMatch) {
-                const interfaceName = interfaceMatch[1];
                 const range = new vscode.Range(i, 0, i, line.length);
 
                 // Create CodeLens for interface
@@ -62,37 +62,30 @@ export class JavaToXmlCodeLensProvider implements vscode.CodeLensProvider {
                     command: 'mybatis-boost.jumpToXml',
                     arguments: [document.uri, xmlPath]
                 }));
+                break;
+            }
+        }
+
+        // Extract methods using tree-sitter AST parser (with regex fallback)
+        const methods = await extractJavaMethodsFromContent(text);
+
+        for (const method of methods) {
+            // Only show CodeLens if the statement exists in XML
+            if (!statementIds.has(method.name)) {
                 continue;
             }
 
-            // Match method declarations
-            // Need to handle:
-            // 1. Simple types: User selectById(Long id);
-            // 2. Generic types: List<User> listAllByIds(List<Long> ids);
-            // 3. Multi-line: User selectByIdAndName(
-            //                    @Param("id") Long id);
+            // Check if the method has MyBatis SQL annotations (@Select, @Insert, @Update, @Delete)
+            let hasSqlAnnotation = false;
 
-            // Match pattern: any word (including after >) followed by method name and (
-            // This handles both "User methodName(" and "List<User> methodName("
-            const methodMatch = line.match(/>\s+(\w+)\s*\(|^\s*(\w+)\s+(\w+)\s*\(/);
+            // Check the method line itself (same-line annotation case)
+            if (/@(Select|Insert|Update|Delete)\s*\(/.test(lines[method.line] || '')) {
+                hasSqlAnnotation = true;
+            }
 
-            if (methodMatch) {
-                // Extract method name from either capture group
-                const methodName = methodMatch[1] || methodMatch[3];
-
-                if (!methodName) {
-                    continue;
-                }
-
-                // Skip if this line contains class or interface keywords
-                if (line.includes('class ') || line.includes('interface ')) {
-                    continue;
-                }
-
-                // Check if the method has MyBatis SQL annotations (@Select, @Insert, @Update, @Delete)
-                // Look back only for annotations directly above this method (stop at code or empty lines)
-                let hasSqlAnnotation = false;
-                for (let j = i - 1; j >= Math.max(0, i - 10); j--) {
+            // Look back for annotations directly above this method
+            if (!hasSqlAnnotation) {
+                for (let j = method.line - 1; j >= Math.max(0, method.line - 10); j--) {
                     const prevLine = lines[j].trim();
 
                     // Empty line or comment line - continue searching
@@ -112,45 +105,24 @@ export class JavaToXmlCodeLensProvider implements vscode.CodeLensProvider {
                     }
 
                     // Found other code (method, field, etc.) - stop searching
-                    // This means we've reached a different method/code block
                     break;
                 }
-
-                // Skip methods with SQL annotations (they don't need XML)
-                if (hasSqlAnnotation) {
-                    continue;
-                }
-
-                // Look ahead to find the end of the method signature
-                let endLine = i;
-                let foundEnd = line.includes(';') || line.includes(')');
-
-                if (!foundEnd) {
-                    for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
-                        if (lines[j].includes(';') || lines[j].includes('}')) {
-                            endLine = j;
-                            foundEnd = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (foundEnd) {
-                    // Only show CodeLens if the statement exists in XML
-                    if (!statementIds.has(methodName)) {
-                        continue;
-                    }
-
-                    const range = new vscode.Range(i, 0, i, line.length);
-
-                    // Create CodeLens for method
-                    codeLenses.push(new vscode.CodeLens(range, {
-                        title: 'jumpToXml',
-                        command: 'mybatis-boost.jumpToXml',
-                        arguments: [document.uri, xmlPath, methodName]
-                    }));
-                }
             }
+
+            // Skip methods with SQL annotations (they don't need XML)
+            if (hasSqlAnnotation) {
+                continue;
+            }
+
+            const line = lines[method.line] || '';
+            const range = new vscode.Range(method.line, 0, method.line, line.length);
+
+            // Create CodeLens for method
+            codeLenses.push(new vscode.CodeLens(range, {
+                title: 'jumpToXml',
+                command: 'mybatis-boost.jumpToXml',
+                arguments: [document.uri, xmlPath, method.name]
+            }));
         }
 
         return codeLenses;

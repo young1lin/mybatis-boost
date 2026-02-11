@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { FileMapper } from '../core/FileMapper';
 import { findXmlStatementPosition } from '../parsers/xmlParser';
+import { extractJavaMethodsFromContent } from '../parsers/javaParser';
 
 /**
  * Provides go-to-definition for:
@@ -37,40 +38,16 @@ export class JavaToXmlDefinitionProvider implements vscode.DefinitionProvider {
         }
 
         // Check if this is an interface declaration
-        // Need to check multiple lines for cases like: interface MyMapper
-        //                                                extends BaseMapper {
         const interfacePattern = /(?:public\s+)?interface\s+\w+/;
         if (interfacePattern.test(line) && line.includes(word)) {
             return this.navigateToXmlMapper(xmlPath, document, position);
         }
 
-        // Check if this looks like a method declaration
-        // For multi-line methods like: User selectByIdAndName(
-        //                                  @Param("id") Long id);
-        // Check current line for method pattern, then look ahead for '(' if needed
-        const currentLineHasMethodName = /\w+\s+\w+\s*\(/.test(line);
-        const wordFollowedByParen = line.includes(`${word}(`);
-
-        if (currentLineHasMethodName || wordFollowedByParen) {
-            // Verify this is actually a method by checking if it has a closing ';' within next few lines
-            const lineNum = position.line;
-            let hasMethodEnd = line.includes(';') || line.includes(')');
-
-            if (!hasMethodEnd) {
-                // Look ahead up to 10 lines
-                const text = document.getText();
-                const lines = text.split('\n');
-                for (let i = lineNum + 1; i < Math.min(lineNum + 10, lines.length); i++) {
-                    if (lines[i].includes(';') || lines[i].includes('}')) {
-                        hasMethodEnd = true;
-                        break;
-                    }
-                }
-            }
-
-            if (hasMethodEnd) {
-                return this.navigateToXmlStatement(xmlPath, word, document, position);
-            }
+        // Check if word is a method name using tree-sitter AST parser (with regex fallback)
+        const methods = await extractJavaMethodsFromContent(document.getText());
+        const method = methods.find(m => m.name === word);
+        if (method) {
+            return this.navigateToXmlStatement(xmlPath, word, document, position);
         }
 
         return null;

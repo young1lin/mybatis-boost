@@ -10,11 +10,15 @@ import * as path from 'path';
 const mockRequire = require('mock-require');
 
 // Mock fs module before importing GeneratorViewProvider
+// Only mock .html files; pass through everything else (especially .wasm for tree-sitter)
+const realReadFileSync = fs.readFileSync;
 mockRequire('fs', {
     ...fs,
-    readFileSync: ((filePath: string, encoding?: string) => {
-        // Return mock HTML content
-        return '<html><head><title>Mock Generator</title></head><body>Mock Content</body></html>';
+    readFileSync: ((filePath: string | number | Buffer | URL, options?: any) => {
+        if (typeof filePath === 'string' && filePath.endsWith('.html')) {
+            return '<html><head><title>Mock Generator</title></head><body>Mock Content</body></html>';
+        }
+        return realReadFileSync(filePath, options);
     }) as typeof fs.readFileSync
 });
 

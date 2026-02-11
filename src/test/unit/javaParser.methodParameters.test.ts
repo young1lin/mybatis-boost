@@ -318,5 +318,69 @@ public interface CopyMapper {
             assert.strictEqual(result[1].name, 'status', 'Second parameter should be status');
             assert.strictEqual(result[1].hasParamAnnotation, true, 'Second should have @Param');
         });
+
+        it('should handle Javadoc with parentheses before method', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+
+public interface DailyStatMapper {
+    /**
+     * Get daily stats (chart data)
+     */
+    List<DailyStat> selectDailyStats(@Param("startDate") String startDate, @Param("endDate") String endDate);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/DailyStatMapper.java', 'selectDailyStats');
+            assert.strictEqual(result.length, 2, 'Should extract 2 parameters despite Javadoc parentheses');
+            assert.strictEqual(result[0].name, 'startDate', 'First parameter should be startDate');
+            assert.strictEqual(result[0].hasParamAnnotation, true);
+            assert.strictEqual(result[1].name, 'endDate', 'Second parameter should be endDate');
+            assert.strictEqual(result[1].hasParamAnnotation, true);
+        });
+
+        it('should handle Javadoc with multiple parenthesized expressions', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+
+public interface OrderMapper {
+    /**
+     * Calculate total income (including tax) for orders (active only)
+     * @param orderId the order ID (required)
+     */
+    int calculateIncome(@Param("orderId") Long orderId);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/OrderMapper.java', 'calculateIncome');
+            assert.strictEqual(result.length, 1, 'Should extract 1 parameter despite multiple Javadoc parentheses');
+            assert.strictEqual(result[0].name, 'orderId');
+            assert.strictEqual(result[0].hasParamAnnotation, true);
+        });
+
+        it('should handle single-line comment with parentheses before method', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+
+public interface UserMapper {
+    // Get user info (basic)
+    User selectById(@Param("id") Long id);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/UserMapper.java', 'selectById');
+            assert.strictEqual(result.length, 1, 'Should extract 1 parameter despite comment parentheses');
+            assert.strictEqual(result[0].name, 'id');
+            assert.strictEqual(result[0].hasParamAnnotation, true);
+        });
     });
 });

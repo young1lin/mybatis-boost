@@ -69,8 +69,26 @@ const copyResourcesPlugin = {
 				filesCopied++;
 			});
 
+			// Copy WASM files for tree-sitter
+			const wasmSources = [
+				{ src: path.join(__dirname, 'node_modules', 'web-tree-sitter', 'web-tree-sitter.wasm'), name: 'web-tree-sitter.wasm' },
+				{ src: path.join(__dirname, 'node_modules', 'tree-sitter-java', 'tree-sitter-java.wasm'), name: 'tree-sitter-java.wasm' }
+			];
+			const distWasmDir = path.join(__dirname, 'dist', 'wasm');
+			if (!fs.existsSync(distWasmDir)) {
+				fs.mkdirSync(distWasmDir, { recursive: true });
+			}
+			let wasmCopied = 0;
+			wasmSources.forEach(({ src, name }) => {
+				if (fs.existsSync(src)) {
+					fs.copyFileSync(src, path.join(distWasmDir, name));
+					filesCopied++;
+					wasmCopied++;
+				}
+			});
+
 			if (filesCopied > 0) {
-				console.log(`[resources] Copied ${filesCopied} resource files to dist (${templateFiles.length} EJS, ${htmlFiles.length} HTML)`);
+				console.log(`[resources] Copied ${filesCopied} resource files to dist (${templateFiles.length} EJS, ${htmlFiles.length} HTML, ${wasmCopied} WASM)`);
 			}
 		});
 	},

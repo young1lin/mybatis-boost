@@ -2,101 +2,114 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.young1lin.mybatis.boost.integration.test.mapper.UserMapper">
 
-    <resultMap id="UserResultMap" type="com.young1lin.mybatis.boost.integration.test.domain.User">
-        <id property="id" column="id"/>
-        <result property="name" column="name"/>
-        <result property="age" column="age"/>
-        <result property="createTime" column="create_time"/>
-        <result property="updateTime" column="update_time"/>
-        <result property="version" column="version"/>
-    </resultMap>
+  <resultMap id="UserResultMap" type="com.young1lin.mybatis.boost.integration.test.domain.User">
+      <id property="id" column="id"/>
+      <result property="name" column="name"/>
+      <result property="age" column="age"/>
+      <result property="createTime" column="create_time"/>
+      <result property="updateTime" column="update_time"/>
+      <result property="version" column="version"/>
+  </resultMap>
 
-    <sql id="BaseInsertColumns">
-        name, age, create_time, update_time, version
-    </sql>
+  <sql id="BaseInsertColumns">
+      name, age, create_time, update_time, version
+  </sql>
 
-    <sql id="BaseColumns">
-        id, <include refid="BaseInsertColumns" />
-    </sql>
+  <sql id="BaseColumns">
+      id, <include refid="BaseInsertColumns" />
+  </sql>
 
-    <select id="listAllByIds" resultType="com.young1lin.mybatis.boost.integration.test.domain.User">
-        SELECT
-        <include refid="BaseColumns"/>
-        FROM
-            `user`
-        WHERE
-            id IN
-        <foreach collection="ids" item="id" separator="," open="(" close=")">
-            #{id}
-        </foreach>
-    </select>
+  <select id="listAllByIds" resultType="com.young1lin.mybatis.boost.integration.test.domain.User">
+    SELECT
+    <include refid="BaseColumns"/>
+    FROM
+      `user`
+    WHERE
+      id IN
+    <foreach collection="ids" item="id" separator="," open="(" close=")">
+      #{id}
+    </foreach>
+  </select>
 
-    <select id="selectByIdAndName" resultMap="UserResultMap">
-        SELECT
-        <include refid="BaseColumns"/>
-        FROM
-            `user`
-        WHERE
-            id = #{id}
-        AND name = #{name}
-    </select>
+  <select id="selectByIdAndName" resultMap="UserResultMap">
+    SELECT
+    <include refid="BaseColumns"/>
+    FROM
+      `user`
+    WHERE
+      id = #{id}
+      AND name = #{name}
+  </select>
 
-    <update id="updateById" parameterType="com.young1lin.mybatis.boost.integration.test.domain.User">
-        UPDATE `user`
-        SET
-            `name` = #{name},
-        age = #{age},
-        update_time = #{updateTime},
-        version = version + 1
-        WHERE
-            id = #{id}
-        AND version = #{version}
-    </update>
+  <update id="updateById" parameterType="com.young1lin.mybatis.boost.integration.test.domain.User">
+    UPDATE `user`
+    SET
+      `name` = #{name},
+      age = #{age},
+      update_time = #{updateTime},
+      version = version + 1
+    WHERE
+      id = #{id}
+      AND version = #{version}
+  </update>
 
-    <insert id="batchInsert" keyProperty="id" useGeneratedKeys="true"
-        parameterType="com.young1lin.mybatis.boost.integration.test.domain.User">
-        INSERT INTO
-        `user` (
-        <include refid="BaseInsertColumns"/>
-        )
-        VALUES
-        <foreach collection="users" item="user" separator=",">
-            ( #{user.name},
-            #{user.age},
-            #{user.createTime},
-            #{user.updateTime},
-        0)
-        </foreach>
-    </insert>
+  <insert id="batchInsert" keyProperty="id" useGeneratedKeys="true"
+      parameterType="com.young1lin.mybatis.boost.integration.test.domain.User">
+    INSERT INTO
+    `user` (
+    <include refid="BaseInsertColumns"/>
+    )
+    VALUES
+    <foreach collection="users" item="user" separator=",">
+      (
+        #{user.name},
+        #{user.age},
+        #{user.createTime},
+        #{user.updateTime},
+        0
+      )
+    </foreach>
+  </insert>
 
-    <insert id="batchInsertV2" keyProperty="id" useGeneratedKeys="true">
-        INSERT INTO
-        `user` (
-        <include refid="BaseInsertColumns"/>
-        )
-        VALUES
-        <foreach collection="users" item="user" separator=",">
-            ( #{user.name},
-            #{user.age},
-            #{user.createTime},
-            #{user.updateTime},
-        0)
-        </foreach>
-    </insert>
+  <insert id="batchInsertV2" keyProperty="id" useGeneratedKeys="true">
+    INSERT INTO
+    `user` (
+    <include refid="BaseInsertColumns"/>
+    )
+    VALUES
+    <foreach collection="users" item="user" separator=",">
+      (
+        #{user.name},
+        #{user.age},
+        #{user.createTime},
+        #{user.updateTime},
+        0
+      )
+    </foreach>
+  </insert>
 
-    <insert id="batchInsertV3" keyProperty="id" useGeneratedKeys="true">
-        INSERT INTO
-        `user` (
-        <include refid="BaseInsertColumns"/>
-        )
-        VALUES
-        <foreach collection="aUsers" item="user" separator=",">
-            ( #{user.name},
-            #{user.age},
-            #{user.createTime},
-            #{user.updateTime},
-        0)
-        </foreach>
-    </insert>
+  <insert id="batchInsertV3" keyProperty="id" useGeneratedKeys="true">
+    INSERT INTO
+    `user` (
+    <include refid="BaseInsertColumns"/>
+    )
+    VALUES
+    <foreach collection="aUsers" item="user" separator=",">
+      (
+        #{user.name},
+        #{user.age},
+        #{user.createTime},
+        #{user.updateTime},
+        0
+      )
+    </foreach>
+  </insert>
+
+  <select id="selectCount" resultType="java.lang.Integer">
+    SELECT
+      COUNT(*)
+    FROM
+      `user`
+  </select>
 
 </mapper>

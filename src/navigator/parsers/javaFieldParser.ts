@@ -1,9 +1,12 @@
 /**
  * Java field parser for extracting field declarations from Java classes
+ *
+ * Uses tree-sitter AST parsing when available, with regex fallback.
  */
 
 import { JavaField } from '../../types';
 import { readFile } from '../../utils/fileUtils';
+import { extractFieldsFromAST } from './javaTreeSitterParser';
 
 /**
  * Extract all fields from a Java class
@@ -13,81 +16,11 @@ import { readFile } from '../../utils/fileUtils';
  */
 export async function extractJavaFields(filePath: string): Promise<JavaField[]> {
     const content = await readFile(filePath);
-    const lines = content.split('\n');
-    const fields: JavaField[] = [];
-
-    let inClassBody = false;
-    let braceLevel = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmed = line.trim();
-
-        // Track class boundaries
-        if (/(?:class|interface|enum)\s+\w+/.test(line)) {
-            inClassBody = false; // Will become true when we see the opening brace
-        }
-
-        // Track brace level
-        braceLevel += (line.match(/{/g) || []).length;
-        braceLevel -= (line.match(/}/g) || []).length;
-
-        // We're in class body if brace level is 1 (inside class but not in methods)
-        if (braceLevel > 0) {
-            inClassBody = true;
-        }
-
-        // Skip if not in class body or inside methods/blocks
-        if (!inClassBody || braceLevel !== 1) {
-            continue;
-        }
-
-        // Skip comments and annotations
-        if (trimmed.startsWith('//') || trimmed.startsWith('@') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
-            continue;
-        }
-
-        // Skip method declarations (they have parentheses)
-        if (trimmed.includes('(')) {
-            continue;
-        }
-
-        // Match field declarations
-        // Pattern: [modifiers] Type fieldName [= value];
-        // Examples:
-        //   private String name;
-        //   protected Integer age = 0;
-        //   public Long id;
-        //   private List<String> items;
-        const fieldRegex = /(?:private|protected|public|static|final)?\s*(\w+(?:<[^>]+>)?)\s+(\w+)\s*[;=]/;
-        const match = trimmed.match(fieldRegex);
-
-        if (match) {
-            const fieldType = match[1];
-            const fieldName = match[2];
-
-            // Find the column position of the field name in the original line
-            const fieldNameIndex = line.indexOf(fieldName);
-
-            if (fieldNameIndex >= 0) {
-                const startColumn = fieldNameIndex;
-                const endColumn = startColumn + fieldName.length;
-
-                fields.push({
-                    name: fieldName,
-                    fieldType: fieldType,
-                    line: i,
-                    startColumn: startColumn,
-                    endColumn: endColumn
-                });
-
-                console.log(`[javaFieldParser] Found field: ${fieldName} (${fieldType}) at line ${i}, columns ${startColumn}-${endColumn}`);
-            }
-        }
+    try {
+        return await extractFieldsFromAST(content);
+    } catch {
+        return extractJavaFieldsRegex(content);
     }
-
-    console.log(`[javaFieldParser] Total fields found: ${fields.length}`);
-    return fields;
 }
 
 /**
@@ -135,4 +68,70 @@ export async function findJavaFieldPosition(
     }
 
     return null;
+}
+
+// ==================== Regex fallback implementation ====================
+
+function extractJavaFieldsRegex(content: string): JavaField[] {
+    const lines = content.split('\n');
+    const fields: JavaField[] = [];
+
+    let inClassBody = false;
+    let braceLevel = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        if (/(?:class|interface|enum)\s+\w+/.test(line)) {
+            inClassBody = false;
+        }
+
+        braceLevel += (line.match(/{/g) || []).length;
+        braceLevel -= (line.match(/}/g) || []).length;
+
+        if (braceLevel > 0) {
+            inClassBody = true;
+        }
+
+        if (!inClassBody || braceLevel !== 1) {
+            continue;
+        }
+
+        if (trimmed.startsWith('//') || trimmed.startsWith('@') || trimmed.startsWith('*') || trimmed.startsWith('/*')) {
+            continue;
+        }
+
+        if (trimmed.includes('(')) {
+            continue;
+        }
+
+        const fieldRegex = /(?:private|protected|public|static|final)?\s*(\w+(?:<[^>]+>)?)\s+(\w+)\s*[;=]/;
+        const match = trimmed.match(fieldRegex);
+
+        if (match) {
+            const fieldType = match[1];
+            const fieldName = match[2];
+
+            const fieldNameIndex = line.indexOf(fieldName);
+
+            if (fieldNameIndex >= 0) {
+                const startColumn = fieldNameIndex;
+                const endColumn = startColumn + fieldName.length;
+
+                fields.push({
+                    name: fieldName,
+                    fieldType: fieldType,
+                    line: i,
+                    startColumn: startColumn,
+                    endColumn: endColumn
+                });
+
+                console.log(`[javaFieldParser] Found field: ${fieldName} (${fieldType}) at line ${i}, columns ${startColumn}-${endColumn}`);
+            }
+        }
+    }
+
+    console.log(`[javaFieldParser] Total fields found: ${fields.length}`);
+    return fields;
 }

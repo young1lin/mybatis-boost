@@ -21,7 +21,7 @@ export { JavaToXmlCodeLensProvider } from './providers/JavaToXmlCodeLensProvider
 export { ParameterValidator } from './diagnostics/ParameterValidator';
 
 // Export parsers (if needed externally)
-export { extractJavaNamespace, isMyBatisMapper, extractJavaMethods, findJavaMethodLine, findJavaMethodPosition, extractMethodParameters } from './parsers/javaParser';
+export { extractJavaNamespace, isMyBatisMapper, extractJavaMethods, extractJavaMethodsFromContent, findJavaMethodLine, findJavaMethodPosition, extractMethodParameters } from './parsers/javaParser';
 export { extractXmlNamespace, extractXmlStatements, findXmlStatementLine, findXmlStatementPosition, extractStatementIdFromPosition, findXmlMapperPosition } from './parsers/xmlParser';
 export { extractParameterReferences, extractStatementParameterInfo, getParameterAtPosition } from './parsers/parameterParser';
 export { extractJavaFields, findJavaField, findJavaFieldPosition } from './parsers/javaFieldParser';

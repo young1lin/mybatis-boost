@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import com.young1lin.mybatis.boost.integration.test.domain.User;
 
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 
 @Mapper
 public interface UserMapper {
@@ -34,6 +35,11 @@ public interface UserMapper {
 
     int batchInsertV2(@Param("users") List<User> users);
 
+    /**
+     * (parameters) is also allowed
+     */
     int batchInsertV3(@Param("aUsers") List<User> users);
+
+    @Nullable Integer selectCount();
 
 }
