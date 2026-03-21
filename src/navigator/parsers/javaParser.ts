@@ -5,6 +5,7 @@
  */
 import { JavaMethod, MethodParameter } from '../../types';
 import { readFirstLines, readFile } from '../../utils/fileUtils';
+import { escapeRegex } from '../../utils/stringUtils';
 import {
     extractMethodsFromAST,
     extractParametersFromAST,
@@ -527,6 +528,3 @@ function stripLeadingAnnotations(line: string): string {
     return temp;
 }
 
-function escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}

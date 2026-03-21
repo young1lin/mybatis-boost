@@ -356,6 +356,73 @@ public interface UserMapper {
             const extracted = line.substring(result[0].startColumn, result[0].endColumn);
             assert.strictEqual(extracted, 'selectUserInfoById');
         });
+
+        it('should return empty array for interface with no methods', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface Empty {
+}
+`;
+            const result = await extractMethodsFromAST(content);
+            assert.strictEqual(result.length, 0);
+        });
+
+        it('should handle default method', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface UserMapper {
+    User selectById(Long id);
+
+    default User selectDefault() {
+        return null;
+    }
+}
+`;
+            const result = await extractMethodsFromAST(content);
+            // default methods are valid interface methods - should be included
+            assert.ok(result.some(m => m.name === 'selectById'));
+        });
+
+        it('should handle void return type', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface UserMapper {
+    void deleteAll();
+}
+`;
+            const result = await extractMethodsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'deleteAll');
+        });
+
+        it('should handle wildcard generic return type List<? extends User>', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface UserMapper {
+    List<? extends User> selectAll();
+}
+`;
+            const result = await extractMethodsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'selectAll');
+        });
+
+        it('should handle super wildcard Map<String, ? super Number>', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface DataMapper {
+    Map<String, ? super Number> getData();
+}
+`;
+            const result = await extractMethodsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'getData');
+        });
     });
 
     describe('extractParametersFromAST', () => {
@@ -546,6 +613,46 @@ public interface UserMapper {
             assert.strictEqual(result[0].name, 'records');
             assert.strictEqual(result[0].paramType, 'List');
         });
+
+        it('should handle varargs parameter Integer...', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface UserMapper {
+    void delete(Integer... ids);
+}
+`;
+            const result = await extractParametersFromAST(content, 'delete');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'ids');
+        });
+
+        it('should handle array type parameter String[]', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface UserMapper {
+    void insert(String[] names);
+}
+`;
+            const result = await extractParametersFromAST(content, 'insert');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'names');
+        });
+
+        it('should handle wildcard generic parameter List<? extends User>', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface UserMapper {
+    void process(List<? extends User> users);
+}
+`;
+            const result = await extractParametersFromAST(content, 'process');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'users');
+            assert.strictEqual(result[0].paramType, 'List');
+        });
     });
 
     describe('extractFieldsFromAST', () => {
@@ -629,6 +736,116 @@ public class Report {
             assert.strictEqual(result.length, 1);
             assert.strictEqual(result[0].name, 'groupedData');
             assert.strictEqual(result[0].fieldType, 'Map');
+        });
+
+        it('should extract static field', async () => {
+            const content = `
+package com.example.model;
+
+public class Config {
+    private static String instance;
+}
+`;
+            const result = await extractFieldsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'instance');
+            assert.strictEqual(result[0].fieldType, 'String');
+        });
+
+        it('should extract final field', async () => {
+            const content = `
+package com.example.model;
+
+public class Config {
+    private final Long id;
+}
+`;
+            const result = await extractFieldsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'id');
+            assert.strictEqual(result[0].fieldType, 'Long');
+        });
+
+        it('should extract static final field', async () => {
+            const content = `
+package com.example.model;
+
+public class Config {
+    private static final String VERSION = "1.0";
+}
+`;
+            const result = await extractFieldsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'VERSION');
+            assert.strictEqual(result[0].fieldType, 'String');
+        });
+
+        it('should extract array type field', async () => {
+            const content = `
+package com.example.model;
+
+public class Data {
+    private String[] names;
+}
+`;
+            const result = await extractFieldsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'names');
+        });
+
+        it('should extract nested array type field', async () => {
+            const content = `
+package com.example.model;
+
+public class Data {
+    private int[][] matrix;
+}
+`;
+            const result = await extractFieldsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'matrix');
+        });
+
+        it('should extract field with single annotation', async () => {
+            const content = `
+package com.example.model;
+
+public class User {
+    @Column
+    private String name;
+}
+`;
+            const result = await extractFieldsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'name');
+            assert.strictEqual(result[0].fieldType, 'String');
+        });
+
+        it('should extract field with multiple annotations', async () => {
+            const content = `
+package com.example.model;
+
+public class User {
+    @Id
+    @Column
+    private Long id;
+}
+`;
+            const result = await extractFieldsFromAST(content);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'id');
+            assert.strictEqual(result[0].fieldType, 'Long');
+        });
+
+        it('should return empty array for class with no fields', async () => {
+            const content = `
+package com.example.model;
+
+public class Empty {
+}
+`;
+            const result = await extractFieldsFromAST(content);
+            assert.strictEqual(result.length, 0);
         });
     });
 });

@@ -7,6 +7,7 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import { extractJavaNamespace, isMyBatisMapper, extractJavaMethods, extractJavaMethodsFromContent, findJavaMethodLine, findJavaMethodPosition } from '../../navigator/parsers/javaParser';
 import * as fileUtils from '../../utils/fileUtils';
+import * as javaTreeSitterParser from '../../navigator/parsers/javaTreeSitterParser';
 
 describe('javaParser Unit Tests', () => {
     let readFirstLinesStub: sinon.SinonStub;
@@ -747,6 +748,80 @@ public interface UserMapper {
             assert.ok(line.includes('selectById'), 'Found line should contain selectById');
             assert.strictEqual(result!.startColumn, line.indexOf('selectById'));
             assert.strictEqual(result!.endColumn, line.indexOf('selectById') + 'selectById'.length);
+        });
+    });
+
+    describe('extractJavaMethodsRegex - edge cases (AST forced to throw)', () => {
+        let extractMethodsFromASTStub: sinon.SinonStub;
+
+        beforeEach(() => {
+            extractMethodsFromASTStub = sinon.stub(javaTreeSitterParser, 'extractMethodsFromAST')
+                .rejects(new Error('WASM not available'));
+        });
+
+        it('should return empty array for empty interface', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+public interface EmptyMapper {
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractJavaMethods('/fake/path/EmptyMapper.java');
+            assert.strictEqual(result.length, 0);
+        });
+
+        it('should extract void return type method', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+public interface UserMapper {
+    void deleteAll();
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractJavaMethods('/fake/path/UserMapper.java');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'deleteAll');
+        });
+
+        it('should skip default methods with body (brace level > 1 — correct behavior: no XML mapping)', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+public interface UserMapper {
+    User selectById(Long id);
+
+    default User selectDefault() {
+        return null;
+    }
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractJavaMethods('/fake/path/UserMapper.java');
+            // Regex parser skips default methods with body - this is correct behavior
+            // because default methods don't have corresponding XML statements
+            assert.ok(result.some(m => m.name === 'selectById'));
+            // default methods with body are skipped by regex (brace level > 1)
+            assert.ok(!result.some(m => m.name === 'selectDefault'));
+        });
+
+        it('should handle method with annotation prefix on same line', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+public interface UserMapper {
+    @Nullable Integer selectCount();
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractJavaMethods('/fake/path/UserMapper.java');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'selectCount');
         });
     });
 });

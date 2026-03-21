@@ -65,6 +65,13 @@ export function getWorkspaceRoot(): string | undefined {
 }
 
 /**
+ * Exclude pattern for workspace file searches (findFiles)
+ * Skips common non-source directories for performance
+ */
+export const WORKSPACE_EXCLUDE_PATTERN =
+    '**/{ node_modules,target,.git,.vscode,.claude,.idea,.settings,build,dist,out,bin}/**';
+
+/**
  * Normalize path separators
  */
 export function normalizePath(filePath: string): string {

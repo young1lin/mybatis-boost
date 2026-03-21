@@ -46,6 +46,18 @@ describe('ParameterValidator Configuration Toggle', () => {
             return { dispose: () => {} };
         };
 
+        // Mock createFileSystemWatcher
+        if (!(vscode.workspace as any).createFileSystemWatcher) {
+            (vscode.workspace as any).createFileSystemWatcher = function() {
+                return {
+                    onDidChange: () => ({ dispose: () => {} }),
+                    onDidCreate: () => ({ dispose: () => {} }),
+                    onDidDelete: () => ({ dispose: () => {} }),
+                    dispose: () => {}
+                };
+            };
+        }
+
         // Clear module cache to get fresh instances
         delete require.cache[require.resolve('../../navigator/diagnostics/ParameterValidator')];
     });

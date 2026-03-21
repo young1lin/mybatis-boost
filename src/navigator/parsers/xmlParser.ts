@@ -4,25 +4,7 @@
 
 import { XmlStatement } from '../../types';
 import { readFirstLines, readFile } from '../../utils/fileUtils';
-
-/**
- * Remove XML comments from content
- * Removes all <!-- ... --> comment blocks while preserving line numbers
- */
-function removeXmlComments(content: string): string {
-    // Guard against undefined/null content
-    if (!content) {
-        return '';
-    }
-
-    // Remove XML comments (<!-- ... -->)
-    // Replace comment content with newlines to preserve line numbers
-    return content.replace(/<!--[\s\S]*?-->/g, (match) => {
-        // Count newlines in the comment and preserve them
-        const newlineCount = (match.match(/\n/g) || []).length;
-        return '\n'.repeat(newlineCount);
-    });
-}
+import { removeXmlComments } from '../../utils/xmlUtils';
 
 /**
  * Extract namespace from XML mapper file

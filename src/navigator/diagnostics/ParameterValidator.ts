@@ -9,58 +9,10 @@ import { extractParameterReferences, extractStatementParameterInfo, extractLocal
 import { extractXmlStatements } from '../parsers/xmlParser';
 import { extractMethodParameters } from '../parsers/javaParser';
 import { extractJavaFields } from '../parsers/javaFieldParser';
-
-/**
- * LRU Cache for storing class fields
- */
-class FieldCache {
-    private cache: Map<string, string[]> = new Map();
-    private maxSize: number;
-
-    constructor(maxSize: number = 200) {
-        this.maxSize = maxSize;
-    }
-
-    get(className: string): string[] | undefined {
-        const value = this.cache.get(className);
-        if (value !== undefined) {
-            // Move to end (most recently used)
-            this.cache.delete(className);
-            this.cache.set(className, value);
-        }
-        return value;
-    }
-
-    set(className: string, fields: string[]): void {
-        // Remove if exists (to update position)
-        if (this.cache.has(className)) {
-            this.cache.delete(className);
-        } else if (this.cache.size >= this.maxSize) {
-            // Remove least recently used (first item)
-            const firstKey = this.cache.keys().next().value;
-            if (firstKey !== undefined) {
-                this.cache.delete(firstKey);
-            }
-        }
-        this.cache.set(className, fields);
-    }
-
-    has(className: string): boolean {
-        return this.cache.has(className);
-    }
-
-    delete(className: string): void {
-        this.cache.delete(className);
-    }
-
-    clear(): void {
-        this.cache.clear();
-    }
-
-    size(): number {
-        return this.cache.size;
-    }
-}
+import { LRUCache } from '../../utils/LRUCache';
+import { isBuiltInType, isCollectionType } from '../../utils/javaTypeUtils';
+import { resolveFullyQualifiedType } from '../../utils/javaTypeResolver';
+import { WORKSPACE_EXCLUDE_PATTERN } from '../../utils/fileUtils';
 
 /**
  * Validates parameters in XML mapper files
@@ -69,7 +21,7 @@ export class ParameterValidator {
     private diagnosticCollection: vscode.DiagnosticCollection;
     private disposables: vscode.Disposable[] = [];
     private validationTimers: Map<string, NodeJS.Timeout> = new Map();
-    private fieldCache: FieldCache;
+    private fieldCache: LRUCache<string, string[]>;
     private readonly DEBOUNCE_DELAY = 500; // 500ms debounce for text changes
     private readonly FIELD_CACHE_SIZE = 200; // Cache up to 200 classes
     private enabled: boolean;
@@ -83,7 +35,7 @@ export class ParameterValidator {
         this.context.subscriptions.push(this.diagnosticCollection);
 
         // Initialize field cache
-        this.fieldCache = new FieldCache(this.FIELD_CACHE_SIZE);
+        this.fieldCache = new LRUCache(this.FIELD_CACHE_SIZE);
 
         // Read initial configuration
         this.enabled = this.isValidationEnabled();
@@ -148,6 +100,22 @@ export class ParameterValidator {
                 }
             })
         );
+
+        // Watch Java files at filesystem level for external changes (git checkout, etc.)
+        const javaFsWatcher = vscode.workspace.createFileSystemWatcher('**/*.java');
+        javaFsWatcher.onDidChange(() => {
+            this.fieldCache.clear();
+            this.revalidateOpenXmlDocuments();
+        });
+        javaFsWatcher.onDidCreate(() => {
+            this.fieldCache.clear();
+            this.revalidateOpenXmlDocuments();
+        });
+        javaFsWatcher.onDidDelete(() => {
+            this.fieldCache.clear();
+            this.revalidateOpenXmlDocuments();
+        });
+        this.disposables.push(javaFsWatcher);
 
         // Validate all open XML documents if validation is enabled
         if (this.enabled) {
@@ -301,7 +269,7 @@ export class ParameterValidator {
             }
 
             // 2. Add fields from parameterType class
-            if (paramInfo.parameterType && !this.isBuiltInType(paramInfo.parameterType)) {
+            if (paramInfo.parameterType && !isBuiltInType(paramInfo.parameterType)) {
                 try {
                     const fields = await this.getClassFields(paramInfo.parameterType);
                     fields.forEach(f => validParams.add(f));
@@ -334,12 +302,12 @@ export class ParameterValidator {
                 const singleParam = methodParams[0];
                 const paramType = singleParam.paramType;
 
-                if (this.isBuiltInType(paramType)) {
+                if (isBuiltInType(paramType)) {
                     // For single primitive/built-in parameter without @Param,
                     // MyBatis allows any parameter name, so skip validation entirely
                     skipValidation = true;
                     console.log(`[ParameterValidator] Single primitive parameter ${singleParam.name} (${paramType}): skipping validation (any name allowed)`);
-                } else if (this.isCollectionType(paramType)) {
+                } else if (isCollectionType(paramType)) {
                     // For single collection parameter, MyBatis allows special names
                     validParams.add('list');
                     validParams.add('collection');
@@ -349,7 +317,7 @@ export class ParameterValidator {
                     // For complex objects, auto-map fields
                     try {
                         // Try to get the fully qualified class name from the Java file
-                        const fullyQualifiedType = await this.resolveFullyQualifiedType(javaPath, paramType);
+                        const fullyQualifiedType = await resolveFullyQualifiedType(javaPath, paramType);
 
                         if (fullyQualifiedType) {
                             const fields = await this.getClassFields(fullyQualifiedType);
@@ -434,7 +402,7 @@ export class ParameterValidator {
         try {
             const files = await vscode.workspace.findFiles(
                 searchPattern,
-                '**/{ node_modules,target,.git,.vscode,.idea,.settings,build,dist,out,bin}/**',
+                WORKSPACE_EXCLUDE_PATTERN,
                 1
             );
 
@@ -526,142 +494,17 @@ export class ParameterValidator {
     }
 
     /**
-     * Check if a class name is a built-in type
+     * Revalidate all open XML documents after external Java file changes
      */
-    private isBuiltInType(className: string): boolean {
-        const primitives = ['int', 'long', 'double', 'float', 'boolean', 'byte', 'short', 'char'];
-        const javaLang = [
-            'String',
-            'Integer',
-            'Long',
-            'Double',
-            'Float',
-            'Boolean',
-            'Byte',
-            'Short',
-            'Character',
-            'Object',
-            'java.lang.String',
-            'java.lang.Integer',
-            'java.lang.Long',
-            'java.lang.Double',
-            'java.lang.Float',
-            'java.lang.Boolean',
-            'java.lang.Byte',
-            'java.lang.Short',
-            'java.lang.Character',
-            'java.lang.Object'
-        ];
-
-        return primitives.includes(className) || javaLang.includes(className);
-    }
-
-    /**
-     * Check if a class name is a collection type
-     */
-    private isCollectionType(className: string): boolean {
-        const collectionTypes = [
-            'List',
-            'Set',
-            'Map',
-            'Collection',
-            'ArrayList',
-            'LinkedList',
-            'HashSet',
-            'HashMap',
-            'LinkedHashMap',
-            'TreeMap',
-            'TreeSet',
-            'Vector',
-            'Stack',
-            'Queue',
-            'Deque',
-            'java.util.List',
-            'java.util.Set',
-            'java.util.Map',
-            'java.util.Collection',
-            'java.util.ArrayList',
-            'java.util.LinkedList',
-            'java.util.HashSet',
-            'java.util.HashMap',
-            'java.util.LinkedHashMap',
-            'java.util.TreeMap',
-            'java.util.TreeSet',
-            'java.util.Vector',
-            'java.util.Stack',
-            'java.util.Queue',
-            'java.util.Deque'
-        ];
-
-        return collectionTypes.includes(className);
-    }
-
-    /**
-     * Resolve the fully qualified class name from a simple type name in a Java file
-     */
-    private async resolveFullyQualifiedType(javaPath: string, simpleTypeName: string): Promise<string | null> {
-        try {
-            // If the type name already contains dots, it's already fully qualified
-            if (simpleTypeName.includes('.')) {
-                console.log(`[ParameterValidator] ${simpleTypeName} is already fully qualified`);
-                return simpleTypeName;
-            }
-
-            const fs = await import('fs');
-            const content = await fs.promises.readFile(javaPath, 'utf-8');
-            const lines = content.split('\n');
-
-            // Look for import statements that match the simple type name
-            for (const line of lines) {
-                const trimmed = line.trim();
-
-                // Stop at the class/interface declaration
-                if (trimmed.match(/(?:class|interface|enum)\s+/)) {
-                    break;
-                }
-
-                // Check for matching import
-                const importMatch = trimmed.match(/import\s+([\w.]+\.(\w+))\s*;/);
-                if (importMatch) {
-                    const fullyQualified = importMatch[1];
-                    const importedSimpleName = importMatch[2];
-
-                    if (importedSimpleName === simpleTypeName) {
-                        console.log(`[ParameterValidator] Resolved ${simpleTypeName} to ${fullyQualified}`);
-                        return fullyQualified;
-                    }
-                }
-            }
-
-            // If not found in imports, check if it's in the same package
-            const packageMatch = content.match(/package\s+([\w.]+)\s*;/);
-            if (packageMatch) {
-                const packageName = packageMatch[1];
-                const possibleFullyQualified = `${packageName}.${simpleTypeName}`;
-
-                // Try to find the class file in the same package
-                const pathPattern = possibleFullyQualified.replace(/\./g, '/') + '.java';
-                const searchPattern = `**/${pathPattern}`;
-
-                const files = await vscode.workspace.findFiles(
-                    searchPattern,
-                    '**/{ node_modules,target,.git,.vscode,.idea,.settings,build,dist,out,bin}/**',
-                    1
-                );
-
-                if (files.length > 0) {
-                    console.log(`[ParameterValidator] Resolved ${simpleTypeName} to ${possibleFullyQualified} (same package)`);
-                    return possibleFullyQualified;
-                }
-            }
-
-            console.log(`[ParameterValidator] Could not resolve fully qualified name for ${simpleTypeName}`);
-            return null;
-
-        } catch (error) {
-            console.error(`[ParameterValidator] Error resolving type ${simpleTypeName}:`, error);
-            return null;
+    private revalidateOpenXmlDocuments(): void {
+        if (!this.enabled) {
+            return;
         }
+        vscode.workspace.textDocuments.forEach(doc => {
+            if (doc.languageId === 'xml') {
+                this.debouncedValidateDocument(doc);
+            }
+        });
     }
 
     /**

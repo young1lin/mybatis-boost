@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { FileMapper } from '../core/FileMapper';
 import { findXmlStatementPosition } from '../parsers/xmlParser';
 import { extractJavaMethodsFromContent } from '../parsers/javaParser';
+import { mapCursorProportionally } from '../../utils/navigationUtils';
 
 /**
  * Provides go-to-definition for:
@@ -136,11 +137,8 @@ export class JavaToXmlDefinitionProvider implements vscode.DefinitionProvider {
                 const javaNameLength = javaMethodPosition.endColumn - javaMethodPosition.startColumn;
                 const xmlNameLength = statementPosition.endColumn - statementPosition.startColumn;
 
-                // Map the offset proportionally (or directly if names are same length)
                 if (javaNameLength > 0) {
-                    const relativePosition = offsetInJava / javaNameLength;
-                    const mappedOffset = Math.floor(relativePosition * xmlNameLength);
-                    targetColumn = statementPosition.startColumn + Math.min(mappedOffset, xmlNameLength);
+                    targetColumn = mapCursorProportionally(offsetInJava, javaNameLength, statementPosition.startColumn, xmlNameLength);
                 }
             }
         }

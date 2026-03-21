@@ -6,59 +6,8 @@ import * as path from 'path';
 import { MappingMetadata } from '../../types';
 import { extractJavaNamespace, isMyBatisMapper } from '../parsers/javaParser';
 import { extractXmlNamespace } from '../parsers/xmlParser';
-import { getFileModTime, normalizePath } from '../../utils/fileUtils';
-
-/**
- * Simple LRU Cache implementation
- */
-class LRUCache<K, V> {
-    private cache: Map<K, V> = new Map();
-    private maxSize: number;
-
-    constructor(maxSize: number) {
-        this.maxSize = maxSize;
-    }
-
-    get(key: K): V | undefined {
-        const value = this.cache.get(key);
-        if (value !== undefined) {
-            // Move to end (most recently used)
-            this.cache.delete(key);
-            this.cache.set(key, value);
-        }
-        return value;
-    }
-
-    set(key: K, value: V): void {
-        // Remove if exists (to update position)
-        if (this.cache.has(key)) {
-            this.cache.delete(key);
-        } else if (this.cache.size >= this.maxSize) {
-            // Remove least recently used (first item)
-            const firstKey = this.cache.keys().next().value as K;
-            if (firstKey !== undefined) {
-                this.cache.delete(firstKey);
-            }
-        }
-        this.cache.set(key, value);
-    }
-
-    has(key: K): boolean {
-        return this.cache.has(key);
-    }
-
-    delete(key: K): void {
-        this.cache.delete(key);
-    }
-
-    clear(): void {
-        this.cache.clear();
-    }
-
-    size(): number {
-        return this.cache.size;
-    }
-}
+import { getFileModTime, normalizePath, WORKSPACE_EXCLUDE_PATTERN } from '../../utils/fileUtils';
+import { LRUCache } from '../../utils/LRUCache';
 
 /**
  * FileMapper manages mappings between Java mapper interfaces and XML files
@@ -94,7 +43,7 @@ export class FileMapper {
     private async scanWorkspace(): Promise<void> {
         const javaFiles = await vscode.workspace.findFiles(
             '**/*.java',
-            '**/{ node_modules,target,.git,.vscode,.idea,.settings,build,dist,out,bin}/**'
+            WORKSPACE_EXCLUDE_PATTERN
         );
 
         console.log(`[MyBatis Boost] Found ${javaFiles.length} Java files, checking for mappers...`);
@@ -172,7 +121,7 @@ export class FileMapper {
         // Priority 1: Search all XML files
         const xmlFiles = await vscode.workspace.findFiles(
             '**/*.xml',
-            '**/{ node_modules,target,.git,.vscode,.idea,.settings,build,dist,out,bin}/**'
+            WORKSPACE_EXCLUDE_PATTERN
         );
 
         // Try to find by namespace match
@@ -283,7 +232,7 @@ export class FileMapper {
         // Search Java files for matching namespace
         const javaFiles = await vscode.workspace.findFiles(
             '**/*.java',
-            '**/{ node_modules,target,.git,.vscode,.idea,.settings,build,dist,out,bin}/**'
+            WORKSPACE_EXCLUDE_PATTERN
         );
 
         for (const javaUri of javaFiles) {
@@ -307,14 +256,60 @@ export class FileMapper {
         // Watch Java files
         const javaWatcher = vscode.workspace.createFileSystemWatcher('**/*.java');
         javaWatcher.onDidChange(uri => this.handleFileChange(uri.fsPath));
+        javaWatcher.onDidCreate(uri => this.handleJavaFileCreate(uri.fsPath));
         javaWatcher.onDidDelete(uri => this.handleFileDelete(uri.fsPath));
         this.watchers.push(javaWatcher);
 
         // Watch XML files
         const xmlWatcher = vscode.workspace.createFileSystemWatcher('**/*.xml');
         xmlWatcher.onDidChange(uri => this.handleFileChange(uri.fsPath));
+        xmlWatcher.onDidCreate(uri => this.handleXmlFileCreate(uri.fsPath));
         xmlWatcher.onDidDelete(uri => this.handleFileDelete(uri.fsPath));
         this.watchers.push(xmlWatcher);
+    }
+
+    /**
+     * Handle new Java file creation
+     */
+    private async handleJavaFileCreate(filePath: string): Promise<void> {
+        try {
+            if (await isMyBatisMapper(filePath)) {
+                await this.buildMappingForJavaFile(filePath);
+                console.log(`[MyBatis Boost] New mapper detected: ${filePath}`);
+            }
+        } catch (error) {
+            console.error(`[MyBatis Boost] Error handling new Java file:`, error);
+        }
+    }
+
+    /**
+     * Handle new XML file creation
+     */
+    private async handleXmlFileCreate(filePath: string): Promise<void> {
+        try {
+            const namespace = await extractXmlNamespace(filePath);
+            if (!namespace) {
+                return;
+            }
+
+            // Search for corresponding Java mapper
+            const javaFiles = await vscode.workspace.findFiles(
+                '**/*.java',
+                WORKSPACE_EXCLUDE_PATTERN
+            );
+
+            for (const javaUri of javaFiles) {
+                const javaPath = javaUri.fsPath;
+                const javaNamespace = await extractJavaNamespace(javaPath);
+                if (javaNamespace === namespace) {
+                    await this.buildMappingForJavaFile(javaPath);
+                    console.log(`[MyBatis Boost] New XML mapped to ${javaPath}`);
+                    break;
+                }
+            }
+        } catch (error) {
+            console.error(`[MyBatis Boost] Error handling new XML file:`, error);
+        }
     }
 
     /**

@@ -3,6 +3,8 @@
  */
 
 import { readFile } from '../utils/fileUtils';
+import { removeXmlComments } from '../utils/xmlUtils';
+import { escapeRegex } from '../utils/stringUtils';
 
 /**
  * SQL Fragment definition
@@ -10,19 +12,6 @@ import { readFile } from '../utils/fileUtils';
 interface SqlFragment {
     id: string;
     content: string;
-}
-
-/**
- * Remove XML comments from content
- */
-function removeXmlComments(content: string): string {
-    if (!content) {
-        return '';
-    }
-    return content.replace(/<!--[\s\S]*?-->/g, (match) => {
-        const newlineCount = (match.match(/\n/g) || []).length;
-        return '\n'.repeat(newlineCount);
-    });
 }
 
 /**
@@ -66,13 +55,6 @@ function extractStatementContent(content: string, statementId: string): string |
     }
 
     return match[2].trim();
-}
-
-/**
- * Escape special regex characters
- */
-function escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**

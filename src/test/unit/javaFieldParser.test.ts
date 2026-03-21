@@ -4,12 +4,15 @@
 
 import * as assert from 'assert';
 import * as sinon from 'sinon';
+import * as vscode from 'vscode';
 import {
     extractJavaFields,
     findJavaField,
     findJavaFieldPosition
 } from '../../navigator/parsers/javaFieldParser';
 import * as fileUtils from '../../utils/fileUtils';
+import * as javaTreeSitterParser from '../../navigator/parsers/javaTreeSitterParser';
+import * as javaLSHelper from '../../utils/javaLSHelper';
 
 describe('javaFieldParser Unit Tests', () => {
     let readFileStub: sinon.SinonStub;
@@ -209,6 +212,229 @@ public class User {
 
             const result = await findJavaFieldPosition('/fake/path/User.java', 'nonExistent');
             assert.strictEqual(result, null);
+        });
+    });
+
+    // ==================== Three-tier fallback chain ====================
+
+    describe('Three-tier fallback chain', () => {
+        let extractFieldsFromASTStub: sinon.SinonStub;
+        let getClassFieldsViaLSStub: sinon.SinonStub;
+
+        const MOCK_CONTENT = `
+package com.example;
+
+public class User {
+    private Long id;
+    private String name;
+}
+`;
+
+        const AST_FIELDS = [
+            { name: 'id', fieldType: 'Long', line: 4, startColumn: 16, endColumn: 18 },
+            { name: 'name', fieldType: 'String', line: 5, startColumn: 19, endColumn: 23 },
+        ];
+
+        const LS_FIELDS = [
+            { name: 'id', fieldType: 'Long', line: 4, startColumn: 16, endColumn: 18 },
+            { name: 'name', fieldType: 'String', line: 5, startColumn: 19, endColumn: 23 },
+            { name: 'email', fieldType: 'String', line: 6, startColumn: 19, endColumn: 24 },
+        ];
+
+        beforeEach(() => {
+            extractFieldsFromASTStub = sinon.stub(javaTreeSitterParser, 'extractFieldsFromAST');
+            getClassFieldsViaLSStub = sinon.stub(javaLSHelper, 'getClassFieldsViaLS');
+        });
+
+        it('should use Tier 1 (AST) result and not call Tier 2', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.resolves(AST_FIELDS);
+
+            const result = await extractJavaFields('/fake/User.java');
+            assert.strictEqual(result.length, 2);
+            assert.strictEqual(result[0].name, 'id');
+            assert.strictEqual(getClassFieldsViaLSStub.called, false);
+        });
+
+        it('should fall to Tier 2 (LS) when Tier 1 throws', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.rejects(new Error('WASM not initialized'));
+            getClassFieldsViaLSStub.resolves(LS_FIELDS);
+
+            const result = await extractJavaFields('/fake/User.java');
+            assert.strictEqual(result.length, 3);
+            assert.strictEqual(result[2].name, 'email');
+        });
+
+        it('should fall to Tier 3 (Regex) when Tier 1 throws and Tier 2 returns null', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.rejects(new Error('WASM fail'));
+            getClassFieldsViaLSStub.resolves(null);
+
+            const result = await extractJavaFields('/fake/User.java');
+            assert.strictEqual(result.length, 2);
+            assert.strictEqual(result[0].name, 'id');
+            assert.strictEqual(result[1].name, 'name');
+        });
+
+        it('should fall to Tier 3 (Regex) when both Tier 1 and Tier 2 throw', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.rejects(new Error('WASM fail'));
+            getClassFieldsViaLSStub.rejects(new Error('LS crashed'));
+
+            const result = await extractJavaFields('/fake/User.java');
+            assert.strictEqual(result.length, 2);
+            assert.strictEqual(result[0].name, 'id');
+        });
+
+        it('should NOT fallback when Tier 1 returns empty array', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.resolves([]);
+
+            const result = await extractJavaFields('/fake/User.java');
+            assert.strictEqual(result.length, 0);
+            assert.strictEqual(getClassFieldsViaLSStub.called, false);
+        });
+
+        it('should preserve Tier 2 JavaField shape correctly', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.rejects(new Error('WASM fail'));
+            getClassFieldsViaLSStub.resolves([
+                { name: 'status', fieldType: 'Integer', line: 7, startColumn: 20, endColumn: 26 }
+            ]);
+
+            const result = await extractJavaFields('/fake/User.java');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'status');
+            assert.strictEqual(result[0].fieldType, 'Integer');
+            assert.strictEqual(result[0].line, 7);
+            assert.strictEqual(result[0].startColumn, 20);
+            assert.strictEqual(result[0].endColumn, 26);
+        });
+
+        it('should find specific field via Tier 2 fallback (findJavaField)', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.rejects(new Error('WASM fail'));
+            getClassFieldsViaLSStub.resolves(LS_FIELDS);
+
+            const result = await findJavaField('/fake/User.java', 'email');
+            assert.ok(result !== null);
+            assert.strictEqual(result.name, 'email');
+            assert.strictEqual(result.fieldType, 'String');
+        });
+
+        it('should return null when Tier 2 has no matching field (findJavaField)', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.rejects(new Error('WASM fail'));
+            getClassFieldsViaLSStub.resolves(LS_FIELDS);
+
+            const result = await findJavaField('/fake/User.java', 'nonExistent');
+            assert.strictEqual(result, null);
+        });
+
+        it('should return position from Tier 2 fallback (findJavaFieldPosition)', async () => {
+            readFileStub.resolves(MOCK_CONTENT);
+            extractFieldsFromASTStub.rejects(new Error('WASM fail'));
+            getClassFieldsViaLSStub.resolves(LS_FIELDS);
+
+            const result = await findJavaFieldPosition('/fake/User.java', 'name');
+            assert.ok(result !== null);
+            assert.strictEqual(result.line, 5);
+            assert.strictEqual(result.startColumn, 19);
+            assert.strictEqual(result.endColumn, 23);
+        });
+    });
+
+    describe('extractJavaFieldsRegex - edge cases (both AST and LS forced to throw)', () => {
+        let extractFieldsFromASTStub: sinon.SinonStub;
+        let getClassFieldsViaLSStub: sinon.SinonStub;
+
+        beforeEach(() => {
+            extractFieldsFromASTStub = sinon.stub(javaTreeSitterParser, 'extractFieldsFromAST')
+                .rejects(new Error('WASM fail'));
+            getClassFieldsViaLSStub = sinon.stub(javaLSHelper, 'getClassFieldsViaLS')
+                .rejects(new Error('LS fail'));
+        });
+
+        it('should extract field from "private static String instance;" (regex captures type=String, name=instance)', async () => {
+            const mockContent = `
+package com.example;
+
+public class Config {
+    private static String instance;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractJavaFields('/fake/Config.java');
+            // Regex: matches "static String instance;" - type=String, name=instance
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'instance');
+            assert.strictEqual(result[0].fieldType, 'String');
+        });
+
+        it('should extract field from "private final Long id;"', async () => {
+            const mockContent = `
+package com.example;
+
+public class Entity {
+    private final Long id;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractJavaFields('/fake/Entity.java');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'id');
+            assert.strictEqual(result[0].fieldType, 'Long');
+        });
+
+        it('should SKIP inline-annotated field "@Column private String name;" (startsWith @ check)', async () => {
+            // Line starts with @Column, so the entire line is skipped
+            const mockContent = `
+package com.example;
+
+public class User {
+    @Column private String name;
+    private Long id;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractJavaFields('/fake/User.java');
+            // @Column private String name; is skipped (starts with @)
+            // but private Long id; is extracted
+            const fieldNames = result.map(f => f.name);
+            assert.ok(!fieldNames.includes('name'), 'Inline-annotated field should be skipped');
+            assert.ok(fieldNames.includes('id'));
+        });
+
+        it('should NOT extract array type field "private String[] names;" (regex limitation)', async () => {
+            // The regex /(?:...)?\s*(\w+(?:<[^>]+>)?)\s+(\w+)\s*[;=]/ does not match String[]
+            const mockContent = `
+package com.example;
+
+public class Data {
+    private String[] names;
+    private Long id;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractJavaFields('/fake/Data.java');
+            const fieldNames = result.map(f => f.name);
+            assert.ok(!fieldNames.includes('names'), 'Array fields are a known regex limitation');
+            assert.ok(fieldNames.includes('id'));
+        });
+
+        it('should extract field with no access modifier "String name;"', async () => {
+            const mockContent = `
+package com.example;
+
+public class User {
+    String name;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractJavaFields('/fake/User.java');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'name');
         });
     });
 });

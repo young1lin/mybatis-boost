@@ -7,20 +7,34 @@
 import { JavaField } from '../../types';
 import { readFile } from '../../utils/fileUtils';
 import { extractFieldsFromAST } from './javaTreeSitterParser';
+import { getClassFieldsViaLS } from '../../utils/javaLSHelper';
 
 /**
  * Extract all fields from a Java class
+ *
+ * Three-tier fallback: WASM (tree-sitter) → Java LS → Regex
  *
  * @param filePath - Path to Java file
  * @returns Array of field information
  */
 export async function extractJavaFields(filePath: string): Promise<JavaField[]> {
     const content = await readFile(filePath);
+
+    // Tier 1: WASM (tree-sitter)
     try {
         return await extractFieldsFromAST(content);
-    } catch {
-        return extractJavaFieldsRegex(content);
-    }
+    } catch { /* fallthrough */ }
+
+    // Tier 2: Java Language Server
+    try {
+        const lsFields = await getClassFieldsViaLS(filePath);
+        if (lsFields) {
+            return lsFields;
+        }
+    } catch { /* fallthrough */ }
+
+    // Tier 3: Regex fallback
+    return extractJavaFieldsRegex(content);
 }
 
 /**

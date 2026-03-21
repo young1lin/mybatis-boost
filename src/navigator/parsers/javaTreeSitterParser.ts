@@ -174,10 +174,27 @@ export async function extractParametersFromAST(
                 return parameters;
             }
 
-            const formalParams = params.descendantsOfType('formal_parameter');
+            const formalParams = [
+                ...params.descendantsOfType('formal_parameter'),
+                ...params.descendantsOfType('spread_parameter'),
+            ];
             for (const fp of formalParams) {
-                const paramNameNode = fp.childForFieldName('name');
-                const paramTypeNode = fp.childForFieldName('type');
+                let paramNameNode = fp.childForFieldName('name');
+                let paramTypeNode = fp.childForFieldName('type');
+
+                // spread_parameter (varargs) uses variable_declarator for name
+                // and has type as a direct child, not via field name
+                if (!paramNameNode && fp.type === 'spread_parameter') {
+                    const varDecl = fp.descendantsOfType('variable_declarator');
+                    if (varDecl.length > 0) {
+                        paramNameNode = varDecl[0].childForFieldName('name');
+                    }
+                    const typeNodes = fp.descendantsOfType('type_identifier');
+                    if (typeNodes.length > 0) {
+                        paramTypeNode = typeNodes[0];
+                    }
+                }
+
                 if (!paramNameNode || !paramTypeNode) {
                     continue;
                 }

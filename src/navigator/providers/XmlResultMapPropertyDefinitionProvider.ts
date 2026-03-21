@@ -4,6 +4,9 @@
  */
 
 import * as vscode from 'vscode';
+import { isBuiltInTypeForNavigation as isBuiltInType } from '../../utils/javaTypeUtils';
+import { escapeRegex } from '../../utils/stringUtils';
+import { matchXmlAttributeAtCursor, mapCursorProportionally, findJavaClassFile, CursorMatchInfo } from '../../utils/navigationUtils';
 
 /**
  * Provides go-to-definition for property attributes in resultMap tags
@@ -21,13 +24,13 @@ export class XmlResultMapPropertyDefinitionProvider implements vscode.Definition
         const line = document.lineAt(position.line).text;
 
         // Check if cursor is on property attribute value
-        const propertyMatch = this.matchPropertyAttribute(line, position.character);
+        const propertyMatch = matchXmlAttributeAtCursor(line, position.character, /property\s*=\s*["']([^"']+)["']/g);
         if (!propertyMatch) {
             return null;
         }
 
-        console.log(`[XmlResultMapPropertyDefinitionProvider] Found property: ${propertyMatch.propertyName}`);
-        console.log(`[XmlResultMapPropertyDefinitionProvider] Cursor offset in XML: ${propertyMatch.cursorOffset}/${propertyMatch.propertyName.length}`);
+        console.log(`[XmlResultMapPropertyDefinitionProvider] Found property: ${propertyMatch.value}`);
+        console.log(`[XmlResultMapPropertyDefinitionProvider] Cursor offset in XML: ${propertyMatch.cursorOffset}/${propertyMatch.value.length}`);
 
         // Find the parent resultMap tag to get the type attribute
         const javaClassName = await this.findResultMapType(document, position.line);
@@ -40,34 +43,6 @@ export class XmlResultMapPropertyDefinitionProvider implements vscode.Definition
 
         // Find the Java class and field
         return this.findJavaField(javaClassName, propertyMatch);
-    }
-
-    /**
-     * Match property attribute value at cursor position
-     * Returns property name and cursor offset information
-     */
-    private matchPropertyAttribute(line: string, cursorPos: number): { propertyName: string; startColumn: number; endColumn: number; cursorOffset: number } | null {
-        const regex = /property\s*=\s*["']([^"']+)["']/g;
-        let match;
-
-        while ((match = regex.exec(line)) !== null) {
-            const propertyValue = match[1];
-            const matchStart = match.index;
-            const propertyStart = matchStart + match[0].indexOf(propertyValue);
-            const propertyEnd = propertyStart + propertyValue.length;
-
-            // Check if cursor is within the property value
-            if (cursorPos >= propertyStart && cursorPos <= propertyEnd) {
-                return {
-                    propertyName: propertyValue,
-                    startColumn: propertyStart,
-                    endColumn: propertyEnd,
-                    cursorOffset: cursorPos - propertyStart
-                };
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -125,45 +100,30 @@ export class XmlResultMapPropertyDefinitionProvider implements vscode.Definition
      */
     private async findJavaField(
         className: string,
-        matchInfo: { propertyName: string; startColumn: number; endColumn: number; cursorOffset: number }
+        matchInfo: CursorMatchInfo
     ): Promise<vscode.Definition | null> {
-        const fieldName = matchInfo.propertyName;
+        const fieldName = matchInfo.value;
 
         // Handle primitive types and java.lang classes (skip navigation)
-        if (this.isBuiltInType(className)) {
+        if (isBuiltInType(className)) {
             return null;
         }
 
-        // Convert fully-qualified class name to file path
-        // Example: com.example.entity.User -> **/com/example/entity/User.java
-        const pathPattern = className.replace(/\./g, '/') + '.java';
-        const searchPattern = `**/${pathPattern}`;
-
         try {
-            const files = await vscode.workspace.findFiles(
-                searchPattern,
-                '**/{ node_modules,target,.git,.vscode,.idea,.settings,build,dist,out,bin}/**',
-                1 // Limit to first match
-            );
-
-            if (files.length === 0) {
+            const javaUri = await findJavaClassFile(className);
+            if (!javaUri) {
                 console.log(`[XmlResultMapPropertyDefinitionProvider] Java class not found: ${className}`);
                 return null;
             }
 
             // Find the field declaration line
-            const javaUri = files[0];
             const document = await vscode.workspace.openTextDocument(javaUri);
             const content = document.getText();
             const lines = content.split('\n');
 
             // Look for field declaration
-            // Matches patterns like: private String taskId;
-            //                    or: private String taskId = "default";
-            //                    or: @NotNull
-            //                        private String taskId;  (multi-line with annotations)
             const fieldRegex = new RegExp(
-                `(?:private|protected|public)?\\s+\\w+(?:<[^>]+>)?\\s+${this.escapeRegex(fieldName)}\\s*[;=]`
+                `(?:private|protected|public)?\\s+\\w+(?:<[^>]+>)?\\s+${escapeRegex(fieldName)}\\s*[;=]`
             );
 
             // Track if we're in a class body
@@ -176,19 +136,17 @@ export class XmlResultMapPropertyDefinitionProvider implements vscode.Definition
 
                 // Track class boundaries
                 if (/(?:class|interface|enum)\s+\w+/.test(line)) {
-                    inClassBody = false; // Will become true when we see the opening brace
+                    inClassBody = false;
                 }
 
                 // Track brace level
                 braceLevel += (line.match(/{/g) || []).length;
                 braceLevel -= (line.match(/}/g) || []).length;
 
-                // We're in class body if brace level is 1 (inside class but not in methods)
                 if (braceLevel > 0) {
                     inClassBody = true;
                 }
 
-                // Skip if not in class body
                 if (!inClassBody || braceLevel < 1) {
                     continue;
                 }
@@ -198,36 +156,27 @@ export class XmlResultMapPropertyDefinitionProvider implements vscode.Definition
                     console.log(`[XmlResultMapPropertyDefinitionProvider] Found field at line ${i}`);
 
                     // Find the exact column position of the field name
-                    const fieldNameRegex = new RegExp(`\\b${this.escapeRegex(fieldName)}\\b`);
+                    const fieldNameRegex = new RegExp(`\\b${escapeRegex(fieldName)}\\b`);
                     const match = line.match(fieldNameRegex);
 
                     if (match && match.index !== undefined) {
                         const fieldStartColumn = match.index;
-                        const fieldEndColumn = fieldStartColumn + fieldName.length;
-
-                        // Map cursor position proportionally
                         const sourceLength = matchInfo.endColumn - matchInfo.startColumn;
-                        const targetLength = fieldEndColumn - fieldStartColumn;
+                        const targetLength = fieldName.length;
 
-                        let targetColumn = fieldStartColumn;
-                        if (sourceLength > 0 && targetLength > 0) {
-                            const relativePosition = matchInfo.cursorOffset / sourceLength;
-                            const mappedOffset = Math.floor(relativePosition * targetLength);
-                            targetColumn = fieldStartColumn + Math.min(mappedOffset, targetLength);
-
-                            console.log(`[XmlResultMapPropertyDefinitionProvider] Mapped offset: ${matchInfo.cursorOffset}/${sourceLength} -> ${mappedOffset}/${targetLength}`);
-                        }
+                        const targetColumn = (sourceLength > 0 && targetLength > 0)
+                            ? mapCursorProportionally(matchInfo.cursorOffset, sourceLength, fieldStartColumn, targetLength)
+                            : fieldStartColumn;
 
                         console.log(`[XmlResultMapPropertyDefinitionProvider] Field position: line ${i}, column ${targetColumn}`);
                         return new vscode.Location(javaUri, new vscode.Position(i, targetColumn));
                     }
 
-                    // Fallback to line start if we can't find the exact position
+                    // Fallback to line start
                     return new vscode.Location(javaUri, new vscode.Position(i, 0));
                 }
             }
 
-            // If not found, return first line
             console.log(`[XmlResultMapPropertyDefinitionProvider] Field ${fieldName} not found in class`);
             return null;
 
@@ -237,31 +186,4 @@ export class XmlResultMapPropertyDefinitionProvider implements vscode.Definition
         }
     }
 
-    /**
-     * Check if a class name is a built-in type that doesn't need navigation
-     */
-    private isBuiltInType(className: string): boolean {
-        const primitives = ['int', 'long', 'double', 'float', 'boolean', 'byte', 'short', 'char'];
-        const javaLang = [
-            'java.lang.String',
-            'java.lang.Integer',
-            'java.lang.Long',
-            'java.lang.Double',
-            'java.lang.Float',
-            'java.lang.Boolean',
-            'java.lang.Byte',
-            'java.lang.Short',
-            'java.lang.Character',
-            'java.lang.Object'
-        ];
-
-        return primitives.includes(className) || javaLang.includes(className);
-    }
-
-    /**
-     * Escape special regex characters
-     */
-    private escapeRegex(str: string): string {
-        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
 }

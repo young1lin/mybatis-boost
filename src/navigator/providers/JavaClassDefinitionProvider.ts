@@ -3,7 +3,8 @@
  */
 
 import * as vscode from 'vscode';
-import * as path from 'path';
+import { isBuiltInTypeForNavigation as isBuiltInType } from '../../utils/javaTypeUtils';
+import { mapCursorProportionally, findJavaClassFile } from '../../utils/navigationUtils';
 
 /**
  * Provides go-to-definition for Java class names in XML attributes
@@ -63,35 +64,22 @@ export class JavaClassDefinitionProvider implements vscode.DefinitionProvider {
      */
     private async findJavaClass(className: string, cursorOffsetInSimpleClass: number = 0): Promise<vscode.Definition | null> {
         // Handle primitive types and java.lang classes (skip navigation)
-        if (this.isBuiltInType(className)) {
+        if (isBuiltInType(className)) {
             return null;
         }
 
-        // Convert fully-qualified class name to file path
-        // Example: com.example.User -> **/com/example/User.java
-        const pathPattern = className.replace(/\./g, '/') + '.java';
-        const searchPattern = `**/${pathPattern}`;
-
         try {
-            const files = await vscode.workspace.findFiles(
-                searchPattern,
-                '**/{ node_modules,target,.git,.vscode,.idea,.settings,build,dist,out,bin}/**',
-                1 // Limit to first match
-            );
-
-            if (files.length === 0) {
+            const javaUri = await findJavaClassFile(className);
+            if (!javaUri) {
                 return null;
             }
 
             // Find the class declaration line
-            const javaUri = files[0];
             const document = await vscode.workspace.openTextDocument(javaUri);
             const content = document.getText();
             const lines = content.split('\n');
 
             // Look for class/interface/enum declaration
-            // Handle multi-line cases like: public class User
-            //                                 extends BaseEntity {
             const simpleClassName = className.split('.').pop()!;
             const classRegex = new RegExp(
                 `(?:public\\s+)?(?:class|interface|enum)\\s+(${simpleClassName})\\b`
@@ -106,17 +94,10 @@ export class JavaClassDefinitionProvider implements vscode.DefinitionProvider {
                     const classNameMatch = line.match(new RegExp(`\\b${simpleClassName}\\b`));
                     if (classNameMatch && classNameMatch.index !== undefined) {
                         const classStartColumn = classNameMatch.index;
-                        const classEndColumn = classStartColumn + simpleClassName.length;
 
-                        // Map cursor position proportionally
-                        let targetColumn = classStartColumn;
-                        if (simpleClassName.length > 0 && cursorOffsetInSimpleClass > 0) {
-                            const relativePosition = cursorOffsetInSimpleClass / simpleClassName.length;
-                            const mappedOffset = Math.floor(relativePosition * simpleClassName.length);
-                            targetColumn = classStartColumn + Math.min(mappedOffset, simpleClassName.length);
-
-                            console.log(`[JavaClassDefinitionProvider] Mapped offset: ${cursorOffsetInSimpleClass}/${simpleClassName.length} -> column ${targetColumn}`);
-                        }
+                        const targetColumn = (simpleClassName.length > 0 && cursorOffsetInSimpleClass > 0)
+                            ? mapCursorProportionally(cursorOffsetInSimpleClass, simpleClassName.length, classStartColumn, simpleClassName.length)
+                            : classStartColumn;
 
                         console.log(`[JavaClassDefinitionProvider] Found class at line ${i}, column ${targetColumn}`);
                         return new vscode.Location(javaUri, new vscode.Position(i, targetColumn));
@@ -135,24 +116,4 @@ export class JavaClassDefinitionProvider implements vscode.DefinitionProvider {
         }
     }
 
-    /**
-     * Check if a class name is a built-in type that doesn't need navigation
-     */
-    private isBuiltInType(className: string): boolean {
-        const primitives = ['int', 'long', 'double', 'float', 'boolean', 'byte', 'short', 'char'];
-        const javaLang = [
-            'java.lang.String',
-            'java.lang.Integer',
-            'java.lang.Long',
-            'java.lang.Double',
-            'java.lang.Float',
-            'java.lang.Boolean',
-            'java.lang.Byte',
-            'java.lang.Short',
-            'java.lang.Character',
-            'java.lang.Object'
-        ];
-
-        return primitives.includes(className) || javaLang.includes(className);
-    }
 }

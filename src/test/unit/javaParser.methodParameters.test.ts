@@ -382,5 +382,39 @@ public interface UserMapper {
             assert.strictEqual(result[0].name, 'id');
             assert.strictEqual(result[0].hasParamAnnotation, true);
         });
+
+        it('should handle array type parameter', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+public interface UserMapper {
+    void insert(String[] names);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            // AST handles array types; regex fallback cannot match "String[] names"
+            const result = await extractMethodParameters('/fake/path/UserMapper.java', 'insert');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'names');
+        });
+
+        it('should handle @Param with standard value', async () => {
+            const mockContent = `
+package com.example.mapper;
+
+import org.apache.ibatis.annotations.Param;
+
+public interface UserMapper {
+    User selectById(@Param("id") Long id);
+}
+`;
+            readFileStub.resolves(mockContent);
+
+            const result = await extractMethodParameters('/fake/path/UserMapper.java', 'selectById');
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'id');
+            assert.strictEqual(result[0].hasParamAnnotation, true);
+        });
     });
 });

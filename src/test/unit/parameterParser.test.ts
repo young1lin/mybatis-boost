@@ -317,4 +317,64 @@ describe('parameterParser Unit Tests', () => {
             assert.strictEqual(result.type, 'substitution');
         });
     });
+
+    describe('extractParameterReferences - CDATA sections', () => {
+        it('should extract parameters inside CDATA section', async () => {
+            const mockContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.UserMapper">
+    <select id="selectById" parameterType="Long">
+        <![CDATA[ WHERE id = #{id} ]]>
+    </select>
+</mapper>`;
+            readFileStub.resolves(mockContent);
+
+            const statement = { id: 'selectById', type: 'select' as const, line: 2, startColumn: 0, endColumn: 0 };
+            const result = await extractParameterReferences('/fake/path.xml', statement);
+
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].name, 'id');
+            assert.strictEqual(result[0].type, 'prepared');
+        });
+
+        it('should extract multiple parameters inside CDATA', async () => {
+            const mockContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.UserMapper">
+    <update id="update" parameterType="User">
+        <![CDATA[
+            UPDATE users SET name = #{name}, age = #{age}
+            WHERE id = #{id}
+        ]]>
+    </update>
+</mapper>`;
+            readFileStub.resolves(mockContent);
+
+            const statement = { id: 'update', type: 'update' as const, line: 2, startColumn: 0, endColumn: 0 };
+            const result = await extractParameterReferences('/fake/path.xml', statement);
+
+            assert.strictEqual(result.length, 3);
+            assert.strictEqual(result[0].name, 'name');
+            assert.strictEqual(result[1].name, 'age');
+            assert.strictEqual(result[2].name, 'id');
+        });
+
+        it('should extract params from both CDATA and non-CDATA in same statement', async () => {
+            const mockContent = `<?xml version="1.0" encoding="UTF-8"?>
+<mapper namespace="com.example.UserMapper">
+    <select id="selectByCondition" parameterType="User">
+        SELECT * FROM users
+        WHERE name = #{name}
+        <![CDATA[ AND age > #{minAge} AND age < #{maxAge} ]]>
+    </select>
+</mapper>`;
+            readFileStub.resolves(mockContent);
+
+            const statement = { id: 'selectByCondition', type: 'select' as const, line: 2, startColumn: 0, endColumn: 0 };
+            const result = await extractParameterReferences('/fake/path.xml', statement);
+
+            assert.strictEqual(result.length, 3);
+            assert.strictEqual(result[0].name, 'name');
+            assert.strictEqual(result[1].name, 'minAge');
+            assert.strictEqual(result[2].name, 'maxAge');
+        });
+    });
 });
