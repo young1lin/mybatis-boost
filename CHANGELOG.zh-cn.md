@@ -6,6 +6,23 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.16] - 2026-03-21
+
+### 重构
+
+- **公共工具**：新增 `LRUCache`、`navigationUtils`（光标映射、XML 属性匹配、Java 类文件查找）、`xmlUtils`（去注释：严格模式与保留行号模式）、`stringUtils`、`javaTypeUtils`
+- **Java 类型解析**：新增 `javaTypeResolver`（tree-sitter 可用性 → import 解析 → Java 语言服务 → 正则与同包回退）与 `javaLSHelper`（工作区符号、文档符号取字段）
+- **核心接入**：`FileMapper` 与 `ParameterValidator` 统一使用共享 `LRUCache`；`SqlComposer`、`parameterParser`、各 Provider 复用上述工具
+- **定义跳转**：多个 XML DefinitionProvider 去除重复实现，共用光标比例映射与属性匹配逻辑
+
+### 修复
+
+- **参数诊断字段缓存**：当在 IDE 外修改磁盘上的 Java 文件时，通过工作区对 `**/*.java` 的 `FileSystemWatcher` 清空缓存并重新校验已打开的 XML Mapper，避免诊断滞后
+
+### 测试
+
+- 为新工具与解析路径补充、扩展单元测试（含 `navigationUtils`、`xmlUtils`、`javaTypeResolver`、`javaLSHelper` 及相关解析器测试）
+
 ## [0.3.15] - 2026-02-11
 
 ### 新增

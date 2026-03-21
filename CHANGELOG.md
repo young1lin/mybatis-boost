@@ -6,6 +6,23 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.16] - 2026-03-21
+
+### Refactored
+
+- **Shared utilities**: Introduced `LRUCache`, `navigationUtils` (cursor mapping, XML attribute matching, Java class file lookup), `xmlUtils` (comment stripping with strict vs line-preserving modes), `stringUtils`, and `javaTypeUtils`
+- **Java type resolution**: Added `javaTypeResolver` (tree-sitter availability → import-based resolution → Java Language Server → regex + same-package fallback) and `javaLSHelper` (workspace symbols, document symbols for fields)
+- **Core integration**: `FileMapper` and `ParameterValidator` now use the shared `LRUCache`; SQL/XML parsing paths reuse the new helpers (`SqlComposer`, `parameterParser`, providers)
+- **Definition providers**: Removed duplicated logic across XML providers; shared helpers for proportional cursor mapping and attribute matching
+
+### Fixed
+
+- **Parameter validation cache**: Field name cache is cleared when Java files change on disk outside the editor, via a workspace `FileSystemWatcher` on `**/*.java` (full cache clear + revalidation of open XML mapper documents)
+
+### Tests
+
+- Expanded unit coverage for new utilities and parsers (`navigationUtils`, `xmlUtils`, `javaTypeResolver`, `javaLSHelper`, and related parser tests)
+
 ## [0.3.15] - 2026-02-11
 
 ### Added
