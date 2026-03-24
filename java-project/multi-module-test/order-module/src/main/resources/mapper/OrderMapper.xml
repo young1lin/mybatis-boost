@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.young1lin.mybatis.boost.multi.mapper.OrderMapper">
+
+    <resultMap id="OrderResultMap" type="com.young1lin.mybatis.boost.multi.domain.Order">
+        <id property="id" column="id"/>
+        <result property="orderNo" column="order_no"/>
+        <result property="userId" column="user_id"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        id, order_no, user_id, total_amount, status, create_time, update_time, version
+    </sql>
+
+    <select id="selectById" resultMap="OrderResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM `order`
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultMap="OrderResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM `order`
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByStatus" resultMap="OrderResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM `order`
+        WHERE status = #{status}
+        ORDER BY create_time DESC
+    </select>
+
+    <insert id="insert" keyProperty="id" useGeneratedKeys="true"
+        parameterType="com.young1lin.mybatis.boost.multi.domain.Order">
+        INSERT INTO `order` (order_no, user_id, total_amount, status, create_time, update_time, version)
+        VALUES (#{orderNo}, #{userId}, #{totalAmount}, #{status}, #{createTime}, #{updateTime}, 0)
+    </insert>
+
+    <update id="updateById" parameterType="com.young1lin.mybatis.boost.multi.domain.Order">
+        UPDATE `order`
+        SET
+            order_no = #{orderNo},
+            total_amount = #{totalAmount},
+            status = #{status},
+            update_time = #{updateTime},
+            version = version + 1
+        WHERE id = #{id}
+        AND version = #{version}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM `order`
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

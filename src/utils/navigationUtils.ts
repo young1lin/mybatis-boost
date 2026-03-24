@@ -112,11 +112,13 @@ export function findAttributeValueLocation(
 
 /**
  * Find a Java class file by fully-qualified class name in the workspace.
+ * Uses two-tier search: package-path match first, then simple name + package verification.
  *
  * @param className - Fully-qualified class name (e.g., "com.example.User")
  * @returns The URI of the found file, or null
  */
 export async function findJavaClassFile(className: string): Promise<vscode.Uri | null> {
+    // Tier 1: Search by fully-qualified path (standard Maven/Gradle layout)
     const pathPattern = className.replace(/\./g, '/') + '.java';
     const searchPattern = `**/${pathPattern}`;
 
@@ -126,5 +128,36 @@ export async function findJavaClassFile(className: string): Promise<vscode.Uri |
         1
     );
 
-    return files.length > 0 ? files[0] : null;
+    if (files.length > 0) {
+        return files[0];
+    }
+
+    // Tier 2: Fallback - search by simple class name + verify package declaration
+    const lastDot = className.lastIndexOf('.');
+    if (lastDot === -1) {
+        return null;
+    }
+    const simpleName = className.substring(lastDot + 1);
+    const expectedPackage = className.substring(0, lastDot);
+
+    const fallbackFiles = await vscode.workspace.findFiles(
+        `**/${simpleName}.java`,
+        WORKSPACE_EXCLUDE_PATTERN,
+        10
+    );
+
+    const fs = await import('fs');
+    for (const file of fallbackFiles) {
+        try {
+            const content = await fs.promises.readFile(file.fsPath, 'utf-8');
+            const packageMatch = content.match(/package\s+([\w.]+)\s*;/);
+            if (packageMatch && packageMatch[1] === expectedPackage) {
+                return file;
+            }
+        } catch {
+            // skip unreadable files
+        }
+    }
+
+    return null;
 }

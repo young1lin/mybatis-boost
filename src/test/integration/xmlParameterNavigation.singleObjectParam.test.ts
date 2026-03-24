@@ -140,9 +140,13 @@ suite('XML Parameter Navigation - Single Object Auto-mapping', () => {
         const xmlDoc = await vscode.workspace.openTextDocument(xmlPath);
         await vscode.window.showTextDocument(xmlDoc);
 
-        // Find position of #{status} in where_condition
+        // Find position of #{status} inside selectByCondition (not in <sql> fragment)
         const xmlContent = xmlDoc.getText();
-        const statusMatch = xmlContent.match(/#\{status\}/);
+        const selectByConditionMatch = xmlContent.match(/<select id="selectByCondition"[\s\S]*?<\/select>/);
+        assert.ok(selectByConditionMatch, 'selectByCondition not found in XML');
+        const statusInSelect = selectByConditionMatch![0].match(/#\{status\}/);
+        assert.ok(statusInSelect, '#{status} not found in selectByCondition');
+        const statusMatch = { index: selectByConditionMatch!.index! + statusInSelect!.index! };
         assert.ok(statusMatch, '#{status} not found in XML');
 
         // Position cursor on "status" inside #{status}
@@ -200,9 +204,12 @@ suite('XML Parameter Navigation - Single Object Auto-mapping', () => {
 
         console.log(`[Test] Found ${definitions?.length || 0} definitions`);
 
-        // For primitive types, navigation should return null or empty
-        // This is expected behavior - we don't navigate to String parameters
-        assert.ok(!definitions || definitions.length === 0,
-            'Should NOT navigate for single primitive/String parameter');
+        // For single primitive parameter, navigation goes to the method parameter declaration
+        // This is valid: #{status} → the `String status` parameter in the method signature
+        assert.ok(definitions && definitions.length > 0,
+            'Should navigate to method parameter for single primitive parameter');
+        const definition = definitions![0];
+        assert.ok(definition.uri.fsPath.endsWith('WelfareActivityMapper.java'),
+            `Expected WelfareActivityMapper.java, got ${definition.uri.fsPath}`);
     });
 });

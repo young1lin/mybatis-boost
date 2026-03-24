@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { FileMapper, JavaToXmlDefinitionProvider, XmlToJavaDefinitionProvider, XmlSqlFragmentDefinitionProvider } from '../../navigator';
 
+// Skip: tests create temp files outside workspace, executeDefinitionProvider requires workspace-scoped FileMapper
 suite.skip('Precise Position Navigation Integration Tests', () => {
     let tempDir: string;
     let javaFilePath: string;

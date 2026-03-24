@@ -6,6 +6,31 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.17] - 2026-03-24
+
+### Fixed
+
+- **Multi-module same-namespace navigation** ([#45](https://github.com/young1lin/mybatis-boost/issues/45)): In workspaces with multiple modules containing identically named mappers (same fully-qualified namespace), `jumpToXml` now correctly navigates to the XML file within the same module instead of the first match found workspace-wide
+  - Added **longest common path prefix** algorithm to prefer same-module XML/Java files when multiple namespace matches exist
+  - Enhanced **Quick Paths** with `src/main/resources` root patterns (`mapper/`, `mappers/`, `mybatis/`) for faster same-module discovery
+  - Applied same-module preference to `getJavaPath()` (XML→Java) and `handleXmlFileCreate()` (file watcher)
+- **Regex fallback interface detection**: Fixed `extractJavaNamespaceRegex` matching `"interface"` inside Javadoc comments (e.g., `"mapper interface for testing"` was parsed as interface name `for`), causing namespace extraction and method parsing to fail silently
+  - `extractJavaNamespaceRegex`: Anchored regex to line start with `/m` flag
+  - `extractJavaMethodsRegex` / `extractMethodParametersRegex`: Added comment-line guard before interface detection
+- **Windows drive letter normalization**: `normalizePath()` now lowercases drive letters (`C:` → `c:`) to prevent cache key mismatches
+- **Java class file lookup fallback**: `findJavaClassFile()` now has a Tier 2 fallback that searches by simple class name + verifies `package` declaration, for projects with non-standard directory layouts
+
+### Tests
+
+- Added 9 unit tests for `getCommonPrefixLength` (cross-module, same-module, Windows paths, edge cases)
+- Fixed 5 pre-existing integration test failures (`definitionProviders`, `fileMapper`, `xmlParameterNavigation`)
+- Enabled previously skipped integration test suites (`definitionProviders`, `fileMapper`)
+- Added multi-module fixture project (`src/test/fixtures/multi-module-project/`) with same-namespace mappers across modules
+
+### Added
+
+- **Multi-module test project**: `java-project/multi-module-test/` with `order-module` and `payment-module` sharing identical `CommonMapper` namespace for manual verification
+
 ## [0.3.16] - 2026-03-21
 
 ### Refactored

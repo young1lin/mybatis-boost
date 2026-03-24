@@ -72,10 +72,15 @@ export const WORKSPACE_EXCLUDE_PATTERN =
     '**/{ node_modules,target,.git,.vscode,.claude,.idea,.settings,build,dist,out,bin}/**';
 
 /**
- * Normalize path separators
+ * Normalize path separators and drive letter case for consistent cache keys
  */
 export function normalizePath(filePath: string): string {
-    return filePath.replace(/\\/g, '/');
+    const normalized = filePath.replace(/\\/g, '/');
+    // Normalize Windows drive letter to lowercase (C:/ -> c:/)
+    if (normalized.length >= 2 && normalized[1] === ':') {
+        return normalized[0].toLowerCase() + normalized.substring(1);
+    }
+    return normalized;
 }
 
 /**

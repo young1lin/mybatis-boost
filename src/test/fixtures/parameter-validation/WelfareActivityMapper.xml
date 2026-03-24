@@ -30,6 +30,9 @@
         <include refid="Base_Column_List"/>
         from t_welfare_activity
         <include refid="where_condition"/>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
         <trim prefix="ORDER BY ">
             <if test="order != null ">
                 ${order}

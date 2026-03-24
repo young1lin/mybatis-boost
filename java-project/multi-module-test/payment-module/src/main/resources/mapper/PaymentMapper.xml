@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.young1lin.mybatis.boost.multi.mapper.PaymentMapper">
+
+    <resultMap id="PaymentResultMap" type="com.young1lin.mybatis.boost.multi.domain.Payment">
+        <id property="id" column="id"/>
+        <result property="paymentNo" column="payment_no"/>
+        <result property="orderId" column="order_id"/>
+        <result property="amount" column="amount"/>
+        <result property="channel" column="channel"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        id, payment_no, order_id, amount, channel, status, create_time, update_time
+    </sql>
+
+    <select id="selectById" resultMap="PaymentResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM payment
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByOrderId" resultMap="PaymentResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM payment
+        WHERE order_id = #{orderId}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByChannel" resultMap="PaymentResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM payment
+        WHERE channel = #{channel}
+        ORDER BY create_time DESC
+    </select>
+
+    <insert id="insert" keyProperty="id" useGeneratedKeys="true"
+        parameterType="com.young1lin.mybatis.boost.multi.domain.Payment">
+        INSERT INTO payment (payment_no, order_id, amount, channel, status, create_time, update_time)
+        VALUES (#{paymentNo}, #{orderId}, #{amount}, #{channel}, #{status}, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="updateById" parameterType="com.young1lin.mybatis.boost.multi.domain.Payment">
+        UPDATE payment
+        SET
+            payment_no = #{paymentNo},
+            amount = #{amount},
+            channel = #{channel},
+            status = #{status},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM payment
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

@@ -6,6 +6,31 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.17] - 2026-03-24
+
+### 修复
+
+- **多模块同 namespace 导航错误** ([#45](https://github.com/young1lin/mybatis-boost/issues/45))：当工作区包含多个模块且存在相同全限定名的 Mapper 时，`jumpToXml` 现在会正确跳转到同模块内的 XML 文件，而非工作区范围内第一个匹配的文件
+  - 新增**最长公共路径前缀**算法，在多个 namespace 匹配时优先选择同模块的 XML/Java 文件
+  - 增强 **Quick Paths** 快速路径，新增 `src/main/resources` 根路径模式（`mapper/`、`mappers/`、`mybatis/`），加速同模块文件发现
+  - `getJavaPath()`（XML→Java）和 `handleXmlFileCreate()`（文件监听器）同步应用同模块优先策略
+- **正则回退接口检测误匹配**：修复 `extractJavaNamespaceRegex` 在 Javadoc 注释中匹配 `"interface"` 关键字的问题（如 `"mapper interface for testing"` 被错误解析为接口名 `for`），导致 namespace 提取和方法解析静默失败
+  - `extractJavaNamespaceRegex`：正则锚定到行首并使用 `/m` 多行标志
+  - `extractJavaMethodsRegex` / `extractMethodParametersRegex`：在接口检测前增加注释行过滤
+- **Windows 盘符大小写归一化**：`normalizePath()` 现在统一将盘符转为小写（`C:` → `c:`），防止缓存 key 不匹配
+- **Java 类文件查找回退**：`findJavaClassFile()` 新增 Tier 2 回退策略，通过简单类名搜索 + 验证 `package` 声明，支持非标准目录结构的项目
+
+### 测试
+
+- 新增 9 个 `getCommonPrefixLength` 单元测试（跨模块、同模块、Windows 路径、边界情况）
+- 修复 5 个已有集成测试失败（`definitionProviders`、`fileMapper`、`xmlParameterNavigation`）
+- 启用之前被跳过的集成测试套件（`definitionProviders`、`fileMapper`）
+- 新增多模块 fixture 测试项目（`src/test/fixtures/multi-module-project/`），包含跨模块同 namespace Mapper
+
+### 新增
+
+- **多模块手动测试项目**：`java-project/multi-module-test/`，含 `order-module` 和 `payment-module` 共享相同 `CommonMapper` namespace，用于手动验证导航
+
 ## [0.3.16] - 2026-03-21
 
 ### 重构

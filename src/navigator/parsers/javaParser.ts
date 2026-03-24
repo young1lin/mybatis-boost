@@ -120,7 +120,9 @@ function extractJavaNamespaceRegex(content: string): string | null {
     }
     const packageName = packageMatch[1];
 
-    const interfaceMatch = content.match(/(?:public\s+)?interface\s+(\w+)/);
+    // Match interface declaration at start of line (with optional modifiers)
+    // Avoids matching "interface" inside comments like "mapper interface for testing"
+    const interfaceMatch = content.match(/^\s*(?:public\s+)?interface\s+(\w+)/m);
     if (!interfaceMatch) {
         return null;
     }
@@ -149,7 +151,8 @@ function extractJavaMethodsRegex(content: string): JavaMethod[] {
         const line = lines[i];
         const trimmed = line.trim();
 
-        if (/interface\s+\w+/.test(line)) {
+        // Match actual interface declarations, not "interface" in comments
+        if (!trimmed.startsWith('*') && !trimmed.startsWith('//') && /interface\s+\w+/.test(line)) {
             inInterface = true;
         }
 
@@ -227,8 +230,10 @@ function extractMethodParametersRegex(content: string, methodName: string): Meth
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        const trimmedLine = line.trim();
 
-        if (/interface\s+\w+/.test(line)) {
+        // Match actual interface declarations, not "interface" in comments
+        if (!trimmedLine.startsWith('*') && !trimmedLine.startsWith('//') && /interface\s+\w+/.test(line)) {
             inInterface = true;
         }
 

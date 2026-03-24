@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+    CommonMapper.xml in ORDER module.
+    Same namespace as payment-module's CommonMapper.xml.
+    Operates on table: order_common_config
+-->
+<mapper namespace="com.young1lin.mybatis.boost.multi.mapper.CommonMapper">
+
+    <resultMap id="CommonEntityResultMap" type="com.young1lin.mybatis.boost.multi.domain.CommonEntity">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="type" column="type"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        id, name, type, status, create_time
+    </sql>
+
+    <select id="selectById" resultMap="CommonEntityResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM order_common_config
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByType" resultMap="CommonEntityResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM order_common_config
+        WHERE type = #{type}
+        ORDER BY id
+    </select>
+
+    <select id="selectAll" resultMap="CommonEntityResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM order_common_config
+        ORDER BY id
+    </select>
+
+    <insert id="insert" keyProperty="id" useGeneratedKeys="true"
+        parameterType="com.young1lin.mybatis.boost.multi.domain.CommonEntity">
+        INSERT INTO order_common_config (name, type, status, create_time)
+        VALUES (#{name}, #{type}, #{status}, #{createTime})
+    </insert>
+
+    <update id="updateById" parameterType="com.young1lin.mybatis.boost.multi.domain.CommonEntity">
+        UPDATE order_common_config
+        SET
+            name = #{name},
+            type = #{type},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM order_common_config
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

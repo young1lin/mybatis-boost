@@ -13,6 +13,7 @@ import { LRUCache } from '../../utils/LRUCache';
 import { isBuiltInType, isCollectionType } from '../../utils/javaTypeUtils';
 import { resolveFullyQualifiedType } from '../../utils/javaTypeResolver';
 import { WORKSPACE_EXCLUDE_PATTERN } from '../../utils/fileUtils';
+import { findJavaClassFile } from '../../utils/navigationUtils';
 
 /**
  * Validates parameters in XML mapper files
@@ -395,25 +396,17 @@ export class ParameterValidator {
         // 2. Cache miss - search and parse
         console.log(`[ParameterValidator] Cache miss for class: ${className}, searching...`);
 
-        // Convert fully-qualified class name to file path
-        const pathPattern = className.replace(/\./g, '/') + '.java';
-        const searchPattern = `**/${pathPattern}`;
-
         try {
-            const files = await vscode.workspace.findFiles(
-                searchPattern,
-                WORKSPACE_EXCLUDE_PATTERN,
-                1
-            );
+            const file = await findJavaClassFile(className);
 
-            if (files.length === 0) {
+            if (!file) {
                 console.log(`[ParameterValidator] Class not found: ${className}`);
                 // Cache empty result to avoid repeated searches
                 this.fieldCache.set(className, []);
                 return [];
             }
 
-            const fields = await extractJavaFields(files[0].fsPath);
+            const fields = await extractJavaFields(file.fsPath);
             const fieldNames = fields.map(f => f.name);
 
             // 3. Store in cache

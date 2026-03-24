@@ -118,21 +118,28 @@ export class FileMapper {
             }
         }
 
-        // Priority 1: Search all XML files
+        // Priority 1: Search all XML files, prefer same module (longest common prefix)
         const xmlFiles = await vscode.workspace.findFiles(
             '**/*.xml',
             WORKSPACE_EXCLUDE_PATTERN
         );
 
-        // Try to find by namespace match
+        const javaPathNormalized = javaPath.replace(/\\/g, '/');
+        let bestXmlPath: string | null = null;
+        let bestPrefixLen = -1;
+
         for (const xmlUri of xmlFiles) {
             const xmlPath = xmlUri.fsPath;
             if (await this.verifyXmlFile(xmlPath, namespace)) {
-                return xmlPath;
+                const prefixLen = this.getCommonPrefixLength(javaPathNormalized, xmlPath);
+                if (prefixLen > bestPrefixLen) {
+                    bestPrefixLen = prefixLen;
+                    bestXmlPath = xmlPath;
+                }
             }
         }
 
-        return null;
+        return bestXmlPath;
     }
 
     /**
@@ -149,10 +156,21 @@ export class FileMapper {
         // mapper subdirectory
         paths.push(path.join(javaDir, 'mapper', xmlFileName));
 
-        // Resources mirror structure
+        // Resources mirror structure (with package path)
         const resourcesPath = javaPath.replace(/[\/\\]java[\/\\]/, '/resources/');
         paths.push(resourcesPath.replace('.java', '.xml'));
         paths.push(path.join(path.dirname(resourcesPath), 'mapper', xmlFileName));
+
+        // Resources root (without package structure)
+        const normalizedJavaPath = javaPath.replace(/\\/g, '/');
+        const srcMainMatch = normalizedJavaPath.match(/^(.*\/src\/main\/)java\//);
+        if (srcMainMatch) {
+            const resourcesRoot = srcMainMatch[1] + 'resources';
+            paths.push(path.join(resourcesRoot, xmlFileName));
+            paths.push(path.join(resourcesRoot, 'mapper', xmlFileName));
+            paths.push(path.join(resourcesRoot, 'mappers', xmlFileName));
+            paths.push(path.join(resourcesRoot, 'mybatis', xmlFileName));
+        }
 
         return paths;
     }
@@ -229,24 +247,33 @@ export class FileMapper {
             return null;
         }
 
-        // Search Java files for matching namespace
+        // Search Java files for matching namespace, prefer same module
         const javaFiles = await vscode.workspace.findFiles(
             '**/*.java',
             WORKSPACE_EXCLUDE_PATTERN
         );
+
+        const xmlPathNormalized = xmlPath.replace(/\\/g, '/');
+        let bestJavaPath: string | null = null;
+        let bestPrefixLen = -1;
 
         for (const javaUri of javaFiles) {
             const javaPath = javaUri.fsPath;
             const javaNamespace = await extractJavaNamespace(javaPath);
 
             if (javaNamespace === namespace) {
-                // Build and cache mapping
-                await this.buildMappingForJavaFile(javaPath);
-                return javaPath;
+                const prefixLen = this.getCommonPrefixLength(xmlPathNormalized, javaPath);
+                if (prefixLen > bestPrefixLen) {
+                    bestPrefixLen = prefixLen;
+                    bestJavaPath = javaPath;
+                }
             }
         }
 
-        return null;
+        if (bestJavaPath) {
+            await this.buildMappingForJavaFile(bestJavaPath);
+        }
+        return bestJavaPath;
     }
 
     /**
@@ -292,20 +319,31 @@ export class FileMapper {
                 return;
             }
 
-            // Search for corresponding Java mapper
+            // Search for corresponding Java mapper, prefer same module
             const javaFiles = await vscode.workspace.findFiles(
                 '**/*.java',
                 WORKSPACE_EXCLUDE_PATTERN
             );
 
+            const xmlPathNormalized = filePath.replace(/\\/g, '/');
+            let bestJavaPath: string | null = null;
+            let bestPrefixLen = -1;
+
             for (const javaUri of javaFiles) {
                 const javaPath = javaUri.fsPath;
                 const javaNamespace = await extractJavaNamespace(javaPath);
                 if (javaNamespace === namespace) {
-                    await this.buildMappingForJavaFile(javaPath);
-                    console.log(`[MyBatis Boost] New XML mapped to ${javaPath}`);
-                    break;
+                    const prefixLen = this.getCommonPrefixLength(xmlPathNormalized, javaPath);
+                    if (prefixLen > bestPrefixLen) {
+                        bestPrefixLen = prefixLen;
+                        bestJavaPath = javaPath;
+                    }
                 }
+            }
+
+            if (bestJavaPath) {
+                await this.buildMappingForJavaFile(bestJavaPath);
+                console.log(`[MyBatis Boost] New XML mapped to ${bestJavaPath}`);
             }
         } catch (error) {
             console.error(`[MyBatis Boost] Error handling new XML file:`, error);
@@ -368,6 +406,21 @@ export class FileMapper {
                 this.cache.delete(normalizePath(mapping.javaPath));
             }
         }
+    }
+
+    /**
+     * Get the length of the common directory-level prefix between two paths.
+     * Used to prefer files in the same module over files in other modules.
+     */
+    getCommonPrefixLength(path1: string, path2: string): number {
+        const a = path1.replace(/\\/g, '/');
+        const b = path2.replace(/\\/g, '/');
+        let lastSep = 0;
+        for (let i = 0; i < Math.min(a.length, b.length); i++) {
+            if (a[i] !== b[i]) { break; }
+            if (a[i] === '/') { lastSep = i; }
+        }
+        return lastSep;
     }
 
     /**
