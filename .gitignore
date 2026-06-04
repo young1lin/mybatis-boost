@@ -11,3 +11,6 @@ src/test/unit/generator/generated-samples/
 src/output/
 
 TODO.md
+
+# Local Claude settings
+.claude/settings.local.json
