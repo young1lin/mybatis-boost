@@ -7,6 +7,8 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 import { FileMapper } from '../../navigator';
 import { createMockContext } from '../helpers/testSetup';
 
@@ -134,6 +136,93 @@ describe('FileMapper Unit Tests', () => {
 
         it('should verify namespace matches when finding XML files', async () => {
             assert.ok(true, 'Namespace verification needs to be tested');
+        });
+    });
+
+    describe('Lazy initialization (issue #46)', () => {
+        it('initialize() must not scan the workspace (no findFiles)', async () => {
+            const findFilesSpy = sandbox.spy(vscode.workspace, 'findFiles');
+            await fileMapper.initialize();
+            assert.strictEqual(
+                findFilesSpy.callCount,
+                0,
+                'initialize() must not trigger any findFiles scan'
+            );
+        });
+    });
+
+    describe('Per-project XML index (issue #46)', () => {
+        const DOCTYPE = '<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" ' +
+            '"http://mybatis.org/dtd/mybatis-3-mapper.dtd">';
+
+        let tmpRoot: string;
+        let projectRoot: string;
+        let fooJava: string;
+        let barJava: string;
+        let fooXml: string;
+        let barXml: string;
+
+        const mapperJava = (name: string) =>
+            `package com.demo;\nimport org.apache.ibatis.annotations.Mapper;\n@Mapper\npublic interface ${name} {}\n`;
+        const mapperXml = (namespace: string) =>
+            `<?xml version="1.0" encoding="UTF-8"?>\n${DOCTYPE}\n<mapper namespace="${namespace}">\n</mapper>\n`;
+
+        beforeEach(() => {
+            tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mb-filemapper-'));
+            projectRoot = path.join(tmpRoot, 'proj');
+            const javaDir = path.join(projectRoot, 'src', 'main', 'java', 'com', 'demo');
+            // XML placed in a custom dir with non-matching filenames so quick paths miss
+            // and the lazy per-project index is exercised.
+            const xmlDir = path.join(projectRoot, 'src', 'main', 'resources', 'custom');
+            fs.mkdirSync(javaDir, { recursive: true });
+            fs.mkdirSync(xmlDir, { recursive: true });
+            fs.writeFileSync(path.join(projectRoot, 'pom.xml'), '<project></project>');
+
+            fooJava = path.join(javaDir, 'FooMapper.java');
+            barJava = path.join(javaDir, 'BarMapper.java');
+            fs.writeFileSync(fooJava, mapperJava('FooMapper'));
+            fs.writeFileSync(barJava, mapperJava('BarMapper'));
+
+            fooXml = path.join(xmlDir, 'Foo.xml');
+            barXml = path.join(xmlDir, 'Bar.xml');
+            fs.writeFileSync(fooXml, mapperXml('com.demo.FooMapper'));
+            fs.writeFileSync(barXml, mapperXml('com.demo.BarMapper'));
+        });
+
+        afterEach(() => {
+            fs.rmSync(tmpRoot, { recursive: true, force: true });
+        });
+
+        it('builds the project XML index once and reuses it across lookups', async () => {
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles')
+                .resolves([vscode.Uri.file(fooXml), vscode.Uri.file(barXml)]);
+
+            const fooResult = await fileMapper.getXmlPath(fooJava);
+            const barResult = await fileMapper.getXmlPath(barJava);
+
+            assert.ok(fooResult && fooResult.endsWith('Foo.xml'), 'FooMapper should resolve to Foo.xml');
+            assert.ok(barResult && barResult.endsWith('Bar.xml'), 'BarMapper should resolve to Bar.xml');
+            assert.strictEqual(
+                findFilesStub.callCount,
+                1,
+                'the per-project index should be built once and reused for the second lookup'
+            );
+        });
+
+        it('scopes the index scan to the project via RelativePattern', async () => {
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles')
+                .resolves([vscode.Uri.file(fooXml), vscode.Uri.file(barXml)]);
+
+            await fileMapper.getXmlPath(fooJava);
+
+            assert.ok(findFilesStub.calledOnce, 'index scan should run exactly once');
+            const include = findFilesStub.firstCall.args[0] as vscode.RelativePattern;
+            assert.ok(include instanceof vscode.RelativePattern, 'include should be a RelativePattern');
+            assert.strictEqual(
+                include.base.replace(/\\/g, '/'),
+                projectRoot.replace(/\\/g, '/'),
+                'RelativePattern base should be the project root'
+            );
         });
     });
 });

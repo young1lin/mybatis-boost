@@ -47,6 +47,23 @@ const vscode = {
         }
     },
 
+    RelativePattern: class RelativePattern {
+        constructor(base, pattern) {
+            // base may be a WorkspaceFolder, a Uri, or a string path
+            if (base && base.uri && base.uri.fsPath) {
+                this.baseUri = base.uri;
+                this.base = base.uri.fsPath;
+            } else if (base && base.fsPath) {
+                this.baseUri = base;
+                this.base = base.fsPath;
+            } else {
+                this.base = String(base);
+                this.baseUri = { fsPath: this.base };
+            }
+            this.pattern = pattern;
+        }
+    },
+
     workspace: {
         workspaceFolders: [
             {
@@ -112,6 +129,19 @@ const vscode = {
         textDocuments: [],
         findFiles: function(include, exclude, maxResults) {
             return Promise.resolve([]);
+        },
+        getWorkspaceFolder: function(uri) {
+            const folders = vscode.workspace.workspaceFolders;
+            return folders && folders.length > 0 ? folders[0] : undefined;
+        },
+        createFileSystemWatcher: function(pattern) {
+            const noop = () => ({ dispose: () => {} });
+            return {
+                onDidCreate: noop,
+                onDidChange: noop,
+                onDidDelete: noop,
+                dispose: () => {}
+            };
         }
     },
 

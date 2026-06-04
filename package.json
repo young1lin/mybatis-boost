@@ -27,9 +27,11 @@
     "sql"
   ],
   "activationEvents": [
+    "onLanguage:java",
+    "onLanguage:xml",
     "workspaceContains:**/pom.xml",
     "workspaceContains:**/build.gradle",
-    "workspaceContains:**/*.java"
+    "workspaceContains:**/build.gradle.kts"
   ],
   "main": "./dist/extension.js",
   "contributes": {

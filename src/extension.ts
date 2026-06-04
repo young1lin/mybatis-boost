@@ -21,6 +21,7 @@ import {
 import { XmlSqlHoverProvider, JavaSqlHoverProvider } from './hover';
 import { MybatisBindingDecorator, DynamicSqlHighlighter } from './decorator';
 import { findProjectFileInParents } from './utils/projectDetector';
+import { WORKSPACE_EXCLUDE_PATTERN } from './utils/fileUtils';
 import { GeneratorViewProvider } from './webview/GeneratorViewProvider';
 import { MybatisLogViewProvider } from './webview/MybatisLogViewProvider';
 import { MCPManager } from './mcp/MCPManager';
@@ -302,7 +303,7 @@ async function isJavaProject(): Promise<boolean> {
     console.log('[MyBatis Boost] No project files found, checking for Java files...');
     const javaFiles = await vscode.workspace.findFiles(
         '**/*.java',
-        '**/{ node_modules,target,.git,build,dist,out,bin}/**',
+        WORKSPACE_EXCLUDE_PATTERN,
         1  // Only need to find 1 file to confirm it's a Java project
     );
 

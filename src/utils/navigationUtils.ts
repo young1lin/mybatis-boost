@@ -115,15 +115,23 @@ export function findAttributeValueLocation(
  * Uses two-tier search: package-path match first, then simple name + package verification.
  *
  * @param className - Fully-qualified class name (e.g., "com.example.User")
+ * @param projectRoot - Optional project/module root to scope the search to. When provided,
+ *                      the search is limited to that subtree (RelativePattern) instead of the
+ *                      whole workspace, which keeps lookups fast in multi-project workspaces.
  * @returns The URI of the found file, or null
  */
-export async function findJavaClassFile(className: string): Promise<vscode.Uri | null> {
+export async function findJavaClassFile(
+    className: string,
+    projectRoot?: string
+): Promise<vscode.Uri | null> {
     // Tier 1: Search by fully-qualified path (standard Maven/Gradle layout)
     const pathPattern = className.replace(/\./g, '/') + '.java';
-    const searchPattern = `**/${pathPattern}`;
+    const tier1Include: vscode.GlobPattern = projectRoot
+        ? new vscode.RelativePattern(projectRoot, `**/${pathPattern}`)
+        : `**/${pathPattern}`;
 
     const files = await vscode.workspace.findFiles(
-        searchPattern,
+        tier1Include,
         WORKSPACE_EXCLUDE_PATTERN,
         1
     );
@@ -140,8 +148,12 @@ export async function findJavaClassFile(className: string): Promise<vscode.Uri |
     const simpleName = className.substring(lastDot + 1);
     const expectedPackage = className.substring(0, lastDot);
 
+    const tier2Include: vscode.GlobPattern = projectRoot
+        ? new vscode.RelativePattern(projectRoot, `**/${simpleName}.java`)
+        : `**/${simpleName}.java`;
+
     const fallbackFiles = await vscode.workspace.findFiles(
-        `**/${simpleName}.java`,
+        tier2Include,
         WORKSPACE_EXCLUDE_PATTERN,
         10
     );
