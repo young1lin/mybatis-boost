@@ -47,6 +47,13 @@ const vscode = {
         }
     },
 
+    RelativePattern: class RelativePattern {
+        constructor(baseUri, pattern) {
+            this.baseUri = typeof baseUri === 'string' ? vscode.Uri.file(baseUri) : baseUri;
+            this.pattern = pattern;
+        }
+    },
+
     workspace: {
         workspaceFolders: [
             {
@@ -109,6 +116,15 @@ const vscode = {
                 dispose: () => {}
             };
         },
+        createFileSystemWatcher: function(pattern) {
+            return {
+                pattern,
+                onDidChange: () => ({ dispose: () => {} }),
+                onDidCreate: () => ({ dispose: () => {} }),
+                onDidDelete: () => ({ dispose: () => {} }),
+                dispose: () => {}
+            };
+        },
         textDocuments: [],
         findFiles: function(include, exclude, maxResults) {
             return Promise.resolve([]);
@@ -121,6 +137,7 @@ const vscode = {
                 dispose: () => {}
             };
         },
+        activeTextEditor: undefined,
         onDidChangeActiveTextEditor: function(callback) {
             // Return a disposable for the event listener
             return {
@@ -133,9 +150,19 @@ const vscode = {
             };
         },
         visibleTextEditors: [],
+        withProgress: function(options, task) {
+            return task();
+        },
+        showInformationMessage: function(message) {
+            return Promise.resolve();
+        },
         showWarningMessage: function(message) {
             return Promise.resolve();
         }
+    },
+
+    ProgressLocation: {
+        Notification: 15
     },
 
     EventEmitter: class EventEmitter {

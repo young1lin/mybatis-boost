@@ -2,201 +2,264 @@
  * Core FileMapper class for managing Java-XML mappings
  */
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
 import { MappingMetadata } from '../../types';
-import { extractJavaNamespace, isMyBatisMapper } from '../parsers/javaParser';
+import { extractJavaNamespace } from '../parsers/javaParser';
 import { extractXmlNamespace } from '../parsers/xmlParser';
 import { getFileModTime, normalizePath, WORKSPACE_EXCLUDE_PATTERN } from '../../utils/fileUtils';
 import { LRUCache } from '../../utils/LRUCache';
+import { findProjectFileInParents } from '../../utils/projectDetector';
+
+interface ModuleIndex {
+    root: string;
+    javaByNamespace: Map<string, string[]>;
+    xmlByNamespace: Map<string, string[]>;
+}
 
 /**
  * FileMapper manages mappings between Java mapper interfaces and XML files
  */
 export class FileMapper {
     private cache: LRUCache<string, MappingMetadata>;
-    private context: vscode.ExtensionContext;
-    private watchers: vscode.FileSystemWatcher[] = [];
+    private moduleIndexes = new Map<string, ModuleIndex>();
+    private moduleIndexPromises = new Map<string, Promise<ModuleIndex>>();
+    private moduleWatchers = new Map<string, vscode.FileSystemWatcher[]>();
 
-    constructor(context: vscode.ExtensionContext, cacheSize: number = 1000) {
-        this.context = context;
+    constructor(_context: vscode.ExtensionContext, cacheSize: number = 1000) {
         this.cache = new LRUCache(cacheSize);
     }
 
     /**
-     * Initialize the mapper by scanning workspace
+     * Lightweight initialization used during extension activation.
+     * Module indexes and watchers are created lazily when a file is used.
+     */
+    initializeLazy(): void {
+        console.log('[MyBatis Boost] FileMapper lazy initialization ready');
+    }
+
+    /**
+     * Initialize the mapper by scanning the whole workspace.
+     * Kept for explicit refresh flows and backwards-compatible tests.
      */
     async initialize(): Promise<void> {
         console.log('[MyBatis Boost] Initializing FileMapper...');
-
-        // Setup file watchers
-        this.setupFileWatchers();
-
-        // Perform initial scan
-        await this.scanWorkspace();
-
+        this.initializeLazy();
+        await this.refreshWorkspace();
         console.log('[MyBatis Boost] FileMapper initialized');
     }
 
     /**
-     * Scan workspace for Java mapper files
+     * Refresh all workspace mappings. This is intentionally explicit and is not
+     * called from extension activation.
      */
-    private async scanWorkspace(): Promise<void> {
-        const javaFiles = await vscode.workspace.findFiles(
-            '**/*.java',
-            WORKSPACE_EXCLUDE_PATTERN
-        );
+    async refreshWorkspace(): Promise<void> {
+        this.clearCache();
+        this.moduleIndexes.clear();
+        this.moduleIndexPromises.clear();
 
-        console.log(`[MyBatis Boost] Found ${javaFiles.length} Java files, checking for mappers...`);
+        const [javaFiles, xmlFiles] = await Promise.all([
+            vscode.workspace.findFiles(
+                '**/*.java',
+                WORKSPACE_EXCLUDE_PATTERN
+            ),
+            vscode.workspace.findFiles(
+                '**/*.xml',
+                WORKSPACE_EXCLUDE_PATTERN
+            )
+        ]);
 
-        let mapperCount = 0;
+        const moduleFiles = new Map<string, { javaFiles: vscode.Uri[]; xmlFiles: vscode.Uri[] }>();
+
         for (const javaUri of javaFiles) {
-            const javaPath = javaUri.fsPath;
-
-            // Check if it's a MyBatis mapper
-            if (await isMyBatisMapper(javaPath)) {
-                await this.buildMappingForJavaFile(javaPath);
-                mapperCount++;
-            }
+            const moduleRoot = this.getModuleRootForFile(javaUri.fsPath);
+            const entry = this.getOrCreateModuleFileGroup(moduleFiles, moduleRoot);
+            entry.javaFiles.push(javaUri);
         }
-
-        console.log(`[MyBatis Boost] Built mappings for ${mapperCount} mapper interfaces`);
-    }
-
-    /**
-     * Build mapping for a specific Java mapper file
-     */
-    private async buildMappingForJavaFile(javaPath: string): Promise<void> {
-        try {
-            // Extract namespace
-            const namespace = await extractJavaNamespace(javaPath);
-            if (!namespace) {
-                return;
-            }
-
-            // Find corresponding XML file
-            const xmlPath = await this.findXmlFile(javaPath, namespace);
-            if (!xmlPath) {
-                return;
-            }
-
-            // Get modification times
-            const javaModTime = await getFileModTime(javaPath);
-            const xmlModTime = await getFileModTime(xmlPath);
-
-            // Store in cache
-            const mapping: MappingMetadata = {
-                javaPath,
-                xmlPath,
-                javaModTime,
-                xmlModTime,
-                namespace
-            };
-
-            this.cache.set(normalizePath(javaPath), mapping);
-            this.cache.set(normalizePath(xmlPath), mapping);
-
-        } catch (error) {
-            console.error(`[MyBatis Boost] Error building mapping for ${javaPath}:`, error);
-        }
-    }
-
-    /**
-     * Find XML file corresponding to a Java mapper
-     */
-    private async findXmlFile(javaPath: string, namespace: string): Promise<string | null> {
-        const javaFileName = path.basename(javaPath, '.java');
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!workspaceRoot) {
-            return null;
-        }
-
-        // Priority 0: Quick path - common MyBatis structures
-        const quickPaths = this.getQuickPaths(javaPath, javaFileName);
-        for (const xmlPath of quickPaths) {
-            if (await this.verifyXmlFile(xmlPath, namespace)) {
-                return xmlPath;
-            }
-        }
-
-        // Priority 1: Search all XML files, prefer same module (longest common prefix)
-        const xmlFiles = await vscode.workspace.findFiles(
-            '**/*.xml',
-            WORKSPACE_EXCLUDE_PATTERN
-        );
-
-        const javaPathNormalized = javaPath.replace(/\\/g, '/');
-        let bestXmlPath: string | null = null;
-        let bestPrefixLen = -1;
 
         for (const xmlUri of xmlFiles) {
-            const xmlPath = xmlUri.fsPath;
-            if (await this.verifyXmlFile(xmlPath, namespace)) {
-                const prefixLen = this.getCommonPrefixLength(javaPathNormalized, xmlPath);
-                if (prefixLen > bestPrefixLen) {
-                    bestPrefixLen = prefixLen;
-                    bestXmlPath = xmlPath;
+            const moduleRoot = this.getModuleRootForFile(xmlUri.fsPath);
+            const entry = this.getOrCreateModuleFileGroup(moduleFiles, moduleRoot);
+            entry.xmlFiles.push(xmlUri);
+        }
+
+        console.log(`[MyBatis Boost] Refreshing mappings for ${moduleFiles.size} module(s)`);
+
+        for (const [moduleRoot, files] of moduleFiles) {
+            const index = await this.buildModuleIndexFromFiles(moduleRoot, files.javaFiles, files.xmlFiles);
+            this.setModuleIndex(index);
+        }
+    }
+
+    /**
+     * Refresh mappings for the module that contains the provided file.
+     */
+    async refreshModuleForFile(filePath: string): Promise<void> {
+        const moduleRoot = this.getModuleRootForFile(filePath);
+        await this.refreshModule(moduleRoot);
+    }
+
+    /**
+     * Refresh mappings for a module root.
+     */
+    async refreshModule(moduleRoot: string): Promise<void> {
+        const moduleKey = normalizePath(moduleRoot);
+        this.cache.clear();
+        this.moduleIndexes.delete(moduleKey);
+        this.moduleIndexPromises.delete(moduleKey);
+        const index = await this.buildModuleIndex(moduleRoot);
+        this.setModuleIndex(index);
+    }
+
+    /**
+     * Scan one module and build namespace indexes.
+     */
+    private async buildModuleIndex(moduleRoot: string): Promise<ModuleIndex> {
+        const [javaFiles, xmlFiles] = await Promise.all([
+            vscode.workspace.findFiles(
+                new vscode.RelativePattern(moduleRoot, '**/*.java'),
+                WORKSPACE_EXCLUDE_PATTERN
+            ),
+            vscode.workspace.findFiles(
+                new vscode.RelativePattern(moduleRoot, '**/*.xml'),
+                WORKSPACE_EXCLUDE_PATTERN
+            )
+        ]);
+
+        return this.buildModuleIndexFromFiles(moduleRoot, javaFiles, xmlFiles);
+    }
+
+    private async buildModuleIndexFromFiles(
+        moduleRoot: string,
+        javaFiles: vscode.Uri[],
+        xmlFiles: vscode.Uri[]
+    ): Promise<ModuleIndex> {
+        const index: ModuleIndex = {
+            root: moduleRoot,
+            javaByNamespace: new Map(),
+            xmlByNamespace: new Map()
+        };
+
+        for (const javaUri of javaFiles) {
+            const namespace = await extractJavaNamespace(javaUri.fsPath);
+            if (namespace) {
+                this.addToNamespaceIndex(index.javaByNamespace, namespace, javaUri.fsPath);
+            }
+        }
+
+        for (const xmlUri of xmlFiles) {
+            const namespace = await extractXmlNamespace(xmlUri.fsPath);
+            if (namespace) {
+                this.addToNamespaceIndex(index.xmlByNamespace, namespace, xmlUri.fsPath);
+            }
+        }
+
+        await this.populateMappingCache(index);
+        console.log(
+            `[MyBatis Boost] Indexed module ${moduleRoot}: ` +
+            `${javaFiles.length} Java file(s), ${xmlFiles.length} XML file(s)`
+        );
+
+        return index;
+    }
+
+    private getOrCreateModuleFileGroup(
+        moduleFiles: Map<string, { javaFiles: vscode.Uri[]; xmlFiles: vscode.Uri[] }>,
+        moduleRoot: string
+    ): { javaFiles: vscode.Uri[]; xmlFiles: vscode.Uri[] } {
+        const existing = moduleFiles.get(moduleRoot);
+        if (existing) {
+            return existing;
+        }
+
+        const entry = { javaFiles: [] as vscode.Uri[], xmlFiles: [] as vscode.Uri[] };
+        moduleFiles.set(moduleRoot, entry);
+        return entry;
+    }
+
+    private addToNamespaceIndex(index: Map<string, string[]>, namespace: string, filePath: string): void {
+        const list = index.get(namespace) ?? [];
+        list.push(filePath);
+        index.set(namespace, list);
+    }
+
+    private setModuleIndex(index: ModuleIndex): void {
+        const moduleKey = normalizePath(index.root);
+        this.moduleIndexes.set(moduleKey, index);
+        this.ensureModuleWatchers(index.root);
+    }
+
+    private async populateMappingCache(index: ModuleIndex): Promise<void> {
+        for (const [namespace, javaPaths] of index.javaByNamespace) {
+            const xmlPaths = index.xmlByNamespace.get(namespace);
+            if (!xmlPaths) {
+                continue;
+            }
+
+            for (const javaPath of javaPaths) {
+                const xmlPath = this.findBestPath(javaPath, xmlPaths);
+                if (xmlPath) {
+                    await this.cacheMapping(javaPath, xmlPath, namespace);
                 }
             }
         }
-
-        return bestXmlPath;
     }
 
     /**
-     * Get quick path candidates for XML file
+     * Resolve the module root for a file.
      */
-    private getQuickPaths(javaPath: string, javaFileName: string): string[] {
-        const paths: string[] = [];
-        const javaDir = path.dirname(javaPath);
-        const xmlFileName = `${javaFileName}.xml`;
-
-        // Same directory
-        paths.push(path.join(javaDir, xmlFileName));
-
-        // mapper subdirectory
-        paths.push(path.join(javaDir, 'mapper', xmlFileName));
-
-        // Resources mirror structure (with package path)
-        const resourcesPath = javaPath.replace(/[\/\\]java[\/\\]/, '/resources/');
-        paths.push(resourcesPath.replace('.java', '.xml'));
-        paths.push(path.join(path.dirname(resourcesPath), 'mapper', xmlFileName));
-
-        // Resources root (without package structure)
-        const normalizedJavaPath = javaPath.replace(/\\/g, '/');
-        const srcMainMatch = normalizedJavaPath.match(/^(.*\/src\/main\/)java\//);
-        if (srcMainMatch) {
-            const resourcesRoot = srcMainMatch[1] + 'resources';
-            paths.push(path.join(resourcesRoot, xmlFileName));
-            paths.push(path.join(resourcesRoot, 'mapper', xmlFileName));
-            paths.push(path.join(resourcesRoot, 'mappers', xmlFileName));
-            paths.push(path.join(resourcesRoot, 'mybatis', xmlFileName));
+    getModuleRootForFile(filePath: string): string {
+        const startDirectory = fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()
+            ? filePath
+            : path.dirname(filePath);
+        const projectFile = findProjectFileInParents(startDirectory);
+        if (projectFile) {
+            return path.dirname(projectFile);
         }
 
-        return paths;
+        return this.getWorkspaceFolderForFile(filePath) ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? startDirectory;
     }
 
-    /**
-     * Verify XML file has matching namespace
-     */
-    private async verifyXmlFile(xmlPath: string, expectedNamespace: string): Promise<boolean> {
-        try {
-            const fs = require('fs');
+    private getWorkspaceFolderForFile(filePath: string): string | undefined {
+        const normalizedFile = normalizePath(filePath);
+        const folders = vscode.workspace.workspaceFolders ?? [];
 
-            // Skip invalid paths (e.g., .git files)
-            if (xmlPath.includes('.git') || !xmlPath.endsWith('.xml')) {
-                return false;
-            }
+        return folders
+            .map(folder => folder.uri.fsPath)
+            .filter(folderPath => {
+                const normalizedFolder = normalizePath(folderPath);
+                return normalizedFile === normalizedFolder || normalizedFile.startsWith(`${normalizedFolder}/`);
+            })
+            .sort((a, b) => b.length - a.length)[0];
+    }
 
-            if (!fs.existsSync(xmlPath)) {
-                return false;
-            }
+    private async ensureModuleIndexForFile(filePath: string): Promise<ModuleIndex> {
+        return this.ensureModuleIndex(this.getModuleRootForFile(filePath));
+    }
 
-            const xmlNamespace = await extractXmlNamespace(xmlPath);
-            return xmlNamespace === expectedNamespace;
-        } catch (error) {
-            // Silently ignore errors for invalid files
-            return false;
+    private async ensureModuleIndex(moduleRoot: string): Promise<ModuleIndex> {
+        const moduleKey = normalizePath(moduleRoot);
+        const existing = this.moduleIndexes.get(moduleKey);
+        if (existing) {
+            return existing;
         }
+
+        const existingPromise = this.moduleIndexPromises.get(moduleKey);
+        if (existingPromise) {
+            return existingPromise;
+        }
+
+        const promise = this.buildModuleIndex(moduleRoot)
+            .then(index => {
+                this.setModuleIndex(index);
+                return index;
+            })
+            .finally(() => {
+                this.moduleIndexPromises.delete(moduleKey);
+            });
+
+        this.moduleIndexPromises.set(moduleKey, promise);
+        return promise;
     }
 
     /**
@@ -206,21 +269,18 @@ export class FileMapper {
         const normalizedPath = normalizePath(javaPath);
         const mapping = this.cache.get(normalizedPath);
 
-        if (mapping) {
-            // Check if cache is still valid
-            const currentModTime = await getFileModTime(javaPath);
-            if (currentModTime === mapping.javaModTime) {
-                return mapping.xmlPath;
-            }
-
-            // Cache is stale, rebuild
-            this.cache.delete(normalizedPath);
+        if (mapping && await this.isJavaMappingFresh(javaPath, mapping)) {
+            return mapping.xmlPath;
         }
 
-        // Build mapping on-demand
-        await this.buildMappingForJavaFile(javaPath);
+        this.cache.delete(normalizedPath);
+        await this.ensureModuleIndexForFile(javaPath);
         const newMapping = this.cache.get(normalizedPath);
-        return newMapping?.xmlPath || null;
+        if (newMapping && await this.isJavaMappingFresh(javaPath, newMapping)) {
+            return newMapping.xmlPath;
+        }
+
+        return null;
     }
 
     /**
@@ -230,130 +290,78 @@ export class FileMapper {
         const normalizedPath = normalizePath(xmlPath);
         const mapping = this.cache.get(normalizedPath);
 
-        if (mapping) {
-            // Check if cache is still valid
-            const currentModTime = await getFileModTime(xmlPath);
-            if (currentModTime === mapping.xmlModTime) {
-                return mapping.javaPath;
-            }
-
-            // Cache is stale
-            this.cache.delete(normalizedPath);
+        if (mapping && await this.isXmlMappingFresh(xmlPath, mapping)) {
+            return mapping.javaPath;
         }
 
-        // Need to search for corresponding Java file
+        this.cache.delete(normalizedPath);
+
         const namespace = await extractXmlNamespace(xmlPath);
         if (!namespace) {
             return null;
         }
 
-        // Search Java files for matching namespace, prefer same module
-        const javaFiles = await vscode.workspace.findFiles(
-            '**/*.java',
-            WORKSPACE_EXCLUDE_PATTERN
-        );
-
-        const xmlPathNormalized = xmlPath.replace(/\\/g, '/');
-        let bestJavaPath: string | null = null;
-        let bestPrefixLen = -1;
-
-        for (const javaUri of javaFiles) {
-            const javaPath = javaUri.fsPath;
-            const javaNamespace = await extractJavaNamespace(javaPath);
-
-            if (javaNamespace === namespace) {
-                const prefixLen = this.getCommonPrefixLength(xmlPathNormalized, javaPath);
-                if (prefixLen > bestPrefixLen) {
-                    bestPrefixLen = prefixLen;
-                    bestJavaPath = javaPath;
-                }
-            }
+        const moduleIndex = await this.ensureModuleIndexForFile(xmlPath);
+        const bestJavaPath = this.findBestPath(xmlPath, moduleIndex.javaByNamespace.get(namespace) ?? []);
+        if (!bestJavaPath) {
+            return null;
         }
 
-        if (bestJavaPath) {
-            await this.buildMappingForJavaFile(bestJavaPath);
-        }
+        await this.cacheMapping(bestJavaPath, xmlPath, namespace);
         return bestJavaPath;
     }
 
     /**
-     * Setup file watchers for automatic cache updates
+     * Setup module-local file watchers for automatic cache invalidation
      */
-    private setupFileWatchers(): void {
+    private ensureModuleWatchers(moduleRoot: string): void {
+        const moduleKey = normalizePath(moduleRoot);
+        if (this.moduleWatchers.has(moduleKey)) {
+            return;
+        }
+
         // Watch Java files
-        const javaWatcher = vscode.workspace.createFileSystemWatcher('**/*.java');
+        const javaWatcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(moduleRoot, '**/*.java')
+        );
         javaWatcher.onDidChange(uri => this.handleFileChange(uri.fsPath));
-        javaWatcher.onDidCreate(uri => this.handleJavaFileCreate(uri.fsPath));
+        javaWatcher.onDidCreate(uri => this.handleFileChange(uri.fsPath));
         javaWatcher.onDidDelete(uri => this.handleFileDelete(uri.fsPath));
-        this.watchers.push(javaWatcher);
 
         // Watch XML files
-        const xmlWatcher = vscode.workspace.createFileSystemWatcher('**/*.xml');
+        const xmlWatcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(moduleRoot, '**/*.xml')
+        );
         xmlWatcher.onDidChange(uri => this.handleFileChange(uri.fsPath));
-        xmlWatcher.onDidCreate(uri => this.handleXmlFileCreate(uri.fsPath));
+        xmlWatcher.onDidCreate(uri => this.handleFileChange(uri.fsPath));
         xmlWatcher.onDidDelete(uri => this.handleFileDelete(uri.fsPath));
-        this.watchers.push(xmlWatcher);
+
+        this.moduleWatchers.set(moduleKey, [javaWatcher, xmlWatcher]);
     }
 
     /**
-     * Handle new Java file creation
+     * Cache a Java/XML mapping.
      */
-    private async handleJavaFileCreate(filePath: string): Promise<void> {
-        try {
-            if (await isMyBatisMapper(filePath)) {
-                await this.buildMappingForJavaFile(filePath);
-                console.log(`[MyBatis Boost] New mapper detected: ${filePath}`);
-            }
-        } catch (error) {
-            console.error(`[MyBatis Boost] Error handling new Java file:`, error);
-        }
-    }
+    private async cacheMapping(javaPath: string, xmlPath: string, namespace: string): Promise<void> {
+        const javaModTime = await getFileModTime(javaPath);
+        const xmlModTime = await getFileModTime(xmlPath);
 
-    /**
-     * Handle new XML file creation
-     */
-    private async handleXmlFileCreate(filePath: string): Promise<void> {
-        try {
-            const namespace = await extractXmlNamespace(filePath);
-            if (!namespace) {
-                return;
-            }
+        const mapping: MappingMetadata = {
+            javaPath,
+            xmlPath,
+            javaModTime,
+            xmlModTime,
+            namespace
+        };
 
-            // Search for corresponding Java mapper, prefer same module
-            const javaFiles = await vscode.workspace.findFiles(
-                '**/*.java',
-                WORKSPACE_EXCLUDE_PATTERN
-            );
-
-            const xmlPathNormalized = filePath.replace(/\\/g, '/');
-            let bestJavaPath: string | null = null;
-            let bestPrefixLen = -1;
-
-            for (const javaUri of javaFiles) {
-                const javaPath = javaUri.fsPath;
-                const javaNamespace = await extractJavaNamespace(javaPath);
-                if (javaNamespace === namespace) {
-                    const prefixLen = this.getCommonPrefixLength(xmlPathNormalized, javaPath);
-                    if (prefixLen > bestPrefixLen) {
-                        bestPrefixLen = prefixLen;
-                        bestJavaPath = javaPath;
-                    }
-                }
-            }
-
-            if (bestJavaPath) {
-                await this.buildMappingForJavaFile(bestJavaPath);
-                console.log(`[MyBatis Boost] New XML mapped to ${bestJavaPath}`);
-            }
-        } catch (error) {
-            console.error(`[MyBatis Boost] Error handling new XML file:`, error);
-        }
+        this.cache.set(normalizePath(javaPath), mapping);
+        this.cache.set(normalizePath(xmlPath), mapping);
     }
 
     /**
      * Handle file change event
      */
-    private handleFileChange(filePath: string): void {
+    private async handleFileChange(filePath: string): Promise<void> {
         const normalizedPath = normalizePath(filePath);
 
         // Get the mapping before deleting it
@@ -373,15 +381,7 @@ export class FileMapper {
             }
         }
 
-        // Rebuild mapping if it's a Java file
-        if (filePath.endsWith('.java')) {
-            this.buildMappingForJavaFile(filePath);
-        } else if (filePath.endsWith('.xml')) {
-            // For XML file changes, we need to find the corresponding Java file and rebuild
-            if (mapping && mapping.javaPath) {
-                this.buildMappingForJavaFile(mapping.javaPath);
-            }
-        }
+        this.invalidateModuleForFile(filePath);
     }
 
     /**
@@ -406,6 +406,39 @@ export class FileMapper {
                 this.cache.delete(normalizePath(mapping.javaPath));
             }
         }
+
+        this.invalidateModuleForFile(filePath);
+    }
+
+    private invalidateModuleForFile(filePath: string): void {
+        const moduleKey = normalizePath(this.getModuleRootForFile(filePath));
+        this.moduleIndexes.delete(moduleKey);
+        this.moduleIndexPromises.delete(moduleKey);
+    }
+
+    private async isJavaMappingFresh(javaPath: string, mapping: MappingMetadata): Promise<boolean> {
+        const currentModTime = await getFileModTime(javaPath);
+        return currentModTime === mapping.javaModTime;
+    }
+
+    private async isXmlMappingFresh(xmlPath: string, mapping: MappingMetadata): Promise<boolean> {
+        const currentModTime = await getFileModTime(xmlPath);
+        return currentModTime === mapping.xmlModTime;
+    }
+
+    private findBestPath(originPath: string, candidates: string[]): string | null {
+        let bestPath: string | null = null;
+        let bestPrefixLen = -1;
+
+        for (const candidate of candidates) {
+            const prefixLen = this.getCommonPrefixLength(originPath, candidate);
+            if (prefixLen > bestPrefixLen) {
+                bestPrefixLen = prefixLen;
+                bestPath = candidate;
+            }
+        }
+
+        return bestPath;
     }
 
     /**
@@ -428,13 +461,20 @@ export class FileMapper {
      */
     clearCache(): void {
         this.cache.clear();
+        this.moduleIndexes.clear();
+        this.moduleIndexPromises.clear();
     }
 
     /**
      * Dispose resources
      */
     dispose(): void {
-        this.watchers.forEach(watcher => watcher.dispose());
+        for (const watchers of this.moduleWatchers.values()) {
+            watchers.forEach(watcher => watcher.dispose());
+        }
+        this.moduleWatchers.clear();
+        this.moduleIndexes.clear();
+        this.moduleIndexPromises.clear();
         this.cache.clear();
     }
 }

@@ -27,9 +27,9 @@
     "sql"
   ],
   "activationEvents": [
-    "workspaceContains:**/pom.xml",
-    "workspaceContains:**/build.gradle",
-    "workspaceContains:**/*.java"
+    "onLanguage:java",
+    "onLanguage:xml",
+    "onDebugAdapterProtocolTracker:java"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -74,6 +74,11 @@
       {
         "command": "mybatis-boost.refreshMappings",
         "title": "%command.refreshMappings%",
+        "category": "MyBatis Boost"
+      },
+      {
+        "command": "mybatis-boost.refreshAllMappings",
+        "title": "%command.refreshAllMappings%",
         "category": "MyBatis Boost"
       },
       {

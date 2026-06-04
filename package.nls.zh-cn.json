@@ -2,8 +2,9 @@
   "displayName": "MyBatis Boost",
   "description": "一站式 MyBatis 插件，支持 Mapper navigation，Mapper 生成（支持Cursor MCP 默认开启，支持 VSCode Copilot MCP），SQL 拦截输出，SQL 格式化，XML Dynamic SQL 语法高亮，XML 查看完整 SQL",
 
-  "command.clearCache": "清除缓存并重建",
-  "command.refreshMappings": "刷新映射",
+  "command.clearCache": "清除缓存",
+  "command.refreshMappings": "刷新当前模块映射",
+  "command.refreshAllMappings": "刷新全部工作区映射",
   "command.jumpToXml": "跳转到 MyBatis XML",
 
   "config.title": "MyBatis Boost",

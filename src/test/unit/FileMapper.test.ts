@@ -7,6 +7,8 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 import { FileMapper } from '../../navigator';
 import { createMockContext } from '../helpers/testSetup';
 
@@ -135,5 +137,112 @@ describe('FileMapper Unit Tests', () => {
         it('should verify namespace matches when finding XML files', async () => {
             assert.ok(true, 'Namespace verification needs to be tested');
         });
+
+        it('should not scan files during lazy initialization', () => {
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles').resolves([]);
+
+            fileMapper.initializeLazy();
+
+            assert.strictEqual(findFilesStub.callCount, 0, 'lazy initialization should not call findFiles');
+        });
+
+        it('should build one module index for repeated mapper lookups in the same module', async () => {
+            const fixture = createTempModuleFixture();
+            try {
+                const findFilesStub = stubFindFilesForModule(fixture.moduleRoot, [
+                    fixture.userMapperJavaPath,
+                    fixture.orderMapperJavaPath
+                ], [
+                    fixture.userMapperXmlPath,
+                    fixture.orderMapperXmlPath
+                ]);
+
+                const userXmlPath = await fileMapper.getXmlPath(fixture.userMapperJavaPath);
+                const orderXmlPath = await fileMapper.getXmlPath(fixture.orderMapperJavaPath);
+
+                assert.ok(userXmlPath?.endsWith('UserMapper.xml'), 'UserMapper XML should be found');
+                assert.ok(orderXmlPath?.endsWith('OrderMapper.xml'), 'OrderMapper XML should be found');
+                assert.strictEqual(findFilesStub.callCount, 2, 'module Java/XML files should be scanned once each');
+            } finally {
+                fixture.dispose();
+            }
+        });
     });
+
+    function stubFindFilesForModule(moduleRoot: string, javaPaths: string[], xmlPaths: string[]): sinon.SinonStub {
+        return sandbox.stub(vscode.workspace, 'findFiles').callsFake(async (include: any) => {
+            const pattern = typeof include === 'string' ? include : include.pattern;
+            const basePath = typeof include === 'string' ? undefined : include.baseUri.fsPath;
+
+            if (basePath && path.normalize(basePath) !== path.normalize(moduleRoot)) {
+                return [];
+            }
+
+            if (pattern === '**/*.java') {
+                return javaPaths.map(filePath => vscode.Uri.file(filePath));
+            }
+
+            if (pattern === '**/*.xml') {
+                return xmlPaths.map(filePath => vscode.Uri.file(filePath));
+            }
+
+            return [];
+        });
+    }
+
+    function createTempModuleFixture(): {
+        moduleRoot: string;
+        userMapperJavaPath: string;
+        orderMapperJavaPath: string;
+        userMapperXmlPath: string;
+        orderMapperXmlPath: string;
+        dispose: () => void;
+    } {
+        const moduleRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mybatis-boost-filemapper-'));
+        fs.writeFileSync(path.join(moduleRoot, 'pom.xml'), '<project></project>');
+
+        const javaDir = path.join(moduleRoot, 'src', 'main', 'java', 'com', 'example', 'mapper');
+        const xmlDir = path.join(moduleRoot, 'src', 'main', 'resources', 'mapper');
+        fs.mkdirSync(javaDir, { recursive: true });
+        fs.mkdirSync(xmlDir, { recursive: true });
+
+        const userMapperJavaPath = path.join(javaDir, 'UserMapper.java');
+        const orderMapperJavaPath = path.join(javaDir, 'OrderMapper.java');
+        const userMapperXmlPath = path.join(xmlDir, 'UserMapper.xml');
+        const orderMapperXmlPath = path.join(xmlDir, 'OrderMapper.xml');
+
+        fs.writeFileSync(userMapperJavaPath, [
+            'package com.example.mapper;',
+            'public interface UserMapper {',
+            '    void selectUser();',
+            '}'
+        ].join('\n'));
+        fs.writeFileSync(orderMapperJavaPath, [
+            'package com.example.mapper;',
+            'public interface OrderMapper {',
+            '    void selectOrder();',
+            '}'
+        ].join('\n'));
+        fs.writeFileSync(userMapperXmlPath, [
+            '<?xml version="1.0" encoding="UTF-8" ?>',
+            '<mapper namespace="com.example.mapper.UserMapper">',
+            '    <select id="selectUser"></select>',
+            '</mapper>'
+        ].join('\n'));
+        fs.writeFileSync(orderMapperXmlPath, [
+            '<?xml version="1.0" encoding="UTF-8" ?>',
+            '<mapper namespace="com.example.mapper.OrderMapper">',
+            '    <select id="selectOrder"></select>',
+            '</mapper>'
+        ].join('\n'));
+
+        return {
+            moduleRoot,
+            userMapperJavaPath,
+            orderMapperJavaPath,
+            userMapperXmlPath,
+            orderMapperXmlPath,
+            dispose: () => fs.rmSync(moduleRoot, { recursive: true, force: true })
+        };
+    }
 });

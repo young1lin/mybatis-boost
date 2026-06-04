@@ -2,8 +2,9 @@
   "displayName": "MyBatis Boost",
   "description": "A one-stop MyBatis plugin that supports Mapper navigation, Mapper generation (with Cursor MCP enabled by default and VSCode Copilot MCP support), SQL interception and logging, SQL formatting, XML Dynamic SQL syntax highlighting, and viewing complete SQL in XML.",
 
-  "command.clearCache": "Clear Cache and Rebuild",
-  "command.refreshMappings": "Refresh Mappings",
+  "command.clearCache": "Clear Cache",
+  "command.refreshMappings": "Refresh Current Module Mappings",
+  "command.refreshAllMappings": "Refresh All Workspace Mappings",
   "command.jumpToXml": "Jump to MyBatis XML",
 
   "config.title": "MyBatis Boost",

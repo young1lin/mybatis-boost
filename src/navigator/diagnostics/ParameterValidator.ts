@@ -102,22 +102,6 @@ export class ParameterValidator {
             })
         );
 
-        // Watch Java files at filesystem level for external changes (git checkout, etc.)
-        const javaFsWatcher = vscode.workspace.createFileSystemWatcher('**/*.java');
-        javaFsWatcher.onDidChange(() => {
-            this.fieldCache.clear();
-            this.revalidateOpenXmlDocuments();
-        });
-        javaFsWatcher.onDidCreate(() => {
-            this.fieldCache.clear();
-            this.revalidateOpenXmlDocuments();
-        });
-        javaFsWatcher.onDidDelete(() => {
-            this.fieldCache.clear();
-            this.revalidateOpenXmlDocuments();
-        });
-        this.disposables.push(javaFsWatcher);
-
         // Validate all open XML documents if validation is enabled
         if (this.enabled) {
             vscode.workspace.textDocuments.forEach(doc => {

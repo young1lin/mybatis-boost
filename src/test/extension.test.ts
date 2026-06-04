@@ -22,6 +22,17 @@ suite('Extension Test Suite', () => {
         assert.strictEqual(extension.isActive, true);
     });
 
+    test('Activation events should not scan the workspace on startup', () => {
+        const extension = vscode.extensions.getExtension('young1lin.mybatis-boost');
+        assert.ok(extension);
+
+        const activationEvents = extension.packageJSON.activationEvents as string[];
+        assert.ok(
+            !activationEvents.some(event => event.startsWith('workspaceContains:')),
+            'activationEvents should not use workspaceContains'
+        );
+    });
+
     test('Commands should be registered', async () => {
         const commands = await vscode.commands.getCommands(true);
 
@@ -33,6 +44,11 @@ suite('Extension Test Suite', () => {
         assert.ok(
             commands.includes('mybatis-boost.refreshMappings'),
             'refreshMappings command should be registered'
+        );
+
+        assert.ok(
+            commands.includes('mybatis-boost.refreshAllMappings'),
+            'refreshAllMappings command should be registered'
         );
     });
 

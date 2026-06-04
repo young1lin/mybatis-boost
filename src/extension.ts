@@ -4,8 +4,6 @@
  */
 
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import {
     FileMapper,
     JavaToXmlDefinitionProvider,
@@ -21,6 +19,7 @@ import {
 import { XmlSqlHoverProvider, JavaSqlHoverProvider } from './hover';
 import { MybatisBindingDecorator, DynamicSqlHighlighter } from './decorator';
 import { findProjectFileInParents } from './utils/projectDetector';
+import { WORKSPACE_EXCLUDE_PATTERN } from './utils/fileUtils';
 import { GeneratorViewProvider } from './webview/GeneratorViewProvider';
 import { MybatisLogViewProvider } from './webview/MybatisLogViewProvider';
 import { MCPManager } from './mcp/MCPManager';
@@ -101,7 +100,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Initialize file mapper
     fileMapper = new FileMapper(context, cacheSize);
-    await fileMapper.initialize();
+    fileMapper.initializeLazy();
 
     // Register XML-related definition providers (always enabled)
     registerXmlDefinitionProviders(context);
@@ -302,7 +301,7 @@ async function isJavaProject(): Promise<boolean> {
     console.log('[MyBatis Boost] No project files found, checking for Java files...');
     const javaFiles = await vscode.workspace.findFiles(
         '**/*.java',
-        '**/{ node_modules,target,.git,build,dist,out,bin}/**',
+        WORKSPACE_EXCLUDE_PATTERN,
         1  // Only need to find 1 file to confirm it's a Java project
     );
 
@@ -326,7 +325,10 @@ function registerCommands(context: vscode.ExtensionContext) {
                 return;
             }
             fileMapper.clearCache();
-            await fileMapper.initialize();
+            const activeFilePath = getActiveJavaOrXmlFilePath();
+            if (activeFilePath) {
+                await fileMapper.refreshModuleForFile(activeFilePath);
+            }
             if (bindingDecorator) {
                 bindingDecorator.refresh();
             }
@@ -341,18 +343,43 @@ function registerCommands(context: vscode.ExtensionContext) {
                 vscode.window.showWarningMessage(vscode.l10n.t('command.notActive'));
                 return;
             }
+            const activeFilePath = getActiveJavaOrXmlFilePath();
+            if (!activeFilePath) {
+                vscode.window.showWarningMessage(vscode.l10n.t('command.noJavaOrXmlEditor'));
+                return;
+            }
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: vscode.l10n.t('command.refreshingMappings'),
                 cancellable: false
             }, async () => {
-                fileMapper.clearCache();
-                await fileMapper.initialize();
+                await fileMapper.refreshModuleForFile(activeFilePath);
                 if (bindingDecorator) {
                     bindingDecorator.refresh();
                 }
             });
             vscode.window.showInformationMessage(vscode.l10n.t('command.mappingsRefreshed'));
+        })
+    );
+
+    // Refresh all workspace mappings command (explicit full scan)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('mybatis-boost.refreshAllMappings', async () => {
+            if (!fileMapper) {
+                vscode.window.showWarningMessage(vscode.l10n.t('command.notActive'));
+                return;
+            }
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: vscode.l10n.t('command.refreshingAllMappings'),
+                cancellable: false
+            }, async () => {
+                await fileMapper.refreshWorkspace();
+                if (bindingDecorator) {
+                    bindingDecorator.refresh();
+                }
+            });
+            vscode.window.showInformationMessage(vscode.l10n.t('command.allMappingsRefreshed'));
         })
     );
 
@@ -471,6 +498,24 @@ function registerCommands(context: vscode.ExtensionContext) {
     );
 
     console.log(`[MyBatis Boost] ${vscode.l10n.t('extension.commandsRegistered')}`);
+}
+
+function getActiveJavaOrXmlFilePath(): string | undefined {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        return undefined;
+    }
+
+    const document = editor.document;
+    if (document.uri.scheme !== 'file') {
+        return undefined;
+    }
+
+    if (document.languageId !== 'java' && document.languageId !== 'xml') {
+        return undefined;
+    }
+
+    return document.uri.fsPath;
 }
 
 export function deactivate() {

@@ -17,6 +17,11 @@ suite('FileMapper Integration Tests', () => {
     let userMapperXmlPath: string;
     let userJavaPath: string;
     let extensionPath: string;
+    let multiModuleRoot: string;
+    let moduleATestMapperJavaPath: string;
+    let moduleATestMapperXmlPath: string;
+    let moduleBTestMapperJavaPath: string;
+    let moduleBTestMapperXmlPath: string;
 
     suiteSetup(async function() {
         this.timeout(30000);
@@ -29,6 +34,11 @@ suite('FileMapper Integration Tests', () => {
         userMapperJavaPath = path.join(sampleProjectRoot, 'src', 'main', 'java', 'com', 'example', 'mapper', 'UserMapper.java');
         userMapperXmlPath = path.join(sampleProjectRoot, 'src', 'main', 'resources', 'mapper', 'UserMapper.xml');
         userJavaPath = path.join(sampleProjectRoot, 'src', 'main', 'java', 'com', 'example', 'mapper', 'User.java');
+        multiModuleRoot = path.join(extensionPath, 'src', 'test', 'fixtures', 'multi-module-project');
+        moduleATestMapperJavaPath = path.join(multiModuleRoot, 'module-a', 'src', 'main', 'java', 'com', 'test', 'mapper', 'TestMapper.java');
+        moduleATestMapperXmlPath = path.join(multiModuleRoot, 'module-a', 'src', 'main', 'resources', 'TestMapper.xml');
+        moduleBTestMapperJavaPath = path.join(multiModuleRoot, 'module-b', 'src', 'main', 'java', 'com', 'test', 'mapper', 'TestMapper.java');
+        moduleBTestMapperXmlPath = path.join(multiModuleRoot, 'module-b', 'src', 'main', 'resources', 'TestMapper.xml');
 
         // Verify files exist
         if (!fs.existsSync(userMapperJavaPath)) {
@@ -58,6 +68,21 @@ suite('FileMapper Integration Tests', () => {
         const xmlPath = await fileMapper.getXmlPath(userMapperJavaPath);
         assert.ok(xmlPath, 'XML path should be found');
         assert.ok(xmlPath.endsWith('UserMapper.xml'), 'XML path should end with UserMapper.xml');
+    });
+
+    test('should find XML path lazily without full workspace initialization', async function() {
+        this.timeout(10000);
+
+        const context = createMockContext(extensionPath);
+        const lazyFileMapper = new FileMapper(context, 1000);
+        try {
+            lazyFileMapper.initializeLazy();
+            const xmlPath = await lazyFileMapper.getXmlPath(userMapperJavaPath);
+            assert.ok(xmlPath, 'XML path should be found lazily');
+            assert.ok(xmlPath.endsWith('UserMapper.xml'), 'Lazy XML path should end with UserMapper.xml');
+        } finally {
+            lazyFileMapper.dispose();
+        }
     });
 
     test('should find Java path from XML file', async function() {
@@ -107,5 +132,25 @@ suite('FileMapper Integration Tests', () => {
         // Get mapping again (should rebuild)
         const xmlPath2 = await fileMapper.getXmlPath(userMapperJavaPath);
         assert.strictEqual(xmlPath1!.toLowerCase(), xmlPath2!.toLowerCase(), 'Should rebuild same mapping after cache clear');
+    });
+
+    test('should prefer same-module XML for duplicate mapper namespaces in lazy mode', async function() {
+        this.timeout(10000);
+
+        const context = createMockContext(extensionPath);
+        const lazyFileMapper = new FileMapper(context, 1000);
+        try {
+            lazyFileMapper.initializeLazy();
+
+            const moduleAXmlPath = await lazyFileMapper.getXmlPath(moduleATestMapperJavaPath);
+            const moduleBXmlPath = await lazyFileMapper.getXmlPath(moduleBTestMapperJavaPath);
+
+            assert.ok(moduleAXmlPath, 'Module A XML path should be found');
+            assert.ok(moduleBXmlPath, 'Module B XML path should be found');
+            assert.strictEqual(moduleAXmlPath!.toLowerCase(), moduleATestMapperXmlPath.toLowerCase());
+            assert.strictEqual(moduleBXmlPath!.toLowerCase(), moduleBTestMapperXmlPath.toLowerCase());
+        } finally {
+            lazyFileMapper.dispose();
+        }
     });
 });

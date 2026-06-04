@@ -16,6 +16,7 @@ suite('XML Parameter Navigation - Single Object Auto-mapping', () => {
     let fixtureRoot: string;
     let xmlPath: string;
     let queryJavaPath: string;
+    let providerDisposable: vscode.Disposable;
 
     suiteSetup(async function() {
         this.timeout(30000);
@@ -45,9 +46,16 @@ suite('XML Parameter Navigation - Single Object Auto-mapping', () => {
 
         // Initialize provider
         provider = new XmlParameterDefinitionProvider(fileMapper);
+        providerDisposable = vscode.languages.registerDefinitionProvider(
+            { language: 'xml', pattern: '**/*.xml' },
+            provider
+        );
     });
 
     suiteTeardown(() => {
+        if (providerDisposable) {
+            providerDisposable.dispose();
+        }
         if (fileMapper) {
             fileMapper.dispose();
         }
