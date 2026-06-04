@@ -224,5 +224,21 @@ describe('FileMapper Unit Tests', () => {
                 'RelativePattern base should be the project root'
             );
         });
+
+        it('rebuilds the index after the TTL so out-of-editor changes self-heal', async () => {
+            // Only fake Date so file-system promises keep working normally.
+            const clock = sandbox.useFakeTimers({ now: Date.now(), toFake: ['Date'] });
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles')
+                .resolves([vscode.Uri.file(fooXml), vscode.Uri.file(barXml)]);
+
+            await fileMapper.getXmlPath(fooJava);
+            assert.strictEqual(findFilesStub.callCount, 1, 'first lookup builds the index');
+
+            // Advance beyond the index TTL (30s); a lookup for a different mapper in the
+            // same project should now rebuild instead of trusting the stale snapshot.
+            clock.tick(31_000);
+            await fileMapper.getXmlPath(barJava);
+            assert.strictEqual(findFilesStub.callCount, 2, 'expired index should be rebuilt');
+        });
     });
 });

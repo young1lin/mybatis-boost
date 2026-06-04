@@ -11,6 +11,12 @@ import { LRUCache } from '../../utils/LRUCache';
 import { findProjectFileInParents } from '../../utils/projectDetector';
 import { findJavaClassFile } from '../../utils/navigationUtils';
 
+/** A project's XML namespace index plus the time it was built (for TTL self-healing). */
+interface ProjectXmlIndex {
+    builtAt: number;
+    byNamespace: Map<string, string[]>;
+}
+
 /**
  * FileMapper manages mappings between Java mapper interfaces and XML files
  */
@@ -24,9 +30,17 @@ export class FileMapper {
      * Built lazily, only when a mapper cannot be resolved via quick paths, and
      * cached so repeated lookups within the same project never rescan.
      */
-    private xmlIndexByProject = new Map<string, Map<string, string[]>>();
+    private xmlIndexByProject = new Map<string, ProjectXmlIndex>();
     /** In-flight index builds, to de-duplicate concurrent lookups in the same project. */
-    private xmlIndexPromises = new Map<string, Promise<Map<string, string[]>>>();
+    private xmlIndexPromises = new Map<string, Promise<ProjectXmlIndex>>();
+    /**
+     * Backstop TTL for a project's XML index. File watchers invalidate the index
+     * instantly on edits, but OS watchers can miss events (network/virtual drives,
+     * containers, or bulk out-of-editor edits via CLI tools like Claude Code / Codex).
+     * The TTL guarantees the index self-heals within this window even when no watcher
+     * event arrives, so the cache is never effectively "permanent".
+     */
+    private static readonly XML_INDEX_TTL_MS = 30_000;
 
     constructor(context: vscode.ExtensionContext, cacheSize: number = 1000) {
         this.context = context;
@@ -107,18 +121,31 @@ export class FileMapper {
         }
 
         // Priority 1: Look up the namespace in the lazy, per-project XML index.
-        // The index is built (and cached) only once per project, so this avoids the
-        // O(mappers x xmlFiles) full-workspace rescan that previously ran per mapper.
+        // The index is built once per project and reused (with a TTL backstop), so
+        // this avoids the O(mappers x xmlFiles) full-workspace rescan that previously
+        // ran per mapper.
         const projectRoot = this.getProjectRoot(javaPath);
         const index = await this.getProjectXmlIndex(projectRoot);
-        const candidates = index.get(namespace);
+        const candidates = index.byNamespace.get(namespace);
         if (!candidates || candidates.length === 0) {
             return null;
         }
 
-        // Prefer the candidate in the same module (longest common path prefix).
+        // Prefer same-module candidates (longest common prefix), but re-verify the
+        // chosen file still exists and matches the namespace before returning it: the
+        // cached index can lag a moved/deleted/renamed file if its watcher event was
+        // missed (e.g. bulk CLI edits). Verification keeps results correct regardless.
         const javaPathNormalized = javaPath.replace(/\\/g, '/');
-        return this.pickBestByPrefix(javaPathNormalized, candidates);
+        const ordered = [...candidates].sort(
+            (a, b) => this.getCommonPrefixLength(javaPathNormalized, b)
+                - this.getCommonPrefixLength(javaPathNormalized, a)
+        );
+        for (const candidate of ordered) {
+            if (await this.verifyXmlFile(candidate, namespace)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /**
@@ -144,10 +171,14 @@ export class FileMapper {
      * Get (and lazily build + cache) the namespace -> xmlPaths index for a project.
      * Concurrent callers share a single in-flight build.
      */
-    private async getProjectXmlIndex(projectRoot: string): Promise<Map<string, string[]>> {
+    private async getProjectXmlIndex(projectRoot: string): Promise<ProjectXmlIndex> {
         const cached = this.xmlIndexByProject.get(projectRoot);
-        if (cached) {
+        if (cached && Date.now() - cached.builtAt < FileMapper.XML_INDEX_TTL_MS) {
             return cached;
+        }
+        // Expired (or absent): drop the stale snapshot and rebuild below.
+        if (cached) {
+            this.xmlIndexByProject.delete(projectRoot);
         }
 
         const inflight = this.xmlIndexPromises.get(projectRoot);
@@ -170,8 +201,8 @@ export class FileMapper {
      * Scan a single project's XML files once and group their paths by namespace.
      * Scoped to the project root via RelativePattern so other projects are untouched.
      */
-    private async buildProjectXmlIndex(projectRoot: string): Promise<Map<string, string[]>> {
-        const index = new Map<string, string[]>();
+    private async buildProjectXmlIndex(projectRoot: string): Promise<ProjectXmlIndex> {
+        const byNamespace = new Map<string, string[]>();
         const xmlFiles = await vscode.workspace.findFiles(
             new vscode.RelativePattern(projectRoot, '**/*.xml'),
             WORKSPACE_EXCLUDE_PATTERN
@@ -183,16 +214,16 @@ export class FileMapper {
             if (!xmlNamespace) {
                 continue;
             }
-            const existing = index.get(xmlNamespace);
+            const existing = byNamespace.get(xmlNamespace);
             if (existing) {
                 existing.push(xmlPath);
             } else {
-                index.set(xmlNamespace, [xmlPath]);
+                byNamespace.set(xmlNamespace, [xmlPath]);
             }
         }
 
         console.log(`[MyBatis Boost] Indexed ${xmlFiles.length} XML files in project ${projectRoot}`);
-        return index;
+        return { builtAt: Date.now(), byNamespace };
     }
 
     /**
@@ -202,23 +233,6 @@ export class FileMapper {
         const projectRoot = this.getProjectRoot(filePath);
         this.xmlIndexByProject.delete(projectRoot);
         this.xmlIndexPromises.delete(projectRoot);
-    }
-
-    /**
-     * From a list of candidate paths, pick the one sharing the longest directory
-     * prefix with the reference path (i.e. the same module).
-     */
-    private pickBestByPrefix(referencePath: string, candidates: string[]): string | null {
-        let best: string | null = null;
-        let bestPrefixLen = -1;
-        for (const candidate of candidates) {
-            const prefixLen = this.getCommonPrefixLength(referencePath, candidate);
-            if (prefixLen > bestPrefixLen) {
-                bestPrefixLen = prefixLen;
-                best = candidate;
-            }
-        }
-        return best;
     }
 
     /**
