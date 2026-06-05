@@ -149,6 +149,29 @@ describe('FileMapper Unit Tests', () => {
                 'initialize() must not trigger any findFiles scan'
             );
         });
+
+        it('is idempotent: re-initializing disposes old watchers instead of leaking them', async () => {
+            const disposed: boolean[] = [];
+            sandbox.stub(vscode.workspace, 'createFileSystemWatcher').callsFake(() => {
+                const idx = disposed.push(false) - 1;
+                return {
+                    onDidCreate: () => ({ dispose: () => {} }),
+                    onDidChange: () => ({ dispose: () => {} }),
+                    onDidDelete: () => ({ dispose: () => {} }),
+                    dispose: () => { disposed[idx] = true; }
+                } as unknown as vscode.FileSystemWatcher;
+            });
+
+            await fileMapper.initialize(); // creates watcher pair #1
+            await fileMapper.initialize(); // must dispose #1 before creating #2
+
+            // The first pair of watchers must have been disposed by the second init.
+            assert.strictEqual(disposed[0], true, 'first java watcher should be disposed');
+            assert.strictEqual(disposed[1], true, 'first xml watcher should be disposed');
+            // And the live set should not grow unbounded across re-inits.
+            const live = disposed.filter(d => !d).length;
+            assert.strictEqual(live, 2, 'exactly one live watcher pair should remain');
+        });
     });
 
     describe('Per-project XML index (issue #46)', () => {

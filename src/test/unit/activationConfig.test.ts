@@ -34,6 +34,13 @@ describe('Activation configuration (issue #46)', () => {
                 'should include workspaceContains:**/build.gradle.kts'
             );
         });
+
+        it('activates on a Java debug session so the SQL log console is ready', () => {
+            assert.ok(
+                events.includes('onDebugAdapterProtocolTracker:java'),
+                'should include onDebugAdapterProtocolTracker:java for the SQL log console'
+            );
+        });
     });
 
     describe('WORKSPACE_EXCLUDE_PATTERN', () => {

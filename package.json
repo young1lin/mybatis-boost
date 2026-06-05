@@ -29,6 +29,7 @@
   "activationEvents": [
     "onLanguage:java",
     "onLanguage:xml",
+    "onDebugAdapterProtocolTracker:java",
     "workspaceContains:**/pom.xml",
     "workspaceContains:**/build.gradle",
     "workspaceContains:**/build.gradle.kts"

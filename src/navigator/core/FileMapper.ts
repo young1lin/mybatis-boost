@@ -58,6 +58,12 @@ export class FileMapper {
     async initialize(): Promise<void> {
         console.log('[MyBatis Boost] Initializing FileMapper (lazy, per-project)...');
 
+        // Idempotent: dispose any existing watchers before wiring up new ones, so
+        // re-initialization (e.g. from the Refresh Mappings / Clear Cache commands)
+        // does not leak watchers or double-fire change handlers.
+        this.watchers.forEach(watcher => watcher.dispose());
+        this.watchers.length = 0;
+
         // Setup file watchers only - no upfront workspace scan.
         this.setupFileWatchers();
 
