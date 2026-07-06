@@ -264,4 +264,95 @@ describe('FileMapper Unit Tests', () => {
             assert.strictEqual(findFilesStub.callCount, 2, 'expired index should be rebuilt');
         });
     });
+
+    describe('Cross-module XML resolution (multi-module projects)', () => {
+        const DOCTYPE = '<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" ' +
+            '"http://mybatis.org/dtd/mybatis-3-mapper.dtd">';
+
+        let tmpRoot: string;
+        let savedWorkspaceFolders: typeof vscode.workspace.workspaceFolders;
+
+        const mapperJava = (name: string) =>
+            `package com.demo;\nimport org.apache.ibatis.annotations.Mapper;\n@Mapper\npublic interface ${name} {}\n`;
+        const mapperXml = (namespace: string) =>
+            `<?xml version="1.0" encoding="UTF-8"?>\n${DOCTYPE}\n<mapper namespace="${namespace}">\n</mapper>\n`;
+
+        beforeEach(() => {
+            tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mb-crossmodule-'));
+            // Make the temp root the workspace folder so getProjectRoot's
+            // workspace-bounded aggregate-root walk is exercised (the mocked
+            // getWorkspaceFolder returns workspaceFolders[0]).
+            savedWorkspaceFolders = vscode.workspace.workspaceFolders;
+            (vscode.workspace as any).workspaceFolders = [
+                { uri: { fsPath: tmpRoot }, name: 'tmp', index: 0 }
+            ];
+        });
+
+        afterEach(() => {
+            (vscode.workspace as any).workspaceFolders = savedWorkspaceFolders;
+            fs.rmSync(tmpRoot, { recursive: true, force: true });
+        });
+
+        it('finds XML in a sibling module via the aggregate (parent) build root', async () => {
+            // Multi-module Maven layout with the XML in a different module than the
+            // Java interface — supported by the pre-#46 full scan, must keep working:
+            //   aggregate/pom.xml
+            //   aggregate/module-a/pom.xml + src/main/java/com/demo/FooMapper.java
+            //   aggregate/module-b/pom.xml + src/main/resources/custom/Foo.xml
+            const aggregateRoot = path.join(tmpRoot, 'aggregate');
+            const javaDir = path.join(aggregateRoot, 'module-a', 'src', 'main', 'java', 'com', 'demo');
+            const xmlDir = path.join(aggregateRoot, 'module-b', 'src', 'main', 'resources', 'custom');
+            fs.mkdirSync(javaDir, { recursive: true });
+            fs.mkdirSync(xmlDir, { recursive: true });
+            fs.writeFileSync(path.join(aggregateRoot, 'pom.xml'), '<project></project>');
+            fs.writeFileSync(path.join(aggregateRoot, 'module-a', 'pom.xml'), '<project></project>');
+            fs.writeFileSync(path.join(aggregateRoot, 'module-b', 'pom.xml'), '<project></project>');
+
+            const fooJava = path.join(javaDir, 'FooMapper.java');
+            const fooXml = path.join(xmlDir, 'Foo.xml');
+            fs.writeFileSync(fooJava, mapperJava('FooMapper'));
+            fs.writeFileSync(fooXml, mapperXml('com.demo.FooMapper'));
+
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles')
+                .resolves([vscode.Uri.file(fooXml)]);
+
+            const result = await fileMapper.getXmlPath(fooJava);
+
+            assert.ok(result && result.endsWith('Foo.xml'),
+                'XML in a sibling module should be found via the aggregate root index');
+            const include = findFilesStub.firstCall.args[0] as vscode.RelativePattern;
+            assert.strictEqual(
+                include.base.replace(/\\/g, '/'),
+                aggregateRoot.replace(/\\/g, '/'),
+                'index scan should be rooted at the aggregate (parent pom) root, not the module'
+            );
+        });
+
+        it('keeps independent services isolated when no shared parent build file exists (issue #46 setup)', async () => {
+            // Two standalone services in one workspace folder (no build file at the
+            // workspace root). The index must stay scoped to the owning service —
+            // never widen to the whole workspace, or #46 would regress.
+            const serviceA = path.join(tmpRoot, 'service-a');
+            const javaDir = path.join(serviceA, 'src', 'main', 'java', 'com', 'demo');
+            fs.mkdirSync(javaDir, { recursive: true });
+            fs.mkdirSync(path.join(tmpRoot, 'service-b'), { recursive: true });
+            fs.writeFileSync(path.join(serviceA, 'pom.xml'), '<project></project>');
+            fs.writeFileSync(path.join(tmpRoot, 'service-b', 'pom.xml'), '<project></project>');
+
+            const fooJava = path.join(javaDir, 'FooMapper.java');
+            fs.writeFileSync(fooJava, mapperJava('FooMapper'));
+
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles').resolves([]);
+
+            await fileMapper.getXmlPath(fooJava);
+
+            assert.ok(findFilesStub.calledOnce, 'index scan should run exactly once');
+            const include = findFilesStub.firstCall.args[0] as vscode.RelativePattern;
+            assert.strictEqual(
+                include.base.replace(/\\/g, '/'),
+                serviceA.replace(/\\/g, '/'),
+                'without a shared parent build file the index must stay scoped to the service'
+            );
+        });
+    });
 });

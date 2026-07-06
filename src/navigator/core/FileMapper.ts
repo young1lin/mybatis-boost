@@ -8,7 +8,11 @@ import { extractJavaNamespace, isMyBatisMapper } from '../parsers/javaParser';
 import { extractXmlNamespace } from '../parsers/xmlParser';
 import { getFileModTime, normalizePath, WORKSPACE_EXCLUDE_PATTERN } from '../../utils/fileUtils';
 import { LRUCache } from '../../utils/LRUCache';
-import { findProjectFileInParents } from '../../utils/projectDetector';
+import {
+    findProjectFileInParents,
+    findOutermostProjectFileInParents,
+    isPathInside
+} from '../../utils/projectDetector';
 import { findJavaClassFile } from '../../utils/navigationUtils';
 
 /** A project's XML namespace index plus the time it was built (for TTL self-healing). */
@@ -155,22 +159,40 @@ export class FileMapper {
     }
 
     /**
-     * Resolve the project/module root that owns a file by walking up to the nearest
-     * build file (pom.xml / build.gradle / build.gradle.kts). Falls back to the
-     * enclosing workspace folder, then the first workspace folder.
+     * Resolve the project root that owns a file.
+     *
+     * Uses the OUTERMOST build file (pom.xml / build.gradle / build.gradle.kts)
+     * between the file and its workspace folder — i.e. the aggregate root of a
+     * multi-module project — so mapper XML living in a sibling module of the same
+     * project is still visible to the index (the pre-#46 full-workspace scan
+     * supported that layout). The walk never leaves the workspace folder, so
+     * independent services sharing one workspace folder (the issue #46 setup)
+     * each keep their own root and are never scanned together.
+     *
+     * Files outside any workspace folder fall back to the nearest build file,
+     * then the first workspace folder.
      */
     private getProjectRoot(filePath: string): string {
-        const projectFile = findProjectFileInParents(path.dirname(filePath));
+        const startDir = path.dirname(filePath);
+        const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
+        const folderPath = folder?.uri.fsPath;
+
+        if (folderPath && isPathInside(startDir, folderPath)) {
+            const outermost = findOutermostProjectFileInParents(startDir, folderPath);
+            if (outermost) {
+                return path.dirname(outermost);
+            }
+            // No build file at all between the file and its workspace folder:
+            // scope to the workspace folder itself.
+            return folderPath;
+        }
+
+        const projectFile = findProjectFileInParents(startDir);
         if (projectFile) {
             return path.dirname(projectFile);
         }
 
-        const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
-        if (folder) {
-            return folder.uri.fsPath;
-        }
-
-        return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? path.dirname(filePath);
+        return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? startDir;
     }
 
     /**
