@@ -6,6 +6,26 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.18] - 2026-07-06
+
+### 修复
+
+- **大型多服务工作区激活超时** ([#46](https://github.com/young1lin/mybatis-boost/issues/46))：工作区包含大量 Spring Boot 服务时，激活曾可能耗时约 120s 并超时失败。`FileMapper.initialize()` 不再在激活时扫描工作区——仅注册文件监听器，映射改为按文件/项目按需懒加载并缓存
+- **工作区排除 glob 失效**：`WORKSPACE_EXCLUDE_PATTERN` 花括号内带有空格（`{ node_modules,... }`），导致备选项永远匹配不上，`findFiles` 会深入 `node_modules`、`target`、`.git` 等目录——是 #46 超时的隐性放大因素。已移除空格
+- **每次查找都重复全工作区扫描**：此前每次 Java↔XML 解析都会重新执行 `findFiles('**/*.java' | '**/*.xml')` 并逐个校验。改为懒加载的按项目 namespace 索引，每个项目只构建一次并复用；Java 侧改用有界的包路径查找，不再扫描全部 Java 文件
+- **文件监听事件丢失导致缓存长期不更新**：在网络/虚拟磁盘、容器或编辑器外的批量改动（如命令行工具）下，系统监听事件可能丢失，使索引事实上永久不更新。新增 30s TTL 兜底强制重建，并在返回前再次校验，避免过期索引给出错误结果
+- **刷新 / 清除缓存时监听器泄漏**：重新初始化时先释放既有监听器，`initialize()` 现为幂等操作，变更回调不再重复触发
+- **跨模块 Mapper XML 解析**：按项目懒加载仍保留同一多模块项目中跨兄弟模块查找 Mapper XML 的能力。项目根解析为工作区目录边界内最外层的构建文件（聚合父 `pom.xml` / 根 `build.gradle`）——同一项目的兄弟模块彼此可见，而独立服务（#46 场景）各自保有独立根、互不混扫
+
+### 变更
+
+- **激活事件** ([#46](https://github.com/young1lin/mybatis-boost/issues/46))：将宽泛的 `workspaceContains:**/*.java` 替换为更具针对性的 `onLanguage:java`、`onLanguage:xml`、`onDebugAdapterProtocolTracker:java`，以及针对 `pom.xml` / `build.gradle` / `build.gradle.kts` 的 `workspaceContains`。得益于懒加载，即便触发条件改为基于语言，激活依然轻量
+
+### 测试
+
+- 为懒加载按项目索引、TTL 自愈、项目根解析及激活配置新增单元测试（`FileMapper.test.ts`、`activationConfig.test.ts`，扩展 `projectDetector.test.ts`）
+- 新增 vscode mock 辅助，用于在单元测试中验证监听器/索引行为
+
 ## [0.3.17] - 2026-03-24
 
 ### 修复

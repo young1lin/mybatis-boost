@@ -6,6 +6,26 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.18] - 2026-07-06
+
+### Fixed
+
+- **Activation timeout in large multi-service workspaces** ([#46](https://github.com/young1lin/mybatis-boost/issues/46)): With many Spring Boot services in one workspace, activation could take up to ~120s and time out. `FileMapper.initialize()` no longer scans the workspace upfront — it only wires up file watchers, and mappings are resolved lazily per file/project on demand and cached
+- **Broken workspace exclude glob**: `WORKSPACE_EXCLUDE_PATTERN` had spaces inside the brace group (`{ node_modules,... }`), so the alternatives never matched and `findFiles` descended into `node_modules`, `target`, `.git`, etc. — a silent multiplier on the #46 timeout. Spaces removed
+- **Repeated full-workspace rescans per lookup**: every Java↔XML resolution used to re-run `findFiles('**/*.java' | '**/*.xml')` and verify each match. Replaced with a lazy per-project namespace index, built once per project and reused. Java-side lookup now uses a bounded package-path search instead of scanning all Java files
+- **Stale cache when file-watcher events are missed**: on network/virtual drives, containers, or bulk out-of-editor edits (e.g. CLI tools), OS watcher events can be missed, leaving the index effectively permanent. Added a 30s TTL backstop that forces a rebuild, plus verify-before-return so a stale index never yields a wrong file
+- **Watcher leak on Refresh / Clear Cache**: re-initialization now disposes existing watchers first, so `initialize()` is idempotent and change handlers no longer double-fire
+- **Cross-module mapper XML resolution**: lazy per-project scoping still finds mapper XML in a sibling module of the same multi-module project. Project root resolves to the outermost build file (aggregate parent `pom.xml` / root `build.gradle`) within the workspace folder boundary — sibling modules of one project stay visible, while independent services (the #46 setup) keep separate roots and are never scanned together
+
+### Changed
+
+- **Activation events** ([#46](https://github.com/young1lin/mybatis-boost/issues/46)): Replaced the broad `workspaceContains:**/*.java` with targeted `onLanguage:java`, `onLanguage:xml`, `onDebugAdapterProtocolTracker:java`, plus `workspaceContains` for `pom.xml` / `build.gradle` / `build.gradle.kts`. Lazy initialization keeps activation cheap even though the triggers are now language-based
+
+### Tests
+
+- Added unit tests for the lazy per-project index, TTL self-healing, project-root resolution, and activation config (`FileMapper.test.ts`, `activationConfig.test.ts`, expanded `projectDetector.test.ts`)
+- Added a vscode mock helper for unit-testing watcher/index behavior
+
 ## [0.3.17] - 2026-03-24
 
 ### Fixed
