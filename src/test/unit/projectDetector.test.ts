@@ -5,7 +5,13 @@
 
 import * as assert from 'assert';
 import * as path from 'path';
-import { findProjectFileInParents, hasProjectFiles, FileExistsFn } from '../../utils/projectDetector';
+import {
+    findProjectFileInParents,
+    findOutermostProjectFileInParents,
+    hasProjectFiles,
+    isPathInside,
+    FileExistsFn
+} from '../../utils/projectDetector';
 
 describe('projectDetector Unit Tests', () => {
     // Helper function to create a mock file existence checker
@@ -128,6 +134,80 @@ describe('projectDetector Unit Tests', () => {
 
             const result = findProjectFileInParents(testPath, 10, mockFileExists);
             assert.strictEqual(result, pomPath);
+        });
+    });
+
+    describe('findOutermostProjectFileInParents', () => {
+        it('returns the aggregate root build file, not the nearest module build file', () => {
+            // Multi-module layout: workspace/project/pom.xml (parent) + module pom
+            const startPath = '/ws/project/module-a/src/main/java/com/demo';
+            const modulePom = path.join('/ws/project/module-a', 'pom.xml');
+            const parentPom = path.join('/ws/project', 'pom.xml');
+            const mockFileExists = createMockFileExists(new Set([modulePom, parentPom]));
+
+            const result = findOutermostProjectFileInParents(startPath, '/ws', mockFileExists);
+            assert.strictEqual(result, parentPom, 'should pick the outermost (aggregate) pom');
+        });
+
+        it('returns the nearest build file when it is the only one below stopDir', () => {
+            const startPath = '/ws/service-a/src/main/java';
+            const servicePom = path.join('/ws/service-a', 'pom.xml');
+            const mockFileExists = createMockFileExists(new Set([servicePom]));
+
+            const result = findOutermostProjectFileInParents(startPath, '/ws', mockFileExists);
+            assert.strictEqual(result, servicePom);
+        });
+
+        it('never walks above stopDir even if a build file exists there', () => {
+            // A stray build file above the workspace folder must be ignored.
+            const startPath = '/home/user/ws/service-a/src';
+            const servicePom = path.join('/home/user/ws/service-a', 'pom.xml');
+            const strayGradle = path.join('/home/user', 'build.gradle');
+            const mockFileExists = createMockFileExists(new Set([servicePom, strayGradle]));
+
+            const result = findOutermostProjectFileInParents(
+                startPath, '/home/user/ws', mockFileExists
+            );
+            assert.strictEqual(result, servicePom, 'stray ancestor build file must be ignored');
+        });
+
+        it('includes a build file directly in stopDir itself', () => {
+            const startPath = '/ws/module/src';
+            const modulePom = path.join('/ws/module', 'pom.xml');
+            const rootGradle = path.join('/ws', 'build.gradle');
+            const mockFileExists = createMockFileExists(new Set([modulePom, rootGradle]));
+
+            const result = findOutermostProjectFileInParents(startPath, '/ws', mockFileExists);
+            assert.strictEqual(result, rootGradle, 'stopDir itself is part of the walk');
+        });
+
+        it('returns null when no build file exists between startPath and stopDir', () => {
+            const mockFileExists = createMockFileExists(new Set());
+
+            const result = findOutermostProjectFileInParents('/ws/plain/src', '/ws', mockFileExists);
+            assert.strictEqual(result, null);
+        });
+    });
+
+    describe('isPathInside', () => {
+        it('returns true for a nested child', () => {
+            assert.strictEqual(isPathInside('/ws/project/src', '/ws'), true);
+        });
+
+        it('returns true when child equals parent', () => {
+            assert.strictEqual(isPathInside('/ws', '/ws'), true);
+        });
+
+        it('returns false for a sibling path', () => {
+            assert.strictEqual(isPathInside('/other/project', '/ws'), false);
+        });
+
+        it('returns false when child is above parent', () => {
+            assert.strictEqual(isPathInside('/', '/ws'), false);
+        });
+
+        it('is not fooled by same-prefix sibling directory names', () => {
+            assert.strictEqual(isPathInside('/ws-other/src', '/ws'), false);
         });
     });
 

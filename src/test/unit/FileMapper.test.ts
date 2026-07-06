@@ -7,6 +7,8 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 import { FileMapper } from '../../navigator';
 import { createMockContext } from '../helpers/testSetup';
 
@@ -134,6 +136,223 @@ describe('FileMapper Unit Tests', () => {
 
         it('should verify namespace matches when finding XML files', async () => {
             assert.ok(true, 'Namespace verification needs to be tested');
+        });
+    });
+
+    describe('Lazy initialization (issue #46)', () => {
+        it('initialize() must not scan the workspace (no findFiles)', async () => {
+            const findFilesSpy = sandbox.spy(vscode.workspace, 'findFiles');
+            await fileMapper.initialize();
+            assert.strictEqual(
+                findFilesSpy.callCount,
+                0,
+                'initialize() must not trigger any findFiles scan'
+            );
+        });
+
+        it('is idempotent: re-initializing disposes old watchers instead of leaking them', async () => {
+            const disposed: boolean[] = [];
+            sandbox.stub(vscode.workspace, 'createFileSystemWatcher').callsFake(() => {
+                const idx = disposed.push(false) - 1;
+                return {
+                    onDidCreate: () => ({ dispose: () => {} }),
+                    onDidChange: () => ({ dispose: () => {} }),
+                    onDidDelete: () => ({ dispose: () => {} }),
+                    dispose: () => { disposed[idx] = true; }
+                } as unknown as vscode.FileSystemWatcher;
+            });
+
+            await fileMapper.initialize(); // creates watcher pair #1
+            await fileMapper.initialize(); // must dispose #1 before creating #2
+
+            // The first pair of watchers must have been disposed by the second init.
+            assert.strictEqual(disposed[0], true, 'first java watcher should be disposed');
+            assert.strictEqual(disposed[1], true, 'first xml watcher should be disposed');
+            // And the live set should not grow unbounded across re-inits.
+            const live = disposed.filter(d => !d).length;
+            assert.strictEqual(live, 2, 'exactly one live watcher pair should remain');
+        });
+    });
+
+    describe('Per-project XML index (issue #46)', () => {
+        const DOCTYPE = '<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" ' +
+            '"http://mybatis.org/dtd/mybatis-3-mapper.dtd">';
+
+        let tmpRoot: string;
+        let projectRoot: string;
+        let fooJava: string;
+        let barJava: string;
+        let fooXml: string;
+        let barXml: string;
+
+        const mapperJava = (name: string) =>
+            `package com.demo;\nimport org.apache.ibatis.annotations.Mapper;\n@Mapper\npublic interface ${name} {}\n`;
+        const mapperXml = (namespace: string) =>
+            `<?xml version="1.0" encoding="UTF-8"?>\n${DOCTYPE}\n<mapper namespace="${namespace}">\n</mapper>\n`;
+
+        beforeEach(() => {
+            tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mb-filemapper-'));
+            projectRoot = path.join(tmpRoot, 'proj');
+            const javaDir = path.join(projectRoot, 'src', 'main', 'java', 'com', 'demo');
+            // XML placed in a custom dir with non-matching filenames so quick paths miss
+            // and the lazy per-project index is exercised.
+            const xmlDir = path.join(projectRoot, 'src', 'main', 'resources', 'custom');
+            fs.mkdirSync(javaDir, { recursive: true });
+            fs.mkdirSync(xmlDir, { recursive: true });
+            fs.writeFileSync(path.join(projectRoot, 'pom.xml'), '<project></project>');
+
+            fooJava = path.join(javaDir, 'FooMapper.java');
+            barJava = path.join(javaDir, 'BarMapper.java');
+            fs.writeFileSync(fooJava, mapperJava('FooMapper'));
+            fs.writeFileSync(barJava, mapperJava('BarMapper'));
+
+            fooXml = path.join(xmlDir, 'Foo.xml');
+            barXml = path.join(xmlDir, 'Bar.xml');
+            fs.writeFileSync(fooXml, mapperXml('com.demo.FooMapper'));
+            fs.writeFileSync(barXml, mapperXml('com.demo.BarMapper'));
+        });
+
+        afterEach(() => {
+            fs.rmSync(tmpRoot, { recursive: true, force: true });
+        });
+
+        it('builds the project XML index once and reuses it across lookups', async () => {
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles')
+                .resolves([vscode.Uri.file(fooXml), vscode.Uri.file(barXml)]);
+
+            const fooResult = await fileMapper.getXmlPath(fooJava);
+            const barResult = await fileMapper.getXmlPath(barJava);
+
+            assert.ok(fooResult && fooResult.endsWith('Foo.xml'), 'FooMapper should resolve to Foo.xml');
+            assert.ok(barResult && barResult.endsWith('Bar.xml'), 'BarMapper should resolve to Bar.xml');
+            assert.strictEqual(
+                findFilesStub.callCount,
+                1,
+                'the per-project index should be built once and reused for the second lookup'
+            );
+        });
+
+        it('scopes the index scan to the project via RelativePattern', async () => {
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles')
+                .resolves([vscode.Uri.file(fooXml), vscode.Uri.file(barXml)]);
+
+            await fileMapper.getXmlPath(fooJava);
+
+            assert.ok(findFilesStub.calledOnce, 'index scan should run exactly once');
+            const include = findFilesStub.firstCall.args[0] as vscode.RelativePattern;
+            assert.ok(include instanceof vscode.RelativePattern, 'include should be a RelativePattern');
+            assert.strictEqual(
+                include.base.replace(/\\/g, '/'),
+                projectRoot.replace(/\\/g, '/'),
+                'RelativePattern base should be the project root'
+            );
+        });
+
+        it('rebuilds the index after the TTL so out-of-editor changes self-heal', async () => {
+            // Only fake Date so file-system promises keep working normally.
+            const clock = sandbox.useFakeTimers({ now: Date.now(), toFake: ['Date'] });
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles')
+                .resolves([vscode.Uri.file(fooXml), vscode.Uri.file(barXml)]);
+
+            await fileMapper.getXmlPath(fooJava);
+            assert.strictEqual(findFilesStub.callCount, 1, 'first lookup builds the index');
+
+            // Advance beyond the index TTL (30s); a lookup for a different mapper in the
+            // same project should now rebuild instead of trusting the stale snapshot.
+            clock.tick(31_000);
+            await fileMapper.getXmlPath(barJava);
+            assert.strictEqual(findFilesStub.callCount, 2, 'expired index should be rebuilt');
+        });
+    });
+
+    describe('Cross-module XML resolution (multi-module projects)', () => {
+        const DOCTYPE = '<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" ' +
+            '"http://mybatis.org/dtd/mybatis-3-mapper.dtd">';
+
+        let tmpRoot: string;
+        let savedWorkspaceFolders: typeof vscode.workspace.workspaceFolders;
+
+        const mapperJava = (name: string) =>
+            `package com.demo;\nimport org.apache.ibatis.annotations.Mapper;\n@Mapper\npublic interface ${name} {}\n`;
+        const mapperXml = (namespace: string) =>
+            `<?xml version="1.0" encoding="UTF-8"?>\n${DOCTYPE}\n<mapper namespace="${namespace}">\n</mapper>\n`;
+
+        beforeEach(() => {
+            tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mb-crossmodule-'));
+            // Make the temp root the workspace folder so getProjectRoot's
+            // workspace-bounded aggregate-root walk is exercised (the mocked
+            // getWorkspaceFolder returns workspaceFolders[0]).
+            savedWorkspaceFolders = vscode.workspace.workspaceFolders;
+            (vscode.workspace as any).workspaceFolders = [
+                { uri: { fsPath: tmpRoot }, name: 'tmp', index: 0 }
+            ];
+        });
+
+        afterEach(() => {
+            (vscode.workspace as any).workspaceFolders = savedWorkspaceFolders;
+            fs.rmSync(tmpRoot, { recursive: true, force: true });
+        });
+
+        it('finds XML in a sibling module via the aggregate (parent) build root', async () => {
+            // Multi-module Maven layout with the XML in a different module than the
+            // Java interface — supported by the pre-#46 full scan, must keep working:
+            //   aggregate/pom.xml
+            //   aggregate/module-a/pom.xml + src/main/java/com/demo/FooMapper.java
+            //   aggregate/module-b/pom.xml + src/main/resources/custom/Foo.xml
+            const aggregateRoot = path.join(tmpRoot, 'aggregate');
+            const javaDir = path.join(aggregateRoot, 'module-a', 'src', 'main', 'java', 'com', 'demo');
+            const xmlDir = path.join(aggregateRoot, 'module-b', 'src', 'main', 'resources', 'custom');
+            fs.mkdirSync(javaDir, { recursive: true });
+            fs.mkdirSync(xmlDir, { recursive: true });
+            fs.writeFileSync(path.join(aggregateRoot, 'pom.xml'), '<project></project>');
+            fs.writeFileSync(path.join(aggregateRoot, 'module-a', 'pom.xml'), '<project></project>');
+            fs.writeFileSync(path.join(aggregateRoot, 'module-b', 'pom.xml'), '<project></project>');
+
+            const fooJava = path.join(javaDir, 'FooMapper.java');
+            const fooXml = path.join(xmlDir, 'Foo.xml');
+            fs.writeFileSync(fooJava, mapperJava('FooMapper'));
+            fs.writeFileSync(fooXml, mapperXml('com.demo.FooMapper'));
+
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles')
+                .resolves([vscode.Uri.file(fooXml)]);
+
+            const result = await fileMapper.getXmlPath(fooJava);
+
+            assert.ok(result && result.endsWith('Foo.xml'),
+                'XML in a sibling module should be found via the aggregate root index');
+            const include = findFilesStub.firstCall.args[0] as vscode.RelativePattern;
+            assert.strictEqual(
+                include.base.replace(/\\/g, '/'),
+                aggregateRoot.replace(/\\/g, '/'),
+                'index scan should be rooted at the aggregate (parent pom) root, not the module'
+            );
+        });
+
+        it('keeps independent services isolated when no shared parent build file exists (issue #46 setup)', async () => {
+            // Two standalone services in one workspace folder (no build file at the
+            // workspace root). The index must stay scoped to the owning service —
+            // never widen to the whole workspace, or #46 would regress.
+            const serviceA = path.join(tmpRoot, 'service-a');
+            const javaDir = path.join(serviceA, 'src', 'main', 'java', 'com', 'demo');
+            fs.mkdirSync(javaDir, { recursive: true });
+            fs.mkdirSync(path.join(tmpRoot, 'service-b'), { recursive: true });
+            fs.writeFileSync(path.join(serviceA, 'pom.xml'), '<project></project>');
+            fs.writeFileSync(path.join(tmpRoot, 'service-b', 'pom.xml'), '<project></project>');
+
+            const fooJava = path.join(javaDir, 'FooMapper.java');
+            fs.writeFileSync(fooJava, mapperJava('FooMapper'));
+
+            const findFilesStub = sandbox.stub(vscode.workspace, 'findFiles').resolves([]);
+
+            await fileMapper.getXmlPath(fooJava);
+
+            assert.ok(findFilesStub.calledOnce, 'index scan should run exactly once');
+            const include = findFilesStub.firstCall.args[0] as vscode.RelativePattern;
+            assert.strictEqual(
+                include.base.replace(/\\/g, '/'),
+                serviceA.replace(/\\/g, '/'),
+                'without a shared parent build file the index must stay scoped to the service'
+            );
         });
     });
 });

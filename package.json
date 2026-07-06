@@ -27,9 +27,12 @@
     "sql"
   ],
   "activationEvents": [
+    "onLanguage:java",
+    "onLanguage:xml",
+    "onDebugAdapterProtocolTracker:java",
     "workspaceContains:**/pom.xml",
     "workspaceContains:**/build.gradle",
-    "workspaceContains:**/*.java"
+    "workspaceContains:**/build.gradle.kts"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -342,7 +345,7 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "test": "pnpm run test:unit && pnpm run test:integration",
-    "test:unit": "pnpm exec mocha src/test/unit/**/*.test.ts",
+    "test:unit": "pnpm exec mocha 'src/test/unit/**/*.test.ts'",
     "test:integration": "vscode-test",
     "release": "node -e \"const v = require('./package.json').version; require('child_process').execSync(`git tag -a v${v} -m \\\"Release ${v}\\\" && git push && git push --tags`, {stdio: 'inherit'})\""
   },

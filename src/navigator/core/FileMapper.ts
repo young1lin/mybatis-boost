@@ -8,6 +8,18 @@ import { extractJavaNamespace, isMyBatisMapper } from '../parsers/javaParser';
 import { extractXmlNamespace } from '../parsers/xmlParser';
 import { getFileModTime, normalizePath, WORKSPACE_EXCLUDE_PATTERN } from '../../utils/fileUtils';
 import { LRUCache } from '../../utils/LRUCache';
+import {
+    findProjectFileInParents,
+    findOutermostProjectFileInParents,
+    isPathInside
+} from '../../utils/projectDetector';
+import { findJavaClassFile } from '../../utils/navigationUtils';
+
+/** A project's XML namespace index plus the time it was built (for TTL self-healing). */
+interface ProjectXmlIndex {
+    builtAt: number;
+    byNamespace: Map<string, string[]>;
+}
 
 /**
  * FileMapper manages mappings between Java mapper interfaces and XML files
@@ -17,49 +29,49 @@ export class FileMapper {
     private context: vscode.ExtensionContext;
     private watchers: vscode.FileSystemWatcher[] = [];
 
+    /**
+     * Per-project XML namespace index: projectRoot -> (namespace -> xmlPaths).
+     * Built lazily, only when a mapper cannot be resolved via quick paths, and
+     * cached so repeated lookups within the same project never rescan.
+     */
+    private xmlIndexByProject = new Map<string, ProjectXmlIndex>();
+    /** In-flight index builds, to de-duplicate concurrent lookups in the same project. */
+    private xmlIndexPromises = new Map<string, Promise<ProjectXmlIndex>>();
+    /**
+     * Backstop TTL for a project's XML index. File watchers invalidate the index
+     * instantly on edits, but OS watchers can miss events (network/virtual drives,
+     * containers, or bulk out-of-editor edits via CLI tools like Claude Code / Codex).
+     * The TTL guarantees the index self-heals within this window even when no watcher
+     * event arrives, so the cache is never effectively "permanent".
+     */
+    private static readonly XML_INDEX_TTL_MS = 30_000;
+
     constructor(context: vscode.ExtensionContext, cacheSize: number = 1000) {
         this.context = context;
         this.cache = new LRUCache(cacheSize);
     }
 
     /**
-     * Initialize the mapper by scanning workspace
+     * Initialize the mapper.
+     *
+     * NOTE: This intentionally does NOT scan the workspace. With many Spring Boot
+     * projects open, an upfront `findFiles('**\/*.java')` + per-mapper XML scan made
+     * activation take up to ~120s (see issue #46). Mappings are now resolved on demand
+     * (per file, per project) and cached. Activation only wires up the file watchers.
      */
     async initialize(): Promise<void> {
-        console.log('[MyBatis Boost] Initializing FileMapper...');
+        console.log('[MyBatis Boost] Initializing FileMapper (lazy, per-project)...');
 
-        // Setup file watchers
+        // Idempotent: dispose any existing watchers before wiring up new ones, so
+        // re-initialization (e.g. from the Refresh Mappings / Clear Cache commands)
+        // does not leak watchers or double-fire change handlers.
+        this.watchers.forEach(watcher => watcher.dispose());
+        this.watchers.length = 0;
+
+        // Setup file watchers only - no upfront workspace scan.
         this.setupFileWatchers();
 
-        // Perform initial scan
-        await this.scanWorkspace();
-
-        console.log('[MyBatis Boost] FileMapper initialized');
-    }
-
-    /**
-     * Scan workspace for Java mapper files
-     */
-    private async scanWorkspace(): Promise<void> {
-        const javaFiles = await vscode.workspace.findFiles(
-            '**/*.java',
-            WORKSPACE_EXCLUDE_PATTERN
-        );
-
-        console.log(`[MyBatis Boost] Found ${javaFiles.length} Java files, checking for mappers...`);
-
-        let mapperCount = 0;
-        for (const javaUri of javaFiles) {
-            const javaPath = javaUri.fsPath;
-
-            // Check if it's a MyBatis mapper
-            if (await isMyBatisMapper(javaPath)) {
-                await this.buildMappingForJavaFile(javaPath);
-                mapperCount++;
-            }
-        }
-
-        console.log(`[MyBatis Boost] Built mappings for ${mapperCount} mapper interfaces`);
+        console.log('[MyBatis Boost] FileMapper initialized (mappings resolved on demand)');
     }
 
     /**
@@ -118,28 +130,137 @@ export class FileMapper {
             }
         }
 
-        // Priority 1: Search all XML files, prefer same module (longest common prefix)
+        // Priority 1: Look up the namespace in the lazy, per-project XML index.
+        // The index is built once per project and reused (with a TTL backstop), so
+        // this avoids the O(mappers x xmlFiles) full-workspace rescan that previously
+        // ran per mapper.
+        const projectRoot = this.getProjectRoot(javaPath);
+        const index = await this.getProjectXmlIndex(projectRoot);
+        const candidates = index.byNamespace.get(namespace);
+        if (!candidates || candidates.length === 0) {
+            return null;
+        }
+
+        // Prefer same-module candidates (longest common prefix), but re-verify the
+        // chosen file still exists and matches the namespace before returning it: the
+        // cached index can lag a moved/deleted/renamed file if its watcher event was
+        // missed (e.g. bulk CLI edits). Verification keeps results correct regardless.
+        const javaPathNormalized = javaPath.replace(/\\/g, '/');
+        const ordered = [...candidates].sort(
+            (a, b) => this.getCommonPrefixLength(javaPathNormalized, b)
+                - this.getCommonPrefixLength(javaPathNormalized, a)
+        );
+        for (const candidate of ordered) {
+            if (await this.verifyXmlFile(candidate, namespace)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolve the project root that owns a file.
+     *
+     * Uses the OUTERMOST build file (pom.xml / build.gradle / build.gradle.kts)
+     * between the file and its workspace folder — i.e. the aggregate root of a
+     * multi-module project — so mapper XML living in a sibling module of the same
+     * project is still visible to the index (the pre-#46 full-workspace scan
+     * supported that layout). The walk never leaves the workspace folder, so
+     * independent services sharing one workspace folder (the issue #46 setup)
+     * each keep their own root and are never scanned together.
+     *
+     * Files outside any workspace folder fall back to the nearest build file,
+     * then the first workspace folder.
+     */
+    private getProjectRoot(filePath: string): string {
+        const startDir = path.dirname(filePath);
+        const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
+        const folderPath = folder?.uri.fsPath;
+
+        if (folderPath && isPathInside(startDir, folderPath)) {
+            const outermost = findOutermostProjectFileInParents(startDir, folderPath);
+            if (outermost) {
+                return path.dirname(outermost);
+            }
+            // No build file at all between the file and its workspace folder:
+            // scope to the workspace folder itself.
+            return folderPath;
+        }
+
+        const projectFile = findProjectFileInParents(startDir);
+        if (projectFile) {
+            return path.dirname(projectFile);
+        }
+
+        return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? startDir;
+    }
+
+    /**
+     * Get (and lazily build + cache) the namespace -> xmlPaths index for a project.
+     * Concurrent callers share a single in-flight build.
+     */
+    private async getProjectXmlIndex(projectRoot: string): Promise<ProjectXmlIndex> {
+        const cached = this.xmlIndexByProject.get(projectRoot);
+        if (cached && Date.now() - cached.builtAt < FileMapper.XML_INDEX_TTL_MS) {
+            return cached;
+        }
+        // Expired (or absent): drop the stale snapshot and rebuild below.
+        if (cached) {
+            this.xmlIndexByProject.delete(projectRoot);
+        }
+
+        const inflight = this.xmlIndexPromises.get(projectRoot);
+        if (inflight) {
+            return inflight;
+        }
+
+        const promise = this.buildProjectXmlIndex(projectRoot);
+        this.xmlIndexPromises.set(projectRoot, promise);
+        try {
+            const index = await promise;
+            this.xmlIndexByProject.set(projectRoot, index);
+            return index;
+        } finally {
+            this.xmlIndexPromises.delete(projectRoot);
+        }
+    }
+
+    /**
+     * Scan a single project's XML files once and group their paths by namespace.
+     * Scoped to the project root via RelativePattern so other projects are untouched.
+     */
+    private async buildProjectXmlIndex(projectRoot: string): Promise<ProjectXmlIndex> {
+        const byNamespace = new Map<string, string[]>();
         const xmlFiles = await vscode.workspace.findFiles(
-            '**/*.xml',
+            new vscode.RelativePattern(projectRoot, '**/*.xml'),
             WORKSPACE_EXCLUDE_PATTERN
         );
 
-        const javaPathNormalized = javaPath.replace(/\\/g, '/');
-        let bestXmlPath: string | null = null;
-        let bestPrefixLen = -1;
-
         for (const xmlUri of xmlFiles) {
             const xmlPath = xmlUri.fsPath;
-            if (await this.verifyXmlFile(xmlPath, namespace)) {
-                const prefixLen = this.getCommonPrefixLength(javaPathNormalized, xmlPath);
-                if (prefixLen > bestPrefixLen) {
-                    bestPrefixLen = prefixLen;
-                    bestXmlPath = xmlPath;
-                }
+            const xmlNamespace = await extractXmlNamespace(xmlPath);
+            if (!xmlNamespace) {
+                continue;
+            }
+            const existing = byNamespace.get(xmlNamespace);
+            if (existing) {
+                existing.push(xmlPath);
+            } else {
+                byNamespace.set(xmlNamespace, [xmlPath]);
             }
         }
 
-        return bestXmlPath;
+        console.log(`[MyBatis Boost] Indexed ${xmlFiles.length} XML files in project ${projectRoot}`);
+        return { builtAt: Date.now(), byNamespace };
+    }
+
+    /**
+     * Drop the cached XML index (and any in-flight build) for the project owning a file.
+     */
+    private invalidateXmlIndexForFile(filePath: string): void {
+        const projectRoot = this.getProjectRoot(filePath);
+        this.xmlIndexByProject.delete(projectRoot);
+        this.xmlIndexPromises.delete(projectRoot);
     }
 
     /**
@@ -247,33 +368,20 @@ export class FileMapper {
             return null;
         }
 
-        // Search Java files for matching namespace, prefer same module
-        const javaFiles = await vscode.workspace.findFiles(
-            '**/*.java',
-            WORKSPACE_EXCLUDE_PATTERN
-        );
-
-        const xmlPathNormalized = xmlPath.replace(/\\/g, '/');
-        let bestJavaPath: string | null = null;
-        let bestPrefixLen = -1;
-
-        for (const javaUri of javaFiles) {
-            const javaPath = javaUri.fsPath;
-            const javaNamespace = await extractJavaNamespace(javaPath);
-
-            if (javaNamespace === namespace) {
-                const prefixLen = this.getCommonPrefixLength(xmlPathNormalized, javaPath);
-                if (prefixLen > bestPrefixLen) {
-                    bestPrefixLen = prefixLen;
-                    bestJavaPath = javaPath;
-                }
-            }
+        // The namespace IS the fully-qualified Java interface name, so resolve it
+        // directly via a bounded package-path search, scoped to the same project
+        // first and falling back to the workspace. No full '**/*.java' scan.
+        const projectRoot = this.getProjectRoot(xmlPath);
+        let javaUri = await findJavaClassFile(namespace, projectRoot);
+        if (!javaUri) {
+            javaUri = await findJavaClassFile(namespace);
         }
 
-        if (bestJavaPath) {
-            await this.buildMappingForJavaFile(bestJavaPath);
+        if (javaUri) {
+            await this.buildMappingForJavaFile(javaUri.fsPath);
+            return javaUri.fsPath;
         }
-        return bestJavaPath;
+        return null;
     }
 
     /**
@@ -314,36 +422,25 @@ export class FileMapper {
      */
     private async handleXmlFileCreate(filePath: string): Promise<void> {
         try {
+            // A new XML file must be picked up by the project's namespace index.
+            this.invalidateXmlIndexForFile(filePath);
+
             const namespace = await extractXmlNamespace(filePath);
             if (!namespace) {
                 return;
             }
 
-            // Search for corresponding Java mapper, prefer same module
-            const javaFiles = await vscode.workspace.findFiles(
-                '**/*.java',
-                WORKSPACE_EXCLUDE_PATTERN
-            );
-
-            const xmlPathNormalized = filePath.replace(/\\/g, '/');
-            let bestJavaPath: string | null = null;
-            let bestPrefixLen = -1;
-
-            for (const javaUri of javaFiles) {
-                const javaPath = javaUri.fsPath;
-                const javaNamespace = await extractJavaNamespace(javaPath);
-                if (javaNamespace === namespace) {
-                    const prefixLen = this.getCommonPrefixLength(xmlPathNormalized, javaPath);
-                    if (prefixLen > bestPrefixLen) {
-                        bestPrefixLen = prefixLen;
-                        bestJavaPath = javaPath;
-                    }
-                }
+            // The namespace is the Java interface FQN; resolve it with a bounded,
+            // project-scoped search instead of scanning every '**/*.java' file.
+            const projectRoot = this.getProjectRoot(filePath);
+            let javaUri = await findJavaClassFile(namespace, projectRoot);
+            if (!javaUri) {
+                javaUri = await findJavaClassFile(namespace);
             }
 
-            if (bestJavaPath) {
-                await this.buildMappingForJavaFile(bestJavaPath);
-                console.log(`[MyBatis Boost] New XML mapped to ${bestJavaPath}`);
+            if (javaUri) {
+                await this.buildMappingForJavaFile(javaUri.fsPath);
+                console.log(`[MyBatis Boost] New XML mapped to ${javaUri.fsPath}`);
             }
         } catch (error) {
             console.error(`[MyBatis Boost] Error handling new XML file:`, error);
@@ -377,6 +474,8 @@ export class FileMapper {
         if (filePath.endsWith('.java')) {
             this.buildMappingForJavaFile(filePath);
         } else if (filePath.endsWith('.xml')) {
+            // An XML edit may change its namespace, so drop the project's cached index.
+            this.invalidateXmlIndexForFile(filePath);
             // For XML file changes, we need to find the corresponding Java file and rebuild
             if (mapping && mapping.javaPath) {
                 this.buildMappingForJavaFile(mapping.javaPath);
@@ -406,6 +505,11 @@ export class FileMapper {
                 this.cache.delete(normalizePath(mapping.javaPath));
             }
         }
+
+        // A deleted XML file must be dropped from the project's namespace index.
+        if (filePath.endsWith('.xml')) {
+            this.invalidateXmlIndexForFile(filePath);
+        }
     }
 
     /**
@@ -424,10 +528,13 @@ export class FileMapper {
     }
 
     /**
-     * Clear all cached mappings
+     * Clear all cached mappings (and the per-project XML indexes), forcing a fresh
+     * lazy rebuild on the next lookup.
      */
     clearCache(): void {
         this.cache.clear();
+        this.xmlIndexByProject.clear();
+        this.xmlIndexPromises.clear();
     }
 
     /**
@@ -436,5 +543,7 @@ export class FileMapper {
     dispose(): void {
         this.watchers.forEach(watcher => watcher.dispose());
         this.cache.clear();
+        this.xmlIndexByProject.clear();
+        this.xmlIndexPromises.clear();
     }
 }
