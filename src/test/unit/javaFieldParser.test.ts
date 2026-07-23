@@ -454,6 +454,26 @@ public class User {
             const result = await extractJavaFields('/fake/User.java', 'User');
             assert.deepStrictEqual(result.map(f => f.name), ['name']);
         });
+
+        it('should keep collecting outer-class fields declared after a nested type', async () => {
+            const mockContent = `
+package com.example;
+
+public class User {
+    private String name;
+
+    public static class Builder {
+        private String pendingName;
+    }
+
+    private Long id;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractJavaFields('/fake/User.java', 'User');
+            assert.deepStrictEqual(result.map(f => f.name), ['name', 'id'],
+                'fields after the nested type belong to the outer class; nested fields do not');
+        });
     });
 
     // ==================== Superclass extraction ====================

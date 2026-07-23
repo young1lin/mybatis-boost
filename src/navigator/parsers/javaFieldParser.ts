@@ -151,7 +151,12 @@ function extractJavaFieldsRegex(content: string, className?: string): JavaField[
 
         if (/(?:class|interface|enum)\s+\w+/.test(line)) {
             inClassBody = false;
-            if (className) {
+            // Only top-level declarations (braceLevel 0) change which class we
+            // are in. Nested type declarations must not clear the flag: their
+            // own fields sit deeper than braceLevel 1 and are excluded by the
+            // depth check, while the outer class's fields after the nested
+            // type still belong to the target class.
+            if (className && braceLevel === 0) {
                 inTargetClass = new RegExp(`\\b(?:class|interface|enum)\\s+${escapeRegex(className)}\\b`).test(line);
             }
         }
