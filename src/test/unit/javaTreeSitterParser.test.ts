@@ -11,6 +11,7 @@ import {
     extractParametersFromAST,
     extractFieldsFromAST,
     extractNamespaceFromAST,
+    extractSuperclassNameFromAST,
     isMyBatisMapperFromAST,
 } from '../../navigator/parsers/javaTreeSitterParser';
 
@@ -846,6 +847,106 @@ public class Empty {
 `;
             const result = await extractFieldsFromAST(content);
             assert.strictEqual(result.length, 0);
+        });
+    });
+
+    describe('extractSuperclassNameFromAST', () => {
+        it('should extract simple superclass name', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends BaseEntity {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should strip generic type arguments from superclass', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends BaseEntity<Long> {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should extract fully-qualified superclass name', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends com.example.entity.BaseEntity {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'com.example.entity.BaseEntity');
+        });
+
+        it('should extract superclass when class also implements interfaces', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends BaseEntity implements Serializable, Cloneable {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should handle bounded type parameters on the class itself', async () => {
+            const content = `
+package com.example.model;
+
+public class Holder<T extends Number> extends BaseHolder {
+    private T value;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseHolder');
+        });
+
+        it('should return null when class has no extends clause', async () => {
+            const content = `
+package com.example.model;
+
+public class Role implements Serializable {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, null);
+        });
+
+        it('should return null for interface-only files', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface RoleMapper extends BaseMapper {
+    Role selectById(Long id);
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, null);
+        });
+
+        it('should handle multi-line class declarations', async () => {
+            const content = `
+package com.example.model;
+
+public class Role
+        extends BaseEntity<Long>
+        implements Serializable {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseEntity');
         });
     });
 });

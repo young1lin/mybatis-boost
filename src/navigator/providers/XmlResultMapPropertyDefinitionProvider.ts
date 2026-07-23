@@ -5,8 +5,8 @@
 
 import * as vscode from 'vscode';
 import { isBuiltInTypeForNavigation as isBuiltInType } from '../../utils/javaTypeUtils';
-import { escapeRegex } from '../../utils/stringUtils';
-import { matchXmlAttributeAtCursor, mapCursorProportionally, findJavaClassFile, CursorMatchInfo } from '../../utils/navigationUtils';
+import { matchXmlAttributeAtCursor, mapCursorProportionally, CursorMatchInfo } from '../../utils/navigationUtils';
+import { findFieldInHierarchy } from '../../utils/javaFieldHierarchy';
 
 /**
  * Provides go-to-definition for property attributes in resultMap tags
@@ -95,7 +95,8 @@ export class XmlResultMapPropertyDefinitionProvider implements vscode.Definition
     }
 
     /**
-     * Find Java class and field by fully-qualified class name and field name
+     * Find Java class and field by fully-qualified class name and field name,
+     * searching superclasses when the field is inherited.
      * Maps cursor position proportionally from XML property to Java field
      */
     private async findJavaField(
@@ -110,75 +111,25 @@ export class XmlResultMapPropertyDefinitionProvider implements vscode.Definition
         }
 
         try {
-            const javaUri = await findJavaClassFile(className);
-            if (!javaUri) {
-                console.log(`[XmlResultMapPropertyDefinitionProvider] Java class not found: ${className}`);
+            const resolved = await findFieldInHierarchy(className, fieldName);
+            if (!resolved) {
+                console.log(`[XmlResultMapPropertyDefinitionProvider] Field ${fieldName} not found in class ${className} or its superclasses`);
                 return null;
             }
 
-            // Find the field declaration line
-            const document = await vscode.workspace.openTextDocument(javaUri);
-            const content = document.getText();
-            const lines = content.split('\n');
+            const { field } = resolved;
+            const sourceLength = matchInfo.endColumn - matchInfo.startColumn;
+            const targetLength = fieldName.length;
 
-            // Look for field declaration
-            const fieldRegex = new RegExp(
-                `(?:private|protected|public)?\\s+\\w+(?:<[^>]+>)?\\s+${escapeRegex(fieldName)}\\s*[;=]`
+            const targetColumn = (sourceLength > 0 && targetLength > 0)
+                ? mapCursorProportionally(matchInfo.cursorOffset, sourceLength, field.startColumn, targetLength)
+                : field.startColumn;
+
+            console.log(`[XmlResultMapPropertyDefinitionProvider] Field position: ${resolved.filePath} line ${field.line}, column ${targetColumn}`);
+            return new vscode.Location(
+                vscode.Uri.file(resolved.filePath),
+                new vscode.Position(field.line, targetColumn)
             );
-
-            // Track if we're in a class body
-            let inClassBody = false;
-            let braceLevel = 0;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const trimmedLine = line.trim();
-
-                // Track class boundaries
-                if (/(?:class|interface|enum)\s+\w+/.test(line)) {
-                    inClassBody = false;
-                }
-
-                // Track brace level
-                braceLevel += (line.match(/{/g) || []).length;
-                braceLevel -= (line.match(/}/g) || []).length;
-
-                if (braceLevel > 0) {
-                    inClassBody = true;
-                }
-
-                if (!inClassBody || braceLevel < 1) {
-                    continue;
-                }
-
-                // Try to match field on current line
-                if (fieldRegex.test(trimmedLine)) {
-                    console.log(`[XmlResultMapPropertyDefinitionProvider] Found field at line ${i}`);
-
-                    // Find the exact column position of the field name
-                    const fieldNameRegex = new RegExp(`\\b${escapeRegex(fieldName)}\\b`);
-                    const match = line.match(fieldNameRegex);
-
-                    if (match && match.index !== undefined) {
-                        const fieldStartColumn = match.index;
-                        const sourceLength = matchInfo.endColumn - matchInfo.startColumn;
-                        const targetLength = fieldName.length;
-
-                        const targetColumn = (sourceLength > 0 && targetLength > 0)
-                            ? mapCursorProportionally(matchInfo.cursorOffset, sourceLength, fieldStartColumn, targetLength)
-                            : fieldStartColumn;
-
-                        console.log(`[XmlResultMapPropertyDefinitionProvider] Field position: line ${i}, column ${targetColumn}`);
-                        return new vscode.Location(javaUri, new vscode.Position(i, targetColumn));
-                    }
-
-                    // Fallback to line start
-                    return new vscode.Location(javaUri, new vscode.Position(i, 0));
-                }
-            }
-
-            console.log(`[XmlResultMapPropertyDefinitionProvider] Field ${fieldName} not found in class`);
-            return null;
 
         } catch (error) {
             console.error('[XmlResultMapPropertyDefinitionProvider] Error finding Java field:', error);

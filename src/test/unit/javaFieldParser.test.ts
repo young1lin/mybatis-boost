@@ -8,7 +8,8 @@ import * as vscode from 'vscode';
 import {
     extractJavaFields,
     findJavaField,
-    findJavaFieldPosition
+    findJavaFieldPosition,
+    extractSuperclassName
 } from '../../navigator/parsers/javaFieldParser';
 import * as fileUtils from '../../utils/fileUtils';
 import * as javaTreeSitterParser from '../../navigator/parsers/javaTreeSitterParser';
@@ -435,6 +436,122 @@ public class User {
             const result = await extractJavaFields('/fake/User.java');
             assert.strictEqual(result.length, 1);
             assert.strictEqual(result[0].name, 'name');
+        });
+    });
+
+    // ==================== Superclass extraction ====================
+
+    describe('extractSuperclassName (AST tier)', () => {
+        it('should extract superclass name', async () => {
+            const mockContent = `
+package com.example;
+
+public class Role extends BaseEntity {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java');
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should return null when class extends nothing', async () => {
+            const mockContent = `
+package com.example;
+
+public class Role {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java');
+            assert.strictEqual(result, null);
+        });
+    });
+
+    describe('extractSuperclassName (regex fallback, AST forced to throw)', () => {
+        beforeEach(() => {
+            sinon.stub(javaTreeSitterParser, 'extractSuperclassNameFromAST')
+                .rejects(new Error('WASM fail'));
+        });
+
+        it('should extract simple superclass name', async () => {
+            const mockContent = `
+package com.example;
+
+public class Role extends BaseEntity {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java');
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should extract superclass name without generic type arguments', async () => {
+            const mockContent = `
+package com.example;
+
+public class Role extends BaseEntity<Long> {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java');
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should extract fully-qualified superclass name', async () => {
+            const mockContent = `
+package com.example;
+
+public class Role extends com.example.entity.BaseEntity {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java');
+            assert.strictEqual(result, 'com.example.entity.BaseEntity');
+        });
+
+        it('should not capture bounded type parameter as superclass', async () => {
+            const mockContent = `
+package com.example;
+
+public class Holder<T extends Number> extends BaseHolder {
+    private T value;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Holder.java');
+            assert.strictEqual(result, 'BaseHolder');
+        });
+
+        it('should return null for class that only implements interfaces', async () => {
+            const mockContent = `
+package com.example;
+
+public class Role implements Serializable {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java');
+            assert.strictEqual(result, null);
+        });
+
+        it('should handle multi-line class declarations', async () => {
+            const mockContent = `
+package com.example;
+
+public class Role
+        extends BaseEntity {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java');
+            assert.strictEqual(result, 'BaseEntity');
         });
     });
 });

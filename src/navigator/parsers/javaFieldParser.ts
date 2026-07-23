@@ -6,7 +6,7 @@
 
 import { JavaField } from '../../types';
 import { readFile } from '../../utils/fileUtils';
-import { extractFieldsFromAST } from './javaTreeSitterParser';
+import { extractFieldsFromAST, extractSuperclassNameFromAST } from './javaTreeSitterParser';
 import { getClassFieldsViaLS } from '../../utils/javaLSHelper';
 
 /**
@@ -84,7 +84,35 @@ export async function findJavaFieldPosition(
     return null;
 }
 
+/**
+ * Extract the superclass name declared in a Java class file's `extends` clause
+ *
+ * Two-tier fallback: WASM (tree-sitter) → Regex
+ *
+ * @param filePath - Path to Java file
+ * @returns Superclass name as written in source (simple or fully-qualified,
+ *          without generic type arguments), or null when the class extends nothing
+ */
+export async function extractSuperclassName(filePath: string): Promise<string | null> {
+    const content = await readFile(filePath);
+
+    // Tier 1: WASM (tree-sitter)
+    try {
+        return await extractSuperclassNameFromAST(content);
+    } catch { /* fallthrough */ }
+
+    // Tier 2: Regex fallback
+    return extractSuperclassNameRegex(content);
+}
+
 // ==================== Regex fallback implementation ====================
+
+function extractSuperclassNameRegex(content: string): string | null {
+    // The optional generic group keeps bounded type parameters like
+    // "class Child<T extends Number> extends Base" from capturing "Number"
+    const match = content.match(/\bclass\s+\w+(?:\s*<[^>]*>)?\s+extends\s+([\w.]+)/);
+    return match ? match[1] : null;
+}
 
 function extractJavaFieldsRegex(content: string): JavaField[] {
     const lines = content.split('\n');

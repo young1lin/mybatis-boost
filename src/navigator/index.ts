@@ -24,4 +24,4 @@ export { ParameterValidator } from './diagnostics/ParameterValidator';
 export { extractJavaNamespace, isMyBatisMapper, extractJavaMethods, extractJavaMethodsFromContent, findJavaMethodLine, findJavaMethodPosition, extractMethodParameters } from './parsers/javaParser';
 export { extractXmlNamespace, extractXmlStatements, findXmlStatementLine, findXmlStatementPosition, extractStatementIdFromPosition, findXmlMapperPosition } from './parsers/xmlParser';
 export { extractParameterReferences, extractStatementParameterInfo, getParameterAtPosition } from './parsers/parameterParser';
-export { extractJavaFields, findJavaField, findJavaFieldPosition } from './parsers/javaFieldParser';
+export { extractJavaFields, findJavaField, findJavaFieldPosition, extractSuperclassName } from './parsers/javaFieldParser';

@@ -336,6 +336,41 @@ export async function extractFieldsFromAST(content: string): Promise<JavaField[]
 }
 
 /**
+ * Extract the superclass name from the first class declaration with an
+ * `extends` clause using AST. Generic type arguments are stripped
+ * (e.g., `extends BaseEntity<Long>` → "BaseEntity").
+ *
+ * @returns Superclass name as written in source (simple or fully-qualified), or null
+ */
+export async function extractSuperclassNameFromAST(content: string): Promise<string | null> {
+    if (!await initTreeSitter()) {
+        throw new Error('Tree-sitter not available');
+    }
+    const root = parseContent(content);
+
+    const classDecls = root.descendantsOfType('class_declaration');
+    for (const cls of classDecls) {
+        const superclassNode = cls.childForFieldName('superclass');
+        if (!superclassNode) {
+            continue;
+        }
+
+        // The superclass node text is "extends TypeName[<...>]"
+        let name = superclassNode.text.replace(/^extends\s+/, '').trim();
+        const genericIdx = name.indexOf('<');
+        if (genericIdx >= 0) {
+            name = name.substring(0, genericIdx).trim();
+        }
+
+        if (name) {
+            return name;
+        }
+    }
+
+    return null;
+}
+
+/**
  * Extract namespace (package.InterfaceName) from Java content using AST.
  */
 export async function extractNamespaceFromAST(content: string): Promise<string | null> {
