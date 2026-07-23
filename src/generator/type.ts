@@ -203,6 +203,22 @@ export interface ServiceGenerateMetadata extends GenerateMetadata {
   useLombok: boolean;
 }
 
+export interface ServiceImplGenerateMetadata extends GenerateMetadata {
+  kind: 'serviceImpl';
+  entityClassName: string;
+  mapperClassName: string;
+  serviceClassName: string;
+}
+
+export interface ControllerGenerateMetadata extends GenerateMetadata {
+  kind: 'controller';
+  entityClassName: string;
+  serviceClassName: string;
+  primaryKeyType: string;
+  requestPath: string;
+  useLombok: boolean;
+}
+
 /**
  * Union type of all metadata types for type-safe narrowing
  */
@@ -210,7 +226,9 @@ export type GenerateMetadataUnion =
   | EntityGenerateMetadata
   | MapperGenerateMetadata
   | XmlGenerateMetadata
-  | ServiceGenerateMetadata;
+  | ServiceGenerateMetadata
+  | ServiceImplGenerateMetadata
+  | ControllerGenerateMetadata;
 
 /**
  * Type guard functions for runtime type checking
@@ -229,6 +247,14 @@ export function isXmlMetadata(metadata: GenerateMetadata): metadata is XmlGenera
 
 export function isServiceMetadata(metadata: GenerateMetadata): metadata is ServiceGenerateMetadata {
   return 'kind' in metadata && metadata.kind === 'service';
+}
+
+export function isServiceImplMetadata(metadata: GenerateMetadata): metadata is ServiceImplGenerateMetadata {
+  return 'kind' in metadata && metadata.kind === 'serviceImpl';
+}
+
+export function isControllerMetadata(metadata: GenerateMetadata): metadata is ControllerGenerateMetadata {
+  return 'kind' in metadata && metadata.kind === 'controller';
 }
 
 export interface GenerateReuslt {

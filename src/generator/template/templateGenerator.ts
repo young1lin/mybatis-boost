@@ -9,6 +9,8 @@ import {
     MapperGenerateMetadata,
     XmlGenerateMetadata,
     ServiceGenerateMetadata,
+    ServiceImplGenerateMetadata,
+    ControllerGenerateMetadata,
     GenerateReuslt,
 } from '../type';
 import {
@@ -134,13 +136,45 @@ export class CodeGenerator {
         };
     }
 
+    generateServiceImpl(templatePath: string = path.join(__dirname, 'service-impl.ejs')): GenerateReuslt {
+        const metadata = this.buildServiceImplMetadata();
+        const content = this.renderTemplate(templatePath, metadata);
+        const className = metadata.domainName + metadata.classSuffix;
+
+        return {
+            name: `${className}.java`,
+            outputPath: this.buildOutputPath(metadata.packageName, className, 'java'),
+            content,
+            type: 'java',
+            metadata,
+        };
+    }
+
+    generateController(templatePath: string = path.join(__dirname, 'controller.ejs')): GenerateReuslt {
+        const metadata = this.buildControllerMetadata();
+        const content = this.renderTemplate(templatePath, metadata);
+        const className = metadata.domainName + metadata.classSuffix;
+
+        return {
+            name: `${className}.java`,
+            outputPath: this.buildOutputPath(metadata.packageName, className, 'java'),
+            content,
+            type: 'java',
+            metadata,
+        };
+    }
+
     generateAll(): GenerateReuslt[] {
-        return [
+        const results = [
             this.generateEntity(),
             this.generateMapper(),
             this.generateMapperXml(),
             this.generateService(),
         ];
+        if (this.config.useMyBatisPlus) {
+            results.push(this.generateServiceImpl(), this.generateController());
+        }
+        return results;
     }
 
     private buildEntityMetadata(): EntityGenerateMetadata {
@@ -228,6 +262,65 @@ export class CodeGenerator {
             entityClassName: this.domainName + this.config.entitySuffix!,
             mapperClassName,
             mapperClassNameFiled,
+            useLombok: this.config.useLombok!,
+        };
+    }
+
+    private buildServiceImplMetadata(): ServiceImplGenerateMetadata {
+        const entityClassName = this.domainName + this.config.entitySuffix!;
+        const serviceClassName = this.domainName + this.config.serviceSuffix!;
+        return {
+            kind: 'serviceImpl',
+            basePackage: this.config.basePackage,
+            packageName: `${this.config.basePackage}.service.impl`,
+            imports: sortImports(new Set([
+                'com.baomidou.mybatisplus.extension.service.impl.ServiceImpl',
+                `${this.config.basePackage}.entity.${entityClassName}`,
+                `${this.config.basePackage}.mapper.${this.domainName}${this.config.mapperSuffix!}`,
+                `${this.config.basePackage}.service.${serviceClassName}`,
+                'org.springframework.stereotype.Service',
+            ])),
+            comment: this.comment,
+            author: this.config.author,
+            since: this.getCurrentDate(),
+            useMyBatisPlus: true,
+            domainName: this.domainName,
+            classSuffix: `${this.config.serviceSuffix!}Impl`,
+            entityClassName,
+            mapperClassName: this.domainName + this.config.mapperSuffix!,
+            serviceClassName,
+        };
+    }
+
+    private buildControllerMetadata(): ControllerGenerateMetadata {
+        const entityClassName = this.domainName + this.config.entitySuffix!;
+        const serviceClassName = this.domainName + this.config.serviceSuffix!;
+        const imports = new Set([
+            `${this.config.basePackage}.entity.${entityClassName}`,
+            `${this.config.basePackage}.service.${serviceClassName}`,
+            'java.util.List',
+            'org.springframework.web.bind.annotation.*',
+        ]);
+        if (this.config.useLombok) {
+            imports.add('lombok.RequiredArgsConstructor');
+        } else {
+            imports.add('org.springframework.beans.factory.annotation.Autowired');
+        }
+        return {
+            kind: 'controller',
+            basePackage: this.config.basePackage,
+            packageName: `${this.config.basePackage}.controller`,
+            imports: sortImports(imports),
+            comment: this.comment,
+            author: this.config.author,
+            since: this.getCurrentDate(),
+            useMyBatisPlus: true,
+            domainName: this.domainName,
+            classSuffix: 'Controller',
+            entityClassName,
+            serviceClassName,
+            primaryKeyType: this.primaryKey.javaType,
+            requestPath: `/${this.tableName.replace(/_/g, '-')}`,
             useLombok: this.config.useLombok!,
         };
     }
@@ -330,20 +423,19 @@ export class CodeGenerator {
         const entityClassName = domainName + this.config.entitySuffix!;
         imports.add(`${this.config.basePackage}.entity.${entityClassName}`);
 
-        // Mapper import
-        imports.add(`${this.config.basePackage}.mapper.${mapperClassName}`);
-
-        // Spring Service
-        imports.add('org.springframework.stereotype.Service');
-
-        // Dependency injection
-        if (this.config.useLombok) {
-            imports.add('lombok.RequiredArgsConstructor');
+        if (this.config.useMyBatisPlus) {
+            imports.add('com.baomidou.mybatisplus.extension.service.IService');
         } else {
-            imports.add('org.springframework.beans.factory.annotation.Autowired');
-        }
-
-        if (!this.config.useMyBatisPlus) {
+            // Mapper import
+            imports.add(`${this.config.basePackage}.mapper.${mapperClassName}`);
+            // Spring Service
+            imports.add('org.springframework.stereotype.Service');
+            // Dependency injection
+            if (this.config.useLombok) {
+                imports.add('lombok.RequiredArgsConstructor');
+            } else {
+                imports.add('org.springframework.beans.factory.annotation.Autowired');
+            }
             imports.add('java.util.List');
         }
         return sortImports(imports);
@@ -405,6 +497,7 @@ export class CodeGenerator {
             mapperClassName: metadata.mapperClassName,
             mapperFieldName: metadata.mapperClassNameFiled,
             useLombok: metadata.useLombok,
+            useMyBatisPlus: metadata.useMyBatisPlus,
         };
     }
 
