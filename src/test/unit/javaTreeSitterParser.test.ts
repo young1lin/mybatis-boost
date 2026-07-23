@@ -948,5 +948,49 @@ public class Role
             const result = await extractSuperclassNameFromAST(content);
             assert.strictEqual(result, 'BaseEntity');
         });
+
+        it('should only inspect the named class when className is given', async () => {
+            const content = `
+package com.example.model;
+
+class Helper extends HelperBase {
+    private String helperField;
+}
+
+public class Role extends RoleBase {
+    private String roleName;
+}
+`;
+            assert.strictEqual(await extractSuperclassNameFromAST(content, 'Role'), 'RoleBase');
+            assert.strictEqual(await extractSuperclassNameFromAST(content, 'Helper'), 'HelperBase');
+        });
+
+        it('should return null when the named class extends nothing even if another class does', async () => {
+            const content = `
+package com.example.model;
+
+public class Role {
+    private String roleName;
+
+    public static class Builder extends AbstractBuilder {
+        private String pending;
+    }
+}
+`;
+            const result = await extractSuperclassNameFromAST(content, 'Role');
+            assert.strictEqual(result, null);
+        });
+
+        it('should return null when the named class does not exist in the file', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends BaseEntity {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content, 'Missing');
+            assert.strictEqual(result, null);
+        });
     });
 });

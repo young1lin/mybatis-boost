@@ -223,6 +223,35 @@ public class Child extends Object {
             assert.strictEqual(findClassStub.callCount, 1);
         });
 
+        it('should not attribute a secondary class\'s superclass to the visited class', async () => {
+            setupClasses({
+                Plain: `
+package com.example;
+
+public class Plain {
+    private Long id;
+}
+
+class PlainHelper extends HelperBase {
+    private String helperField;
+}
+`,
+                HelperBase: `
+package com.example;
+
+public class HelperBase {
+    private String wrongField;
+}
+`
+            });
+
+            const result = await getClassFieldsWithInheritance('com.example.Plain');
+
+            assert.deepStrictEqual(result.classChain, ['com.example.Plain']);
+            assert.ok(!result.fields.some(f => f.field.name === 'wrongField'),
+                'HelperBase fields must not leak into Plain\'s hierarchy');
+        });
+
         it('should terminate on cyclic extends chains', async () => {
             setupClasses({
                 CycleA: `

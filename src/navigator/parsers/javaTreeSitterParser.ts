@@ -336,13 +336,21 @@ export async function extractFieldsFromAST(content: string): Promise<JavaField[]
 }
 
 /**
- * Extract the superclass name from the first class declaration with an
- * `extends` clause using AST. Generic type arguments are stripped
+ * Extract the superclass name from a class declaration's `extends` clause
+ * using AST. Generic type arguments are stripped
  * (e.g., `extends BaseEntity<Long>` → "BaseEntity").
  *
+ * @param content - Java source content
+ * @param className - When given, only that class declaration is inspected, so
+ *                    other types in the same compilation unit cannot be
+ *                    mistaken for the class's superclass. When omitted, the
+ *                    first class declaration with an `extends` clause is used.
  * @returns Superclass name as written in source (simple or fully-qualified), or null
  */
-export async function extractSuperclassNameFromAST(content: string): Promise<string | null> {
+export async function extractSuperclassNameFromAST(
+    content: string,
+    className?: string
+): Promise<string | null> {
     if (!await initTreeSitter()) {
         throw new Error('Tree-sitter not available');
     }
@@ -350,8 +358,19 @@ export async function extractSuperclassNameFromAST(content: string): Promise<str
 
     const classDecls = root.descendantsOfType('class_declaration');
     for (const cls of classDecls) {
+        if (className) {
+            const nameNode = cls.childForFieldName('name');
+            if (!nameNode || nameNode.text !== className) {
+                continue;
+            }
+        }
+
         const superclassNode = cls.childForFieldName('superclass');
         if (!superclassNode) {
+            if (className) {
+                // The requested class extends nothing
+                return null;
+            }
             continue;
         }
 

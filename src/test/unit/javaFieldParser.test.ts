@@ -553,5 +553,70 @@ public class Role
             const result = await extractSuperclassName('/fake/Role.java');
             assert.strictEqual(result, 'BaseEntity');
         });
+
+        it('should ignore extends clauses inside comments', async () => {
+            const mockContent = `
+package com.example;
+
+// Legacy note: class Role extends OldBase was removed
+/*
+ * class Role extends AnotherWrongBase
+ */
+public class Role extends RealBase {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java', 'Role');
+            assert.strictEqual(result, 'RealBase');
+        });
+
+        it('should return null when only a comment mentions an extends clause', async () => {
+            const mockContent = `
+package com.example;
+
+// class Role extends GhostBase
+public class Role {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java', 'Role');
+            assert.strictEqual(result, null);
+        });
+
+        it('should only match the named class when className is given', async () => {
+            const mockContent = `
+package com.example;
+
+class Helper extends HelperBase {
+    private String helperField;
+}
+
+public class Role extends RoleBase {
+    private String roleName;
+}
+`;
+            readFileStub.resolves(mockContent);
+            assert.strictEqual(await extractSuperclassName('/fake/Role.java', 'Role'), 'RoleBase');
+            assert.strictEqual(await extractSuperclassName('/fake/Role.java', 'Helper'), 'HelperBase');
+        });
+
+        it('should return null when the named class extends nothing even if another class does', async () => {
+            const mockContent = `
+package com.example;
+
+public class Role {
+    private String roleName;
+}
+
+class Helper extends HelperBase {
+    private String helperField;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Role.java', 'Role');
+            assert.strictEqual(result, null);
+        });
     });
 });

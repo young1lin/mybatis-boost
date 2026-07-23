@@ -60,8 +60,12 @@ async function* walkClassHierarchy(
 
         yield { className: current, filePath: file.fsPath };
 
-        current = await resolveSuperclass(file.fsPath);
+        current = await resolveSuperclass(file.fsPath, simpleNameOf(current));
     }
+}
+
+function simpleNameOf(className: string): string {
+    return className.substring(className.lastIndexOf('.') + 1);
 }
 
 /**
@@ -117,11 +121,13 @@ export async function findFieldInHierarchy(
 }
 
 /**
- * Resolve the fully-qualified superclass name of the class declared in a file
+ * Resolve the fully-qualified superclass name of a specific class declared in a file.
+ * The class name anchors extraction so other types in the same compilation unit
+ * cannot be mistaken for the class's superclass.
  */
-async function resolveSuperclass(filePath: string): Promise<string | null> {
+async function resolveSuperclass(filePath: string, className: string): Promise<string | null> {
     try {
-        const superclassName = await extractSuperclassName(filePath);
+        const superclassName = await extractSuperclassName(filePath, className);
         if (!superclassName || isBuiltInType(superclassName)) {
             return null;
         }

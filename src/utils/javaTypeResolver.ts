@@ -68,13 +68,20 @@ export async function resolveFullyQualifiedType(
     }
 
     // Same-package fallback
-    const result = await resolveFromSamePackage(content, simpleTypeName);
-    if (result) {
-        console.log(`[javaTypeResolver] Same-package resolved ${simpleTypeName} to ${result}`);
+    const fromSamePackage = await resolveFromSamePackage(content, simpleTypeName);
+    if (fromSamePackage) {
+        console.log(`[javaTypeResolver] Same-package resolved ${simpleTypeName} to ${fromSamePackage}`);
+        return fromSamePackage;
+    }
+
+    // Wildcard-import fallback (lowest precedence, matching Java import semantics)
+    const fromWildcard = await resolveFromWildcardImports(content, simpleTypeName);
+    if (fromWildcard) {
+        console.log(`[javaTypeResolver] Wildcard-import resolved ${simpleTypeName} to ${fromWildcard}`);
     } else {
         console.log(`[javaTypeResolver] Could not resolve ${simpleTypeName}`);
     }
-    return result;
+    return fromWildcard;
 }
 
 /**
@@ -94,6 +101,44 @@ function resolveFromImports(content: string, simpleTypeName: string): string | n
         const importMatch = trimmed.match(/import\s+([\w.]+\.(\w+))\s*;/);
         if (importMatch && importMatch[2] === simpleTypeName) {
             return importMatch[1];
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Resolve type from wildcard import declarations (e.g., `import com.example.common.*;`)
+ * by checking whether the imported package contains a matching source file in the
+ * workspace. Static imports are ignored — they import members, not types.
+ */
+async function resolveFromWildcardImports(content: string, simpleTypeName: string): Promise<string | null> {
+    const lines = content.split('\n');
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+
+        // Stop at the class/interface declaration
+        if (trimmed.match(/(?:class|interface|enum)\s+/)) {
+            break;
+        }
+
+        const wildcardMatch = trimmed.match(/^import\s+([\w.]+)\.\*\s*;/);
+        if (!wildcardMatch) {
+            continue;
+        }
+
+        const candidate = `${wildcardMatch[1]}.${simpleTypeName}`;
+        const pathPattern = candidate.replace(/\./g, '/') + '.java';
+
+        const files = await vscode.workspace.findFiles(
+            `**/${pathPattern}`,
+            WORKSPACE_EXCLUDE_PATTERN,
+            1
+        );
+
+        if (files.length > 0) {
+            return candidate;
         }
     }
 

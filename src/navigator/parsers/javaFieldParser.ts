@@ -6,6 +6,7 @@
 
 import { JavaField } from '../../types';
 import { readFile } from '../../utils/fileUtils';
+import { escapeRegex } from '../../utils/stringUtils';
 import { extractFieldsFromAST, extractSuperclassNameFromAST } from './javaTreeSitterParser';
 import { getClassFieldsViaLS } from '../../utils/javaLSHelper';
 
@@ -90,27 +91,44 @@ export async function findJavaFieldPosition(
  * Two-tier fallback: WASM (tree-sitter) → Regex
  *
  * @param filePath - Path to Java file
+ * @param className - When given, only that class declaration is inspected, so
+ *                    other types in the same file cannot be mistaken for the
+ *                    class's superclass
  * @returns Superclass name as written in source (simple or fully-qualified,
  *          without generic type arguments), or null when the class extends nothing
  */
-export async function extractSuperclassName(filePath: string): Promise<string | null> {
+export async function extractSuperclassName(
+    filePath: string,
+    className?: string
+): Promise<string | null> {
     const content = await readFile(filePath);
 
     // Tier 1: WASM (tree-sitter)
     try {
-        return await extractSuperclassNameFromAST(content);
+        return await extractSuperclassNameFromAST(content, className);
     } catch { /* fallthrough */ }
 
     // Tier 2: Regex fallback
-    return extractSuperclassNameRegex(content);
+    return extractSuperclassNameRegex(content, className);
 }
 
 // ==================== Regex fallback implementation ====================
 
-function extractSuperclassNameRegex(content: string): string | null {
+function extractSuperclassNameRegex(content: string, className?: string): string | null {
+    // Strip comments so "// class Foo extends Bar" cannot produce a false match
+    const withoutComments = content
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/\/\/[^\n]*/g, ' ');
+
     // The optional generic group keeps bounded type parameters like
-    // "class Child<T extends Number> extends Base" from capturing "Number"
-    const match = content.match(/\bclass\s+\w+(?:\s*<[^>]*>)?\s+extends\s+([\w.]+)/);
+    // "class Child<T extends Number> extends Base" from capturing "Number".
+    // Anchoring on the class name keeps other types in the same file from
+    // being mistaken for the class's superclass.
+    const classToken = className ? escapeRegex(className) : '\\w+';
+    const superclassRegex = new RegExp(
+        `\\bclass\\s+${classToken}(?:\\s*<[^>]*>)?\\s+extends\\s+([\\w.]+)`
+    );
+    const match = withoutComments.match(superclassRegex);
     return match ? match[1] : null;
 }
 
