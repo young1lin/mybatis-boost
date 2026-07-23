@@ -128,9 +128,13 @@ export async function findFieldInHierarchy(
 async function resolveSuperclass(filePath: string, className: string): Promise<string | null> {
     try {
         const superclassName = await extractSuperclassName(filePath, className);
-        if (!superclassName || isBuiltInType(superclassName)) {
+        if (!superclassName) {
             return null;
         }
+        // Only the RESOLVED name is checked against built-ins: java.lang's
+        // extendable-looking short names (String, Integer, ...) are final, so a
+        // compiling `extends Integer` can only mean a user class shadowing the
+        // name — resolution must be allowed to find it
         const fullyQualified = await resolveFullyQualifiedType(filePath, superclassName);
         if (!fullyQualified || isBuiltInType(fullyQualified)) {
             return null;

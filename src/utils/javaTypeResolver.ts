@@ -1,6 +1,7 @@
 /**
- * Three-tier fallback type resolver: WASM (tree-sitter) → Java LS → Regex
- * Resolves simple Java type names to fully-qualified class names
+ * Resolves simple Java type names to fully-qualified class names, following
+ * Java's import precedence: explicit imports → same package → wildcard
+ * imports → Java LS (classpath types without workspace sources)
  */
 
 import * as vscode from 'vscode';
@@ -11,12 +12,14 @@ import { WORKSPACE_EXCLUDE_PATTERN } from './fileUtils';
 /**
  * Resolve a simple type name to its fully-qualified name from a Java source file.
  *
- * Three-tier fallback:
- * 1. WASM (tree-sitter): Verify parser available, extract imports via regex
- *    (import syntax is fixed, regex is reliable here; tree-sitter confirms Java parsing works)
- * 2. Java LS: Use workspace symbol provider via Red Hat Java extension
- *    (finds classes on classpath, not just source files)
- * 3. Regex: Scan import lines + same-package fallback
+ * Resolution follows Java's own precedence for simple names, with the Java LS
+ * as a last resort for classpath types that have no workspace source:
+ * 1. Explicit imports (AST-verified when tree-sitter is available; import
+ *    syntax is fixed, so regex extraction is reliable either way)
+ * 2. Same package (workspace file check)
+ * 3. Wildcard imports (workspace file check)
+ * 4. Java LS workspace symbols — a symbol search returns the first matching
+ *    simple name from anywhere, so it must not outrank the same-package rule
  *
  * @param javaPath - Path to the Java file containing the type reference
  * @param simpleTypeName - Simple class name (e.g., "User")
@@ -34,7 +37,7 @@ export async function resolveFullyQualifiedType(
     const fs = await import('fs');
     const content = await fs.promises.readFile(javaPath, 'utf-8');
 
-    // Tier 1: WASM-backed import resolution
+    // Tier 1: explicit imports (WASM-backed when available)
     // Use tree-sitter availability as a signal that Java parsing is working,
     // then extract imports (which have fixed syntax, so regex is reliable)
     try {
@@ -46,10 +49,32 @@ export async function resolveFullyQualifiedType(
             }
         }
     } catch {
-        // fallthrough to next tier
+        // fallthrough
     }
 
-    // Tier 2: Java Language Server (finds classpath classes, not just source files)
+    const fromImports = resolveFromImports(content, simpleTypeName);
+    if (fromImports) {
+        console.log(`[javaTypeResolver] Regex resolved ${simpleTypeName} to ${fromImports}`);
+        return fromImports;
+    }
+
+    // Tier 2: same package — in Java, same-package types take precedence over
+    // wildcard imports and anything found on the wider classpath
+    const fromSamePackage = await resolveFromSamePackage(content, simpleTypeName);
+    if (fromSamePackage) {
+        console.log(`[javaTypeResolver] Same-package resolved ${simpleTypeName} to ${fromSamePackage}`);
+        return fromSamePackage;
+    }
+
+    // Tier 3: wildcard imports
+    const fromWildcard = await resolveFromWildcardImports(content, simpleTypeName);
+    if (fromWildcard) {
+        console.log(`[javaTypeResolver] Wildcard-import resolved ${simpleTypeName} to ${fromWildcard}`);
+        return fromWildcard;
+    }
+
+    // Tier 4: Java Language Server (finds classpath classes without workspace
+    // sources; ranked last because it matches simple names from any package)
     try {
         const result = await resolveTypeViaLS(simpleTypeName);
         if (result) {
@@ -57,31 +82,11 @@ export async function resolveFullyQualifiedType(
             return result;
         }
     } catch {
-        // fallthrough to next tier
+        // fallthrough
     }
 
-    // Tier 3: Regex fallback (imports + same-package check)
-    const fromImports = resolveFromImports(content, simpleTypeName);
-    if (fromImports) {
-        console.log(`[javaTypeResolver] Regex resolved ${simpleTypeName} to ${fromImports}`);
-        return fromImports;
-    }
-
-    // Same-package fallback
-    const fromSamePackage = await resolveFromSamePackage(content, simpleTypeName);
-    if (fromSamePackage) {
-        console.log(`[javaTypeResolver] Same-package resolved ${simpleTypeName} to ${fromSamePackage}`);
-        return fromSamePackage;
-    }
-
-    // Wildcard-import fallback (lowest precedence, matching Java import semantics)
-    const fromWildcard = await resolveFromWildcardImports(content, simpleTypeName);
-    if (fromWildcard) {
-        console.log(`[javaTypeResolver] Wildcard-import resolved ${simpleTypeName} to ${fromWildcard}`);
-    } else {
-        console.log(`[javaTypeResolver] Could not resolve ${simpleTypeName}`);
-    }
-    return fromWildcard;
+    console.log(`[javaTypeResolver] Could not resolve ${simpleTypeName}`);
+    return null;
 }
 
 /**

@@ -206,7 +206,7 @@ public class Child extends Unresolvable {
             assert.deepStrictEqual(result.classChain, ['com.example.Child']);
         });
 
-        it('should not walk into java.lang superclasses', async () => {
+        it('should stop when the superclass resolves to a java.lang type', async () => {
             setupClasses({
                 Child: `
 package com.example;
@@ -216,11 +216,41 @@ public class Child extends Object {
 }
 `
             });
+            resolveTypeStub.callsFake(async (_javaPath: string, simpleTypeName: string) =>
+                simpleTypeName === 'Object' ? 'java.lang.Object' : `com.example.${simpleTypeName}`
+            );
 
             const result = await getClassFieldsWithInheritance('com.example.Child');
 
             assert.deepStrictEqual(result.classChain, ['com.example.Child']);
             assert.strictEqual(findClassStub.callCount, 1);
+        });
+
+        it('should walk user classes that shadow java.lang names', async () => {
+            // java.lang.Integer is final, so `extends Integer` can only refer
+            // to a user class shadowing the name
+            setupClasses({
+                Child: `
+package com.example;
+
+public class Child extends Integer {
+    private String name;
+}
+`,
+                Integer: `
+package com.example;
+
+public class Integer {
+    private Long shadowField;
+}
+`
+            });
+
+            const result = await getClassFieldsWithInheritance('com.example.Child');
+
+            assert.deepStrictEqual(result.classChain, ['com.example.Child', 'com.example.Integer']);
+            assert.ok(result.fields.some(f => f.field.name === 'shadowField'),
+                'fields of the shadowing user class must be inherited');
         });
 
         it('should not attribute a secondary class\'s superclass to the visited class', async () => {

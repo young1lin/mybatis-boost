@@ -151,6 +151,24 @@ public interface UserMapper {
         assert.strictEqual(result, 'com.example.entity.User');
     });
 
+    it('should prefer same-package resolution over Java LS', async () => {
+        fsReadFileStub.resolves(JAVA_CONTENT_NO_IMPORT);
+        initTreeSitterStub.resolves(true);
+        // LS knows a same-named class from another package
+        resolveTypeViaLSStub.resolves('com.other.entity.User');
+        findFilesStub.callsFake(async (include: string) =>
+            include === '**/com/example/mapper/User.java'
+                ? [vscode.Uri.file('/fake/com/example/mapper/User.java')]
+                : []
+        );
+
+        const result = await resolveFullyQualifiedType('/fake/UserMapper.java', 'User');
+        assert.strictEqual(result, 'com.example.mapper.User',
+            'same-package type must win over an LS match from another package');
+        assert.strictEqual(resolveTypeViaLSStub.called, false,
+            'LS should not even be consulted when same-package resolution succeeds');
+    });
+
     it('should resolve via same-package when all tiers fail', async () => {
         fsReadFileStub.resolves(JAVA_CONTENT_NO_IMPORT);
         initTreeSitterStub.resolves(false);
