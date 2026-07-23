@@ -5,9 +5,17 @@
 export class LRUCache<K, V> {
     private cache: Map<K, V> = new Map();
     private maxSize: number;
+    private onEvict?: (key: K, value: V) => void;
 
-    constructor(maxSize: number) {
+    /**
+     * @param maxSize - Maximum number of entries to keep
+     * @param onEvict - Called when an entry is silently evicted because the
+     *                  cache is full. Not called for explicit delete()/clear(),
+     *                  which the owner already knows about.
+     */
+    constructor(maxSize: number, onEvict?: (key: K, value: V) => void) {
         this.maxSize = maxSize;
+        this.onEvict = onEvict;
     }
 
     get(key: K): V | undefined {
@@ -28,7 +36,11 @@ export class LRUCache<K, V> {
             // Remove least recently used (first item)
             const firstKey = this.cache.keys().next().value as K;
             if (firstKey !== undefined) {
+                const evictedValue = this.cache.get(firstKey);
                 this.cache.delete(firstKey);
+                if (this.onEvict && evictedValue !== undefined) {
+                    this.onEvict(firstKey, evictedValue);
+                }
             }
         }
         this.cache.set(key, value);

@@ -89,6 +89,37 @@ describe('ParameterValidator Inherited Field Caching', () => {
         assert.strictEqual(walkerStub.callCount, 1, 'Unrelated edit should not invalidate the entry');
     });
 
+    it('should fully prune dependency bookkeeping when an entry is invalidated', async () => {
+        await validator.getClassFields(CHILD_FQN);
+
+        assert.strictEqual(validator.dependencyChains.size, 1, 'chain should be registered');
+        assert.ok(validator.classDependents.get(PARENT_FQN)?.has(CHILD_FQN));
+
+        validator.invalidateFieldCache('/project/src/main/java/com/example/query/TaskQuery.java');
+
+        assert.strictEqual(validator.dependencyChains.size, 0,
+            'forward index must not retain invalidated keys');
+        assert.strictEqual(validator.classDependents.size, 0,
+            'dependent sets must not retain invalidated keys');
+    });
+
+    it('should prune dependency bookkeeping when the cache silently evicts an entry', async () => {
+        await validator.getClassFields(CHILD_FQN);
+        assert.ok(validator.dependencyChains.has(CHILD_FQN));
+
+        // Fill the cache past its capacity (200) so the first entry is evicted
+        for (let i = 0; i < 200; i++) {
+            await validator.getClassFields(`com.example.Filler${i}`);
+        }
+
+        assert.strictEqual(validator.fieldCache.has(CHILD_FQN), false,
+            'oldest entry should have been evicted');
+        assert.strictEqual(validator.dependencyChains.has(CHILD_FQN), false,
+            'evicted key must leave the forward index');
+        assert.ok(!validator.classDependents.get(PARENT_FQN)?.has(CHILD_FQN),
+            'evicted key must leave dependent sets');
+    });
+
     it('should re-register hierarchy dependents after re-walking', async () => {
         await validator.getClassFields(CHILD_FQN);
 

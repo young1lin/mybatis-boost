@@ -24,6 +24,9 @@ export class ParameterValidator {
     // Maps each class in a cached inheritance chain to the cache keys that
     // include its fields, so editing a superclass invalidates subclass entries
     private classDependents: Map<string, Set<string>> = new Map();
+    // Forward index: cache key → its inheritance chain, so entries leaving the
+    // cache (invalidation or LRU eviction) can be removed from classDependents
+    private dependencyChains: Map<string, string[]> = new Map();
     private readonly DEBOUNCE_DELAY = 500; // 500ms debounce for text changes
     private readonly FIELD_CACHE_SIZE = 200; // Cache up to 200 classes
     private enabled: boolean;
@@ -36,8 +39,9 @@ export class ParameterValidator {
         this.diagnosticCollection = vscode.languages.createDiagnosticCollection('mybatis-parameters');
         this.context.subscriptions.push(this.diagnosticCollection);
 
-        // Initialize field cache
-        this.fieldCache = new LRUCache(this.FIELD_CACHE_SIZE);
+        // Initialize field cache; silently evicted entries must also drop their
+        // dependency bookkeeping so classDependents cannot outgrow the cache
+        this.fieldCache = new LRUCache(this.FIELD_CACHE_SIZE, key => this.unregisterHierarchy(key));
 
         // Read initial configuration
         this.enabled = this.isValidationEnabled();
@@ -409,6 +413,7 @@ export class ParameterValidator {
             this.fieldCache.set(className, fieldNames);
 
             // 4. Record that editing any class in the chain invalidates this entry
+            this.dependencyChains.set(className, classChain);
             for (const chainClass of classChain) {
                 let dependents = this.classDependents.get(chainClass);
                 if (!dependents) {
@@ -441,10 +446,15 @@ export class ParameterValidator {
             }
 
             this.fieldCache.delete(className);
+            this.unregisterHierarchy(className);
 
             const dependents = this.classDependents.get(className);
             if (dependents) {
-                dependents.forEach(dependent => this.fieldCache.delete(dependent));
+                // Copy first: unregisterHierarchy prunes the set being iterated
+                for (const dependent of [...dependents]) {
+                    this.fieldCache.delete(dependent);
+                    this.unregisterHierarchy(dependent);
+                }
                 this.classDependents.delete(className);
             }
 
@@ -455,11 +465,35 @@ export class ParameterValidator {
     }
 
     /**
+     * Remove a cache key's dependency bookkeeping when its entry leaves the
+     * field cache (explicit invalidation or silent LRU eviction), so
+     * classDependents stays bounded by the cache contents
+     */
+    private unregisterHierarchy(cacheKey: string): void {
+        const chain = this.dependencyChains.get(cacheKey);
+        if (!chain) {
+            return;
+        }
+        this.dependencyChains.delete(cacheKey);
+
+        for (const chainClass of chain) {
+            const dependents = this.classDependents.get(chainClass);
+            if (dependents) {
+                dependents.delete(cacheKey);
+                if (dependents.size === 0) {
+                    this.classDependents.delete(chainClass);
+                }
+            }
+        }
+    }
+
+    /**
      * Clear the field cache and its inheritance dependency tracking
      */
     private clearFieldCache(): void {
         this.fieldCache.clear();
         this.classDependents.clear();
+        this.dependencyChains.clear();
     }
 
     /**
