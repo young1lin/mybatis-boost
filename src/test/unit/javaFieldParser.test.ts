@@ -437,6 +437,23 @@ public class User {
             assert.strictEqual(result.length, 1);
             assert.strictEqual(result[0].name, 'name');
         });
+
+        it('should only extract the named class\'s fields when className is given', async () => {
+            const mockContent = `
+package com.example;
+
+class Helper {
+    private String helperField;
+}
+
+public class User {
+    private String name;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractJavaFields('/fake/User.java', 'User');
+            assert.deepStrictEqual(result.map(f => f.name), ['name']);
+        });
     });
 
     // ==================== Superclass extraction ====================
@@ -524,6 +541,19 @@ public class Holder<T extends Number> extends BaseHolder {
 `;
             readFileStub.resolves(mockContent);
             const result = await extractSuperclassName('/fake/Holder.java');
+            assert.strictEqual(result, 'BaseHolder');
+        });
+
+        it('should handle nested generics in bounded type parameters', async () => {
+            const mockContent = `
+package com.example;
+
+public class Holder<T extends Comparable<String>> extends BaseHolder {
+    private T value;
+}
+`;
+            readFileStub.resolves(mockContent);
+            const result = await extractSuperclassName('/fake/Holder.java', 'Holder');
             assert.strictEqual(result, 'BaseHolder');
         });
 

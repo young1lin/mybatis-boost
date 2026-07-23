@@ -848,6 +848,53 @@ public class Empty {
             const result = await extractFieldsFromAST(content);
             assert.strictEqual(result.length, 0);
         });
+
+        it('should only return the named class\'s fields when className is given', async () => {
+            const content = `
+package com.example.model;
+
+class Helper {
+    private String helperField;
+}
+
+public class Role {
+    private String roleName;
+}
+`;
+            const roleFields = await extractFieldsFromAST(content, 'Role');
+            assert.deepStrictEqual(roleFields.map(f => f.name), ['roleName']);
+
+            const helperFields = await extractFieldsFromAST(content, 'Helper');
+            assert.deepStrictEqual(helperFields.map(f => f.name), ['helperField']);
+        });
+
+        it('should exclude nested class fields when className targets the outer class', async () => {
+            const content = `
+package com.example.model;
+
+public class Role {
+    private String roleName;
+
+    public static class Builder {
+        private String pendingName;
+    }
+}
+`;
+            const result = await extractFieldsFromAST(content, 'Role');
+            assert.deepStrictEqual(result.map(f => f.name), ['roleName']);
+        });
+
+        it('should return empty array when the named class does not exist', async () => {
+            const content = `
+package com.example.model;
+
+public class Role {
+    private String roleName;
+}
+`;
+            const result = await extractFieldsFromAST(content, 'Missing');
+            assert.strictEqual(result.length, 0);
+        });
     });
 
     describe('extractSuperclassNameFromAST', () => {

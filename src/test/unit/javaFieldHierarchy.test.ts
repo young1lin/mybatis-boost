@@ -250,6 +250,9 @@ public class HelperBase {
             assert.deepStrictEqual(result.classChain, ['com.example.Plain']);
             assert.ok(!result.fields.some(f => f.field.name === 'wrongField'),
                 'HelperBase fields must not leak into Plain\'s hierarchy');
+            assert.ok(!result.fields.some(f => f.field.name === 'helperField'),
+                'Same-file sibling class fields must not leak into Plain\'s hierarchy');
+            assert.deepStrictEqual(result.fields.map(f => f.field.name), ['id']);
         });
 
         it('should terminate on cyclic extends chains', async () => {

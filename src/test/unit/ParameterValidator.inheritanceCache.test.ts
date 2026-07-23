@@ -7,6 +7,7 @@
 
 import * as assert from 'assert';
 import * as sinon from 'sinon';
+import * as vscode from 'vscode';
 import { ParameterValidator } from '../../navigator/diagnostics/ParameterValidator';
 import * as javaFieldHierarchy from '../../utils/javaFieldHierarchy';
 
@@ -100,5 +101,34 @@ describe('ParameterValidator Inherited Field Caching', () => {
         await validator.getClassFields(CHILD_FQN);
 
         assert.strictEqual(walkerStub.callCount, 3);
+    });
+
+    it('should revalidate open XML documents when a Java file is saved', () => {
+        const saveHandlers: ((doc: unknown) => void)[] = [];
+        const originalOnSave = vscode.workspace.onDidSaveTextDocument;
+        (vscode.workspace as any).onDidSaveTextDocument = (callback: (doc: unknown) => void) => {
+            saveHandlers.push(callback);
+            return { dispose: () => {} };
+        };
+
+        try {
+            const mockContext = { subscriptions: { push: () => {} } };
+            const mockFileMapper = { getJavaPath: () => Promise.resolve(null) };
+            const localValidator: any = new ParameterValidator(mockContext as any, mockFileMapper as any);
+
+            const revalidateSpy = sinon.spy(localValidator, 'revalidateOpenXmlDocuments');
+
+            saveHandlers.forEach(handler => handler({
+                languageId: 'java',
+                uri: { fsPath: '/project/src/main/java/com/example/entity/BaseEntity.java' }
+            }));
+
+            assert.ok(revalidateSpy.called,
+                'Saving a Java file must trigger revalidation of open XML documents');
+
+            localValidator.dispose();
+        } finally {
+            (vscode.workspace as any).onDidSaveTextDocument = originalOnSave;
+        }
     });
 });

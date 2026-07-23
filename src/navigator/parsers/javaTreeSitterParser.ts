@@ -282,8 +282,18 @@ export async function extractParametersFromAST(
 
 /**
  * Extract all fields from a Java class using AST.
+ *
+ * @param content - Java source content
+ * @param className - When given, only the matching class/interface declaration's
+ *                    own fields are returned (direct members, excluding nested
+ *                    types), so other types in the same compilation unit cannot
+ *                    leak into the result. When omitted, fields of all types in
+ *                    the file are merged (legacy behavior).
  */
-export async function extractFieldsFromAST(content: string): Promise<JavaField[]> {
+export async function extractFieldsFromAST(
+    content: string,
+    className?: string
+): Promise<JavaField[]> {
     if (!await initTreeSitter()) {
         throw new Error('Tree-sitter not available');
     }
@@ -293,12 +303,23 @@ export async function extractFieldsFromAST(content: string): Promise<JavaField[]
     // Find class declarations (and also check interface body for constant fields)
     const classDecls = root.descendantsOfType(['class_declaration', 'interface_declaration']);
     for (const cls of classDecls) {
+        if (className) {
+            const nameNode = cls.childForFieldName('name');
+            if (!nameNode || nameNode.text !== className) {
+                continue;
+            }
+        }
+
         const body = cls.childForFieldName('body');
         if (!body) {
             continue;
         }
 
-        const fieldDecls = body.descendantsOfType('field_declaration');
+        // Scoped extraction takes only the class's direct members so nested
+        // types' fields are not attributed to the class itself
+        const fieldDecls = className
+            ? body.namedChildren.filter((c): c is TSNode => c !== null && c.type === 'field_declaration')
+            : body.descendantsOfType('field_declaration');
         for (const fd of fieldDecls) {
             const declarator = fd.descendantsOfType('variable_declarator')[0];
             if (!declarator) {

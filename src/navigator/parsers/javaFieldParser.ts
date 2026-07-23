@@ -16,26 +16,28 @@ import { getClassFieldsViaLS } from '../../utils/javaLSHelper';
  * Three-tier fallback: WASM (tree-sitter) → Java LS → Regex
  *
  * @param filePath - Path to Java file
+ * @param className - When given, extraction is scoped to that class declaration
+ *                    so other types in the same file cannot contribute fields
  * @returns Array of field information
  */
-export async function extractJavaFields(filePath: string): Promise<JavaField[]> {
+export async function extractJavaFields(filePath: string, className?: string): Promise<JavaField[]> {
     const content = await readFile(filePath);
 
     // Tier 1: WASM (tree-sitter)
     try {
-        return await extractFieldsFromAST(content);
+        return await extractFieldsFromAST(content, className);
     } catch { /* fallthrough */ }
 
     // Tier 2: Java Language Server
     try {
-        const lsFields = await getClassFieldsViaLS(filePath);
+        const lsFields = await getClassFieldsViaLS(filePath, className);
         if (lsFields) {
             return lsFields;
         }
     } catch { /* fallthrough */ }
 
     // Tier 3: Regex fallback
-    return extractJavaFieldsRegex(content);
+    return extractJavaFieldsRegex(content, className);
 }
 
 /**
@@ -121,23 +123,27 @@ function extractSuperclassNameRegex(content: string, className?: string): string
         .replace(/\/\/[^\n]*/g, ' ');
 
     // The optional generic group keeps bounded type parameters like
-    // "class Child<T extends Number> extends Base" from capturing "Number".
+    // "class Child<T extends Number> extends Base" from capturing "Number",
+    // and supports one level of nested generics such as
+    // "class Foo<T extends Comparable<String>> extends Base".
     // Anchoring on the class name keeps other types in the same file from
     // being mistaken for the class's superclass.
     const classToken = className ? escapeRegex(className) : '\\w+';
     const superclassRegex = new RegExp(
-        `\\bclass\\s+${classToken}(?:\\s*<[^>]*>)?\\s+extends\\s+([\\w.]+)`
+        `\\bclass\\s+${classToken}(?:\\s*<(?:[^<>]|<[^<>]*>)*>)?\\s+extends\\s+([\\w.]+)`
     );
     const match = withoutComments.match(superclassRegex);
     return match ? match[1] : null;
 }
 
-function extractJavaFieldsRegex(content: string): JavaField[] {
+function extractJavaFieldsRegex(content: string, className?: string): JavaField[] {
     const lines = content.split('\n');
     const fields: JavaField[] = [];
 
     let inClassBody = false;
     let braceLevel = 0;
+    // When scoped to a class, only collect fields while inside that class's body
+    let inTargetClass = !className;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -145,6 +151,9 @@ function extractJavaFieldsRegex(content: string): JavaField[] {
 
         if (/(?:class|interface|enum)\s+\w+/.test(line)) {
             inClassBody = false;
+            if (className) {
+                inTargetClass = new RegExp(`\\b(?:class|interface|enum)\\s+${escapeRegex(className)}\\b`).test(line);
+            }
         }
 
         braceLevel += (line.match(/{/g) || []).length;
@@ -154,7 +163,7 @@ function extractJavaFieldsRegex(content: string): JavaField[] {
             inClassBody = true;
         }
 
-        if (!inClassBody || braceLevel !== 1) {
+        if (!inClassBody || braceLevel !== 1 || !inTargetClass) {
             continue;
         }
 

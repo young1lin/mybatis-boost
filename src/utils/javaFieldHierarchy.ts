@@ -85,7 +85,7 @@ export async function getClassFieldsWithInheritance(
     for await (const cls of walkClassHierarchy(className)) {
         classChain.push(cls.className);
 
-        const ownFields = await extractJavaFields(cls.filePath);
+        const ownFields = await extractJavaFields(cls.filePath, simpleNameOf(cls.className));
         for (const field of ownFields) {
             if (!seenFieldNames.has(field.name)) {
                 seenFieldNames.add(field.name);
@@ -110,7 +110,7 @@ export async function findFieldInHierarchy(
     fieldName: string
 ): Promise<ResolvedJavaField | null> {
     for await (const cls of walkClassHierarchy(className)) {
-        const ownFields = await extractJavaFields(cls.filePath);
+        const ownFields = await extractJavaFields(cls.filePath, simpleNameOf(cls.className));
         const field = ownFields.find(f => f.name === fieldName);
         if (field) {
             return { field, filePath: cls.filePath, className: cls.className };

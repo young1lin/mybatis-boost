@@ -94,11 +94,15 @@ export class ParameterValidator {
             })
         );
 
-        // Invalidate field cache when Java files are saved (for external changes)
+        // Invalidate field cache when Java files are saved, and refresh diagnostics
+        // of open XML documents so stale field errors don't linger until the next
+        // XML edit (the fs watcher below also fires on save, but this does not
+        // depend on watcher timing)
         this.disposables.push(
             vscode.workspace.onDidSaveTextDocument(doc => {
                 if (doc.languageId === 'java') {
                     this.invalidateFieldCache(doc.uri.fsPath);
+                    this.revalidateOpenXmlDocuments();
                 }
             })
         );
