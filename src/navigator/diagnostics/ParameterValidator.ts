@@ -412,7 +412,10 @@ export class ParameterValidator {
             // 3. Store in cache; empty results are cached too, to avoid repeated searches
             this.fieldCache.set(className, fieldNames);
 
-            // 4. Record that editing any class in the chain invalidates this entry
+            // 4. Record that editing any class in the chain invalidates this entry.
+            // Drop any previous registration first: overlapping cache misses for
+            // the same key would otherwise leave links from a superseded chain
+            this.unregisterHierarchy(className);
             this.dependencyChains.set(className, classChain);
             for (const chainClass of classChain) {
                 let dependents = this.classDependents.get(chainClass);

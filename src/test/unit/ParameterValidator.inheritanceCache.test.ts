@@ -120,6 +120,43 @@ describe('ParameterValidator Inherited Field Caching', () => {
             'evicted key must leave dependent sets');
     });
 
+    it('should not keep links from a superseded chain when overlapping misses repopulate the same key', async () => {
+        // Two concurrent cache misses for the same FQN: the first walk still
+        // sees the parent, the second (later) walk does not
+        walkerStub.onFirstCall().resolves({
+            fields: [
+                {
+                    field: { name: 'taskName', fieldType: 'String', line: 5, startColumn: 19, endColumn: 27 },
+                    filePath: '/fake/TaskQuery.java',
+                    className: CHILD_FQN
+                }
+            ],
+            classChain: [CHILD_FQN, PARENT_FQN]
+        });
+        walkerStub.onSecondCall().resolves({
+            fields: [
+                {
+                    field: { name: 'taskName', fieldType: 'String', line: 5, startColumn: 19, endColumn: 27 },
+                    filePath: '/fake/TaskQuery.java',
+                    className: CHILD_FQN
+                }
+            ],
+            classChain: [CHILD_FQN]
+        });
+
+        // Start both before either resolves so both miss the cache
+        await Promise.all([
+            validator.getClassFields(CHILD_FQN),
+            validator.getClassFields(CHILD_FQN)
+        ]);
+
+        assert.strictEqual(walkerStub.callCount, 2, 'both overlapping calls should have walked');
+        assert.deepStrictEqual(validator.dependencyChains.get(CHILD_FQN), [CHILD_FQN],
+            'forward index must hold the latest chain');
+        assert.ok(!validator.classDependents.get(PARENT_FQN)?.has(CHILD_FQN),
+            'links from the superseded chain must be dropped');
+    });
+
     it('should re-register hierarchy dependents after re-walking', async () => {
         await validator.getClassFields(CHILD_FQN);
 
