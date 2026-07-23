@@ -68,7 +68,8 @@
       "Bash($null)",
       "Bash(rm:*)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d['scripts'], indent=2\\)\\)\")"
     ],
     "deny": [
       "Bash(rm -rf /*)",
