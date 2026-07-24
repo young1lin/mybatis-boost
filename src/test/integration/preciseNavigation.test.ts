@@ -7,11 +7,9 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import { FileMapper, JavaToXmlDefinitionProvider, XmlToJavaDefinitionProvider, XmlSqlFragmentDefinitionProvider } from '../../navigator';
 
-// Skip: tests create temp files outside workspace, executeDefinitionProvider requires workspace-scoped FileMapper
-suite.skip('Precise Position Navigation Integration Tests', () => {
+suite('Precise Position Navigation Integration Tests', () => {
     let tempDir: string;
     let javaFilePath: string;
     let xmlFilePath: string;
@@ -23,8 +21,10 @@ suite.skip('Precise Position Navigation Integration Tests', () => {
     suiteSetup(async function() {
         this.timeout(30000);
 
-        // Create temporary directory for test files
-        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mybatis-boost-test-'));
+        // FileMapper intentionally limits lookup to the open workspace.
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        assert.ok(workspaceRoot, 'Workspace root is required');
+        tempDir = fs.mkdtempSync(path.join(workspaceRoot, '.mybatis-boost-test-'));
 
         // Create directory structure
         const javaDir = path.join(tempDir, 'src', 'main', 'java', 'com', 'example', 'mapper');
@@ -357,7 +357,7 @@ public interface TestMapper {
             const includePattern = /<include refid="BaseColumns"/;
             assert.ok(includePattern.test(xmlContent), 'include refid="BaseColumns" not found in XML');
 
-            const includeRefIdIndex = xmlContent.indexOf('"BaseColumns"') + 1; // Position at 'B'
+            const includeRefIdIndex = xmlContent.indexOf('<include refid="BaseColumns"') + '<include refid="'.length; // Position at 'B'
             const cursorOffset = 4; // Position at 'C' in "BaseColumns"
             const position = xmlDoc.positionAt(includeRefIdIndex + cursorOffset);
 
@@ -414,7 +414,7 @@ public interface TestMapper {
             const includePattern = /<include refid="UserColumns"/;
             assert.ok(includePattern.test(xmlContent), 'include refid="UserColumns" not found in XML');
 
-            const includeRefIdIndex = xmlContent.indexOf('"UserColumns"') + 1; // Position at 'U'
+            const includeRefIdIndex = xmlContent.indexOf('<include refid="UserColumns"') + '<include refid="'.length; // Position at 'U'
             const userColumnsLength = 'UserColumns'.length;
             const cursorOffset = userColumnsLength - 1; // Position at last 's'
             const position = xmlDoc.positionAt(includeRefIdIndex + cursorOffset);
@@ -465,7 +465,7 @@ public interface TestMapper {
             const xmlContent = xmlDoc.getText();
 
             // Test cursor at the very start of "BaseColumns" (at 'B')
-            const includeRefIdIndex = xmlContent.indexOf('"BaseColumns"') + 1; // Position at 'B'
+            const includeRefIdIndex = xmlContent.indexOf('<include refid="BaseColumns"') + '<include refid="'.length; // Position at 'B'
             const position = xmlDoc.positionAt(includeRefIdIndex);
 
             console.log('Testing navigation from include refid at start position');

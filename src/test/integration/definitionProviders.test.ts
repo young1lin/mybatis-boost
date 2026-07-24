@@ -16,6 +16,7 @@ suite('Definition Providers Integration Tests', () => {
     let userMapperJavaPath: string;
     let userMapperXmlPath: string;
     let extensionPath: string;
+    let originalUseDefinitionProvider: boolean | undefined;
 
     suiteSetup(async function() {
         // This may take time as it initializes the extension
@@ -43,16 +44,24 @@ suite('Definition Providers Integration Tests', () => {
         // Initialize FileMapper
         fileMapper = new FileMapper(context, 1000);
         await fileMapper.initialize();
+
+        // Java→XML F12 navigation is only registered in DefinitionProvider mode.
+        const config = vscode.workspace.getConfiguration('mybatis-boost');
+        originalUseDefinitionProvider = config.inspect<boolean>('useDefinitionProvider')?.workspaceValue;
+        await config.update('useDefinitionProvider', true, vscode.ConfigurationTarget.Workspace);
     });
 
-    suiteTeardown(() => {
+    suiteTeardown(async () => {
+        await vscode.workspace
+            .getConfiguration('mybatis-boost')
+            .update('useDefinitionProvider', originalUseDefinitionProvider, vscode.ConfigurationTarget.Workspace);
+
         if (fileMapper) {
             fileMapper.dispose();
         }
     });
 
-    // Java→XML DefinitionProvider is only registered when useDefinitionProvider=true (default uses CodeLens)
-    suite.skip('Java to XML Navigation', () => {
+    suite('Java to XML Navigation', () => {
         test('should navigate from Java method to XML statement', async function() {
             this.timeout(10000);
 
