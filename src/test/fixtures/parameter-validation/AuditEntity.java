@@ -4,6 +4,7 @@ import com.example.entity.BaseEntity;
 
 public class AuditEntity extends BaseEntity<Long> {
     private String updatedBy;
+    private String shadowedField;
 
     public String getUpdatedBy() {
         return updatedBy;

@@ -96,6 +96,37 @@ function parseContent(content: string): TSNode {
     return tree.rootNode;
 }
 
+const TYPE_DECLARATION_NODE_TYPES = new Set([
+    'class_declaration',
+    'interface_declaration',
+    'enum_declaration',
+    'record_declaration',
+    'annotation_type_declaration'
+]);
+
+/**
+ * Match a source-file type by simple name without accepting a same-named
+ * nested or local type. Hierarchy resolution starts from a Java source file
+ * selected by fully-qualified top-level class name, so nested declarations
+ * represent different binary types and must not contribute fields or parents.
+ */
+function isRequestedTopLevelType(node: TSNode, className: string): boolean {
+    const nameNode = node.childForFieldName('name');
+    if (!nameNode || nameNode.text !== className) {
+        return false;
+    }
+
+    let ancestor = node.parent;
+    while (ancestor) {
+        if (TYPE_DECLARATION_NODE_TYPES.has(ancestor.type)) {
+            return false;
+        }
+        ancestor = ancestor.parent;
+    }
+
+    return true;
+}
+
 /**
  * Extract all methods from a Java mapper interface using AST.
  */
@@ -284,11 +315,11 @@ export async function extractParametersFromAST(
  * Extract all fields from a Java class using AST.
  *
  * @param content - Java source content
- * @param className - When given, only the matching class/interface declaration's
- *                    own fields are returned (direct members, excluding nested
- *                    types), so other types in the same compilation unit cannot
- *                    leak into the result. When omitted, fields of all types in
- *                    the file are merged (legacy behavior).
+ * @param className - When given, only the matching top-level class/interface
+ *                    declaration's own fields are returned (direct members,
+ *                    excluding nested types), so other types in the same
+ *                    compilation unit cannot leak into the result. When omitted,
+ *                    fields of all types in the file are merged (legacy behavior).
  */
 export async function extractFieldsFromAST(
     content: string,
@@ -303,11 +334,8 @@ export async function extractFieldsFromAST(
     // Find class declarations (and also check interface body for constant fields)
     const classDecls = root.descendantsOfType(['class_declaration', 'interface_declaration']);
     for (const cls of classDecls) {
-        if (className) {
-            const nameNode = cls.childForFieldName('name');
-            if (!nameNode || nameNode.text !== className) {
-                continue;
-            }
+        if (className && !isRequestedTopLevelType(cls, className)) {
+            continue;
         }
 
         const body = cls.childForFieldName('body');
@@ -362,10 +390,10 @@ export async function extractFieldsFromAST(
  * (e.g., `extends BaseEntity<Long>` → "BaseEntity").
  *
  * @param content - Java source content
- * @param className - When given, only that class declaration is inspected, so
- *                    other types in the same compilation unit cannot be
- *                    mistaken for the class's superclass. When omitted, the
- *                    first class declaration with an `extends` clause is used.
+ * @param className - When given, only that top-level class declaration is
+ *                    inspected, so other types in the same compilation unit
+ *                    cannot be mistaken for the class's superclass. When omitted,
+ *                    the first class declaration with an `extends` clause is used.
  * @returns Superclass name as written in source (simple or fully-qualified), or null
  */
 export async function extractSuperclassNameFromAST(
@@ -379,11 +407,8 @@ export async function extractSuperclassNameFromAST(
 
     const classDecls = root.descendantsOfType('class_declaration');
     for (const cls of classDecls) {
-        if (className) {
-            const nameNode = cls.childForFieldName('name');
-            if (!nameNode || nameNode.text !== className) {
-                continue;
-            }
+        if (className && !isRequestedTopLevelType(cls, className)) {
+            continue;
         }
 
         const superclassNode = cls.childForFieldName('superclass');

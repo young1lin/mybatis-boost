@@ -5,6 +5,7 @@ public class BaseEntity<ID> {
     private String createdBy;
     private String createTime;
     @Deprecated private String astOnlyField;
+    private String shadowedField;
 
     public ID getId() {
         return id;

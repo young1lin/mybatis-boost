@@ -9,6 +9,7 @@
         <result property="updatedBy" column="updated_by"/>
         <result property="taskName" column="task_name"/>
         <result property="astOnlyField" column="ast_only_field"/>
+        <result property="shadowedField" column="shadowed_field"/>
     </resultMap>
 
     <!--
@@ -21,6 +22,12 @@
     <select id="selectByCondition" resultMap="TaskResultMap">
         SELECT * FROM t_task
         <where>
+            <if test="shadowedField != null">
+                AND shadowed_field = #{shadowedField}
+            </if>
+            <if test="astOnlyField != null">
+                AND ast_only_field = #{astOnlyField}
+            </if>
             <if test="taskName != null">
                 AND task_name = #{taskName}
             </if>
@@ -35,9 +42,6 @@
             </if>
             <if test="id != null">
                 AND id = #{id}
-            </if>
-            <if test="astOnlyField != null">
-                AND ast_only_field = #{astOnlyField}
             </if>
         </where>
     </select>

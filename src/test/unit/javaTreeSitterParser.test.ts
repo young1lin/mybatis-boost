@@ -884,6 +884,24 @@ public class Role {
             assert.deepStrictEqual(result.map(f => f.name), ['roleName']);
         });
 
+        it('should ignore a nested class with the same simple name as the target class', async () => {
+            const content = `
+package com.example.model;
+
+class Other {
+    static class Role {
+        private String wrongField;
+    }
+}
+
+public class Role {
+    private String roleName;
+}
+`;
+            const result = await extractFieldsFromAST(content, 'Role');
+            assert.deepStrictEqual(result.map(f => f.name), ['roleName']);
+        });
+
         it('should return empty array when the named class does not exist', async () => {
             const content = `
 package com.example.model;
@@ -1010,6 +1028,22 @@ public class Role extends RoleBase {
 `;
             assert.strictEqual(await extractSuperclassNameFromAST(content, 'Role'), 'RoleBase');
             assert.strictEqual(await extractSuperclassNameFromAST(content, 'Helper'), 'HelperBase');
+        });
+
+        it('should ignore a nested class with the same simple name as the target class', async () => {
+            const content = `
+package com.example.model;
+
+class Other {
+    static class Role extends WrongBase {
+    }
+}
+
+public class Role extends RoleBase {
+}
+`;
+            const result = await extractSuperclassNameFromAST(content, 'Role');
+            assert.strictEqual(result, 'RoleBase');
         });
 
         it('should return null when the named class extends nothing even if another class does', async () => {

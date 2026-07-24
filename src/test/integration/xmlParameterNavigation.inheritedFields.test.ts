@@ -107,4 +107,20 @@ suite('XML Parameter Navigation - Inherited Fields', () => {
         assert.strictEqual(definitions[0].range.start.line, 6,
             'Should point to the annotated astOnlyField declaration in BaseEntity');
     });
+
+    test('should navigate to the nearest declaration when a superclass field is shadowed', async function() {
+        this.timeout(10000);
+
+        // Both AuditEntity and BaseEntity declare shadowedField. TaskQuery
+        // inherits through AuditEntity, so navigation must stop at that nearer
+        // declaration instead of continuing to BaseEntity.
+        const offset = await findOffset(/#\{shadowedField\}/, 2);
+        const definitions = await executeDefinitionAt(offset);
+
+        assert.ok(definitions.length > 0, 'No definitions found for #{shadowedField}');
+        assert.ok(definitions[0].uri.fsPath.endsWith('AuditEntity.java'),
+            `Expected AuditEntity.java, got ${definitions[0].uri.fsPath}`);
+        assert.strictEqual(definitions[0].range.start.line, 6,
+            'Should point to the nearer shadowedField declaration in AuditEntity');
+    });
 });

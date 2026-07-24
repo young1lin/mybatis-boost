@@ -66,6 +66,8 @@ suite('ParameterValidator - Inherited Fields Integration Tests', () => {
         // - #{updatedBy}             (inherited from AuditEntity)
         // - #{createdBy}, #{id}, #{astOnlyField}
         //                             (inherited from BaseEntity<Long>, two levels up)
+        // - #{shadowedField}          (declared in both AuditEntity and BaseEntity;
+        //                              the nearer AuditEntity declaration wins)
         // - #{nonExistentField}      (invalid on purpose)
         // Only nonExistentField may be flagged.
         const unexpectedDiagnostics = mybatisDiagnostics.filter(

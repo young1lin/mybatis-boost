@@ -55,7 +55,7 @@ describe('javaFieldHierarchy Unit Tests', () => {
             const fieldNames = result.fields.map(f => f.field.name);
             assert.deepStrictEqual(
                 fieldNames.sort(),
-                ['astOnlyField', 'createTime', 'createdBy', 'id', 'status', 'taskName', 'updatedBy']
+                ['astOnlyField', 'createTime', 'createdBy', 'id', 'shadowedField', 'status', 'taskName', 'updatedBy']
             );
         });
 
@@ -67,6 +67,8 @@ describe('javaFieldHierarchy Unit Tests', () => {
             assert.strictEqual(byName.get('taskName')?.className, TASK_QUERY_FQN);
             assert.strictEqual(byName.get('updatedBy')?.filePath, AUDIT_ENTITY_PATH);
             assert.strictEqual(byName.get('updatedBy')?.className, AUDIT_ENTITY_FQN);
+            assert.strictEqual(byName.get('shadowedField')?.filePath, AUDIT_ENTITY_PATH);
+            assert.strictEqual(byName.get('shadowedField')?.className, AUDIT_ENTITY_FQN);
             assert.strictEqual(byName.get('createdBy')?.filePath, BASE_ENTITY_PATH);
             assert.strictEqual(byName.get('createdBy')?.className, BASE_ENTITY_FQN);
             // Field declared with the class's own generic type parameter
