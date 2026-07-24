@@ -4,6 +4,7 @@ public class BaseEntity<ID> {
     private ID id;
     private String createdBy;
     private String createTime;
+    @Deprecated private String astOnlyField;
 
     public ID getId() {
         return id;

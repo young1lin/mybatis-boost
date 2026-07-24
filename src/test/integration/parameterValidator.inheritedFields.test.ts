@@ -64,7 +64,8 @@ suite('ParameterValidator - Inherited Fields Integration Tests', () => {
         // The document references:
         // - #{taskName}, #{status}   (declared on TaskQuery itself)
         // - #{updatedBy}             (inherited from AuditEntity)
-        // - #{createdBy}, #{id}      (inherited from BaseEntity<Long>, two levels up)
+        // - #{createdBy}, #{id}, #{astOnlyField}
+        //                             (inherited from BaseEntity<Long>, two levels up)
         // - #{nonExistentField}      (invalid on purpose)
         // Only nonExistentField may be flagged.
         const unexpectedDiagnostics = mybatisDiagnostics.filter(

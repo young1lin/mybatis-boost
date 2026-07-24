@@ -8,13 +8,14 @@
         <result property="createdBy" column="created_by"/>
         <result property="updatedBy" column="updated_by"/>
         <result property="taskName" column="task_name"/>
+        <result property="astOnlyField" column="ast_only_field"/>
     </resultMap>
 
     <!--
         Inherited field validation (issue #50):
         - taskName, status are declared on TaskQuery itself
         - updatedBy is inherited from AuditEntity
-        - createdBy, id are inherited from BaseEntity<Long> (two levels up)
+        - createdBy, id, astOnlyField are inherited from BaseEntity<Long> (two levels up)
         None of these should show parameter validation errors
     -->
     <select id="selectByCondition" resultMap="TaskResultMap">
@@ -34,6 +35,9 @@
             </if>
             <if test="id != null">
                 AND id = #{id}
+            </if>
+            <if test="astOnlyField != null">
+                AND ast_only_field = #{astOnlyField}
             </if>
         </where>
     </select>

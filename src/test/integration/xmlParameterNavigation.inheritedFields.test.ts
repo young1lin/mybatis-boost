@@ -92,4 +92,19 @@ suite('XML Parameter Navigation - Inherited Fields', () => {
         assert.strictEqual(definitions[0].range.start.line, 4,
             'Should point to the createdBy declaration in BaseEntity');
     });
+
+    test('should use the bundled AST parser for an annotated inherited field', async function() {
+        this.timeout(10000);
+
+        // The regex fallback skips lines beginning with annotations, so this
+        // definition is available only when tree-sitter initializes in dist.
+        const offset = await findOffset(/#\{astOnlyField\}/, 2);
+        const definitions = await executeDefinitionAt(offset);
+
+        assert.ok(definitions.length > 0, 'No definitions found for #{astOnlyField}');
+        assert.ok(definitions[0].uri.fsPath.endsWith('BaseEntity.java'),
+            `Expected BaseEntity.java, got ${definitions[0].uri.fsPath}`);
+        assert.strictEqual(definitions[0].range.start.line, 6,
+            'Should point to the annotated astOnlyField declaration in BaseEntity');
+    });
 });

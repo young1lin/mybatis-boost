@@ -55,7 +55,7 @@ describe('javaFieldHierarchy Unit Tests', () => {
             const fieldNames = result.fields.map(f => f.field.name);
             assert.deepStrictEqual(
                 fieldNames.sort(),
-                ['createTime', 'createdBy', 'id', 'status', 'taskName', 'updatedBy']
+                ['astOnlyField', 'createTime', 'createdBy', 'id', 'status', 'taskName', 'updatedBy']
             );
         });
 
