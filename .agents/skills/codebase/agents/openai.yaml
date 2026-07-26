@@ -1,0 +1,4 @@
+interface:
+  display_name: "MyBatis Boost Codebase"
+  short_description: "Locate, trace, and assess MyBatis Boost code"
+  default_prompt: "Use $codebase to locate this MyBatis Boost feature, trace its flow, and identify relevant tests."
