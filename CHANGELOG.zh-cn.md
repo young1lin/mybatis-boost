@@ -6,6 +6,30 @@
 
 查看 [Keep a Changelog](http://keepachangelog.com/) 了解如何组织此文件的建议。
 
+## [0.3.19] - 2026-07-27
+
+### 新增
+
+- **MyBatis-Plus 分层代码生成** ([#52](https://github.com/young1lin/mybatis-boost/pull/52))：启用 MyBatis-Plus 后，生成器现在会生成继承 `IService` 的 Service 接口、基于 `ServiceImpl` 的实现类，以及包含常用 CRUD 接口的 REST Controller
+
+### 修复
+
+- **继承字段导航与校验** ([#50](https://github.com/young1lin/mybatis-boost/issues/50))：XML 参数和 resultMap 属性现在可以沿多层 Java 继承链解析字段；子类与父类存在同名字段时，优先跳转到最近的子类声明
+- **Java 字段和父类解析**：AST 与正则回退解析均限定在目标顶层类中，避免嵌套类、兄弟类或同名内部类的字段和 `extends` 声明泄漏
+- **Java 类型解析**：新增 wildcard import 解析，确保同包源码优先于 Java Language Server，并在完成全限定名解析后再判断内置类型
+- **继承字段缓存一致性**：修复 LRU 淘汰、父类修改以及并发缓存回填时残留的依赖关系
+- **tree-sitter 打包运行时**：扩展打包时强制使用 `web-tree-sitter` CommonJS 入口，避免生产包中的 AST 初始化失败
+
+### 变更
+
+- **扩展开发调试**：编译任务改用 Corepack，并新增隔离的 Extension Host 启动配置，以减少其他已安装扩展造成的干扰
+
+### 测试
+
+- 启用之前跳过的导航集成测试
+- 增加多层继承、字段遮蔽、嵌套类、类型解析、缓存失效和打包后 AST 行为的单元及集成测试
+- 增加继承字段导航 Java 演示工程
+
 ## [0.3.18] - 2026-07-06
 
 ### 修复

@@ -6,6 +6,30 @@ All notable changes to the "mybatis-boost" extension will be documented in this 
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.3.19] - 2026-07-27
+
+### Added
+
+- **MyBatis-Plus layer generation** ([#52](https://github.com/young1lin/mybatis-boost/pull/52)): When MyBatis-Plus is enabled, the generator now creates an `IService` service interface, a `ServiceImpl` implementation, and a REST controller with common CRUD endpoints
+
+### Fixed
+
+- **Inherited-field navigation and validation** ([#50](https://github.com/young1lin/mybatis-boost/issues/50)): XML parameters and resultMap properties now resolve fields through multi-level Java inheritance chains. When a subclass shadows a superclass field, the nearest subclass declaration is used
+- **Java field and superclass parsing**: AST and regex fallback extraction are scoped to the requested top-level class, preventing nested, sibling, or same-named inner classes from leaking fields or `extends` clauses
+- **Java type resolution**: Added wildcard-import resolution, preserved same-package source precedence over Java Language Server results, and delayed built-in type checks until after fully-qualified type resolution
+- **Inherited-field cache consistency**: Fixed stale dependency bookkeeping during LRU eviction, superclass changes, and overlapping cache misses
+- **Packaged tree-sitter runtime**: The extension bundle now uses the CommonJS entry of `web-tree-sitter`, preventing AST initialization failures in packaged builds
+
+### Changed
+
+- **Extension development launch**: Compile tasks now use Corepack, and an isolated Extension Host launch configuration is available to reduce interference from unrelated installed extensions
+
+### Tests
+
+- Enabled previously skipped navigation integration suites
+- Added unit and integration coverage for multi-level inheritance, field shadowing, nested classes, type resolution, cache invalidation, and packaged AST behavior
+- Added a Java inheritance-navigation project for manual verification
+
 ## [0.3.18] - 2026-07-06
 
 ### Fixed
