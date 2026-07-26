@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.mapper.TaskMapper">
+
+    <resultMap id="TaskResultMap" type="com.example.query.TaskQuery">
+        <id property="id" column="id"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="taskName" column="task_name"/>
+        <result property="astOnlyField" column="ast_only_field"/>
+        <result property="shadowedField" column="shadowed_field"/>
+    </resultMap>
+
+    <!--
+        Inherited field validation (issue #50):
+        - taskName, status are declared on TaskQuery itself
+        - updatedBy is inherited from AuditEntity
+        - createdBy, id, astOnlyField are inherited from BaseEntity<Long> (two levels up)
+        None of these should show parameter validation errors
+    -->
+    <select id="selectByCondition" resultMap="TaskResultMap">
+        SELECT * FROM t_task
+        <where>
+            <if test="shadowedField != null">
+                AND shadowed_field = #{shadowedField}
+            </if>
+            <if test="astOnlyField != null">
+                AND ast_only_field = #{astOnlyField}
+            </if>
+            <if test="taskName != null">
+                AND task_name = #{taskName}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="updatedBy != null">
+                AND updated_by = #{updatedBy}
+            </if>
+            <if test="createdBy != null">
+                AND created_by = #{createdBy}
+            </if>
+            <if test="id != null">
+                AND id = #{id}
+            </if>
+        </where>
+    </select>
+
+    <!--
+        parameterType path with inherited fields.
+        createdBy is inherited and must be valid;
+        nonExistentField must still be flagged as undefined
+    -->
+    <select id="countByCondition" parameterType="com.example.query.TaskQuery" resultType="int">
+        SELECT COUNT(*) FROM t_task
+        WHERE created_by = #{createdBy}
+        AND missing_col = #{nonExistentField}
+    </select>
+
+</mapper>

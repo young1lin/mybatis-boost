@@ -17,12 +17,27 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
+				"--disable-extension",
+				"vscjava.vscode-java-debug",
 				"--extensionDevelopmentPath=${workspaceFolder}"
 			],
 			"outFiles": [
 				"${workspaceFolder}/dist/**/*.js"
 			],
-			"preLaunchTask": "pnpm: compile"
+			"preLaunchTask": "corepack: compile"
+		},
+		{
+			"name": "Run Extension (Isolated)",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--disable-extensions",
+				"--extensionDevelopmentPath=${workspaceFolder}"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "corepack: compile"
 		}
 	]
 }

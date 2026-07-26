@@ -74,9 +74,15 @@ export async function resolveTypeViaLS(simpleTypeName: string): Promise<string |
 /**
  * Get class fields using Java Language Server document symbol provider
  *
+ * @param classFilePath - Path to the Java file
+ * @param className - When given, only the matching class symbol's fields are
+ *                    returned, so other types in the same file are excluded
  * @returns Array of JavaField or null if LS unavailable
  */
-export async function getClassFieldsViaLS(classFilePath: string): Promise<JavaField[] | null> {
+export async function getClassFieldsViaLS(
+    classFilePath: string,
+    className?: string
+): Promise<JavaField[] | null> {
     try {
         if (!await isJavaLSReady()) {
             return null;
@@ -96,6 +102,9 @@ export async function getClassFieldsViaLS(classFilePath: string): Promise<JavaFi
 
         // DocumentSymbol is hierarchical - fields are children of class symbols
         for (const symbol of symbols) {
+            if (className && symbol.name !== className) {
+                continue;
+            }
             if (
                 symbol.kind === vscode.SymbolKind.Class ||
                 symbol.kind === vscode.SymbolKind.Interface

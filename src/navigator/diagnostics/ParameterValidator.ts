@@ -8,12 +8,10 @@ import { FileMapper } from '../core/FileMapper';
 import { extractParameterReferences, extractStatementParameterInfo, extractLocalVariables, extractAttributeReferences } from '../parsers/parameterParser';
 import { extractXmlStatements } from '../parsers/xmlParser';
 import { extractMethodParameters } from '../parsers/javaParser';
-import { extractJavaFields } from '../parsers/javaFieldParser';
 import { LRUCache } from '../../utils/LRUCache';
 import { isBuiltInType, isCollectionType } from '../../utils/javaTypeUtils';
 import { resolveFullyQualifiedType } from '../../utils/javaTypeResolver';
-import { WORKSPACE_EXCLUDE_PATTERN } from '../../utils/fileUtils';
-import { findJavaClassFile } from '../../utils/navigationUtils';
+import { getClassFieldsWithInheritance } from '../../utils/javaFieldHierarchy';
 
 /**
  * Validates parameters in XML mapper files
@@ -23,6 +21,12 @@ export class ParameterValidator {
     private disposables: vscode.Disposable[] = [];
     private validationTimers: Map<string, NodeJS.Timeout> = new Map();
     private fieldCache: LRUCache<string, string[]>;
+    // Maps each class in a cached inheritance chain to the cache keys that
+    // include its fields, so editing a superclass invalidates subclass entries
+    private classDependents: Map<string, Set<string>> = new Map();
+    // Forward index: cache key → its inheritance chain, so entries leaving the
+    // cache (invalidation or LRU eviction) can be removed from classDependents
+    private dependencyChains: Map<string, string[]> = new Map();
     private readonly DEBOUNCE_DELAY = 500; // 500ms debounce for text changes
     private readonly FIELD_CACHE_SIZE = 200; // Cache up to 200 classes
     private enabled: boolean;
@@ -35,8 +39,9 @@ export class ParameterValidator {
         this.diagnosticCollection = vscode.languages.createDiagnosticCollection('mybatis-parameters');
         this.context.subscriptions.push(this.diagnosticCollection);
 
-        // Initialize field cache
-        this.fieldCache = new LRUCache(this.FIELD_CACHE_SIZE);
+        // Initialize field cache; silently evicted entries must also drop their
+        // dependency bookkeeping so classDependents cannot outgrow the cache
+        this.fieldCache = new LRUCache(this.FIELD_CACHE_SIZE, key => this.unregisterHierarchy(key));
 
         // Read initial configuration
         this.enabled = this.isValidationEnabled();
@@ -93,11 +98,15 @@ export class ParameterValidator {
             })
         );
 
-        // Invalidate field cache when Java files are saved (for external changes)
+        // Invalidate field cache when Java files are saved, and refresh diagnostics
+        // of open XML documents so stale field errors don't linger until the next
+        // XML edit (the fs watcher below also fires on save, but this does not
+        // depend on watcher timing)
         this.disposables.push(
             vscode.workspace.onDidSaveTextDocument(doc => {
                 if (doc.languageId === 'java') {
                     this.invalidateFieldCache(doc.uri.fsPath);
+                    this.revalidateOpenXmlDocuments();
                 }
             })
         );
@@ -105,15 +114,15 @@ export class ParameterValidator {
         // Watch Java files at filesystem level for external changes (git checkout, etc.)
         const javaFsWatcher = vscode.workspace.createFileSystemWatcher('**/*.java');
         javaFsWatcher.onDidChange(() => {
-            this.fieldCache.clear();
+            this.clearFieldCache();
             this.revalidateOpenXmlDocuments();
         });
         javaFsWatcher.onDidCreate(() => {
-            this.fieldCache.clear();
+            this.clearFieldCache();
             this.revalidateOpenXmlDocuments();
         });
         javaFsWatcher.onDidDelete(() => {
-            this.fieldCache.clear();
+            this.clearFieldCache();
             this.revalidateOpenXmlDocuments();
         });
         this.disposables.push(javaFsWatcher);
@@ -383,7 +392,7 @@ export class ParameterValidator {
     }
 
     /**
-     * Get field names from a Java class (with caching)
+     * Get field names from a Java class, including inherited fields (with caching)
      */
     private async getClassFields(className: string): Promise<string[]> {
         // 1. Check cache first
@@ -393,26 +402,31 @@ export class ParameterValidator {
             return cached;
         }
 
-        // 2. Cache miss - search and parse
+        // 2. Cache miss - walk the class hierarchy and collect fields
         console.log(`[ParameterValidator] Cache miss for class: ${className}, searching...`);
 
         try {
-            const file = await findJavaClassFile(className);
+            const { fields, classChain } = await getClassFieldsWithInheritance(className);
+            const fieldNames = fields.map(f => f.field.name);
 
-            if (!file) {
-                console.log(`[ParameterValidator] Class not found: ${className}`);
-                // Cache empty result to avoid repeated searches
-                this.fieldCache.set(className, []);
-                return [];
+            // 3. Store in cache; empty results are cached too, to avoid repeated searches
+            this.fieldCache.set(className, fieldNames);
+
+            // 4. Record that editing any class in the chain invalidates this entry.
+            // Drop any previous registration first: overlapping cache misses for
+            // the same key would otherwise leave links from a superseded chain
+            this.unregisterHierarchy(className);
+            this.dependencyChains.set(className, classChain);
+            for (const chainClass of classChain) {
+                let dependents = this.classDependents.get(chainClass);
+                if (!dependents) {
+                    dependents = new Set();
+                    this.classDependents.set(chainClass, dependents);
+                }
+                dependents.add(className);
             }
 
-            const fields = await extractJavaFields(file.fsPath);
-            const fieldNames = fields.map(f => f.name);
-
-            // 3. Store in cache
-            this.fieldCache.set(className, fieldNames);
             console.log(`[ParameterValidator] Cached fields for ${className}: ${fieldNames.join(', ')}`);
-
             return fieldNames;
 
         } catch (error) {
@@ -422,20 +436,67 @@ export class ParameterValidator {
     }
 
     /**
-     * Invalidate field cache for a specific Java file
+     * Invalidate field cache for a specific Java file.
+     * Also invalidates cached entries of subclasses that inherited its fields.
      */
     private invalidateFieldCache(javaPath: string): void {
         try {
             // Extract class name from file path
             // Example: /path/to/src/main/java/com/example/User.java → com.example.User
             const className = this.getClassNameFromPath(javaPath);
-            if (className) {
-                this.fieldCache.delete(className);
-                console.log(`[ParameterValidator] Invalidated field cache for: ${className}`);
+            if (!className) {
+                return;
             }
+
+            this.fieldCache.delete(className);
+            this.unregisterHierarchy(className);
+
+            const dependents = this.classDependents.get(className);
+            if (dependents) {
+                // Copy first: unregisterHierarchy prunes the set being iterated
+                for (const dependent of [...dependents]) {
+                    this.fieldCache.delete(dependent);
+                    this.unregisterHierarchy(dependent);
+                }
+                this.classDependents.delete(className);
+            }
+
+            console.log(`[ParameterValidator] Invalidated field cache for: ${className}`);
         } catch (error) {
             console.error(`[ParameterValidator] Error invalidating field cache:`, error);
         }
+    }
+
+    /**
+     * Remove a cache key's dependency bookkeeping when its entry leaves the
+     * field cache (explicit invalidation or silent LRU eviction), so
+     * classDependents stays bounded by the cache contents
+     */
+    private unregisterHierarchy(cacheKey: string): void {
+        const chain = this.dependencyChains.get(cacheKey);
+        if (!chain) {
+            return;
+        }
+        this.dependencyChains.delete(cacheKey);
+
+        for (const chainClass of chain) {
+            const dependents = this.classDependents.get(chainClass);
+            if (dependents) {
+                dependents.delete(cacheKey);
+                if (dependents.size === 0) {
+                    this.classDependents.delete(chainClass);
+                }
+            }
+        }
+    }
+
+    /**
+     * Clear the field cache and its inheritance dependency tracking
+     */
+    private clearFieldCache(): void {
+        this.fieldCache.clear();
+        this.classDependents.clear();
+        this.dependencyChains.clear();
     }
 
     /**
@@ -524,7 +585,7 @@ export class ParameterValidator {
         this.validationTimers.clear();
 
         // Clear field cache
-        this.fieldCache.clear();
+        this.clearFieldCache();
 
         this.diagnosticCollection.dispose();
         this.disposables.forEach(d => d.dispose());

@@ -11,6 +11,7 @@ import {
     extractParametersFromAST,
     extractFieldsFromAST,
     extractNamespaceFromAST,
+    extractSuperclassNameFromAST,
     isMyBatisMapperFromAST,
 } from '../../navigator/parsers/javaTreeSitterParser';
 
@@ -846,6 +847,231 @@ public class Empty {
 `;
             const result = await extractFieldsFromAST(content);
             assert.strictEqual(result.length, 0);
+        });
+
+        it('should only return the named class\'s fields when className is given', async () => {
+            const content = `
+package com.example.model;
+
+class Helper {
+    private String helperField;
+}
+
+public class Role {
+    private String roleName;
+}
+`;
+            const roleFields = await extractFieldsFromAST(content, 'Role');
+            assert.deepStrictEqual(roleFields.map(f => f.name), ['roleName']);
+
+            const helperFields = await extractFieldsFromAST(content, 'Helper');
+            assert.deepStrictEqual(helperFields.map(f => f.name), ['helperField']);
+        });
+
+        it('should exclude nested class fields when className targets the outer class', async () => {
+            const content = `
+package com.example.model;
+
+public class Role {
+    private String roleName;
+
+    public static class Builder {
+        private String pendingName;
+    }
+}
+`;
+            const result = await extractFieldsFromAST(content, 'Role');
+            assert.deepStrictEqual(result.map(f => f.name), ['roleName']);
+        });
+
+        it('should ignore a nested class with the same simple name as the target class', async () => {
+            const content = `
+package com.example.model;
+
+class Other {
+    static class Role {
+        private String wrongField;
+    }
+}
+
+public class Role {
+    private String roleName;
+}
+`;
+            const result = await extractFieldsFromAST(content, 'Role');
+            assert.deepStrictEqual(result.map(f => f.name), ['roleName']);
+        });
+
+        it('should return empty array when the named class does not exist', async () => {
+            const content = `
+package com.example.model;
+
+public class Role {
+    private String roleName;
+}
+`;
+            const result = await extractFieldsFromAST(content, 'Missing');
+            assert.strictEqual(result.length, 0);
+        });
+    });
+
+    describe('extractSuperclassNameFromAST', () => {
+        it('should extract simple superclass name', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends BaseEntity {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should strip generic type arguments from superclass', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends BaseEntity<Long> {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should extract fully-qualified superclass name', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends com.example.entity.BaseEntity {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'com.example.entity.BaseEntity');
+        });
+
+        it('should extract superclass when class also implements interfaces', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends BaseEntity implements Serializable, Cloneable {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should handle bounded type parameters on the class itself', async () => {
+            const content = `
+package com.example.model;
+
+public class Holder<T extends Number> extends BaseHolder {
+    private T value;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseHolder');
+        });
+
+        it('should return null when class has no extends clause', async () => {
+            const content = `
+package com.example.model;
+
+public class Role implements Serializable {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, null);
+        });
+
+        it('should return null for interface-only files', async () => {
+            const content = `
+package com.example.mapper;
+
+public interface RoleMapper extends BaseMapper {
+    Role selectById(Long id);
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, null);
+        });
+
+        it('should handle multi-line class declarations', async () => {
+            const content = `
+package com.example.model;
+
+public class Role
+        extends BaseEntity<Long>
+        implements Serializable {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content);
+            assert.strictEqual(result, 'BaseEntity');
+        });
+
+        it('should only inspect the named class when className is given', async () => {
+            const content = `
+package com.example.model;
+
+class Helper extends HelperBase {
+    private String helperField;
+}
+
+public class Role extends RoleBase {
+    private String roleName;
+}
+`;
+            assert.strictEqual(await extractSuperclassNameFromAST(content, 'Role'), 'RoleBase');
+            assert.strictEqual(await extractSuperclassNameFromAST(content, 'Helper'), 'HelperBase');
+        });
+
+        it('should ignore a nested class with the same simple name as the target class', async () => {
+            const content = `
+package com.example.model;
+
+class Other {
+    static class Role extends WrongBase {
+    }
+}
+
+public class Role extends RoleBase {
+}
+`;
+            const result = await extractSuperclassNameFromAST(content, 'Role');
+            assert.strictEqual(result, 'RoleBase');
+        });
+
+        it('should return null when the named class extends nothing even if another class does', async () => {
+            const content = `
+package com.example.model;
+
+public class Role {
+    private String roleName;
+
+    public static class Builder extends AbstractBuilder {
+        private String pending;
+    }
+}
+`;
+            const result = await extractSuperclassNameFromAST(content, 'Role');
+            assert.strictEqual(result, null);
+        });
+
+        it('should return null when the named class does not exist in the file', async () => {
+            const content = `
+package com.example.model;
+
+public class Role extends BaseEntity {
+    private String roleName;
+}
+`;
+            const result = await extractSuperclassNameFromAST(content, 'Missing');
+            assert.strictEqual(result, null);
         });
     });
 });

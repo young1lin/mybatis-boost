@@ -151,6 +151,24 @@ public interface UserMapper {
         assert.strictEqual(result, 'com.example.entity.User');
     });
 
+    it('should prefer same-package resolution over Java LS', async () => {
+        fsReadFileStub.resolves(JAVA_CONTENT_NO_IMPORT);
+        initTreeSitterStub.resolves(true);
+        // LS knows a same-named class from another package
+        resolveTypeViaLSStub.resolves('com.other.entity.User');
+        findFilesStub.callsFake(async (include: string) =>
+            include === '**/com/example/mapper/User.java'
+                ? [vscode.Uri.file('/fake/com/example/mapper/User.java')]
+                : []
+        );
+
+        const result = await resolveFullyQualifiedType('/fake/UserMapper.java', 'User');
+        assert.strictEqual(result, 'com.example.mapper.User',
+            'same-package type must win over an LS match from another package');
+        assert.strictEqual(resolveTypeViaLSStub.called, false,
+            'LS should not even be consulted when same-package resolution succeeds');
+    });
+
     it('should resolve via same-package when all tiers fail', async () => {
         fsReadFileStub.resolves(JAVA_CONTENT_NO_IMPORT);
         initTreeSitterStub.resolves(false);
@@ -197,10 +215,69 @@ public interface UserMapper {
         assert.strictEqual(result, null);
     });
 
-    it('should not match wildcard imports', async () => {
+    it('should not resolve wildcard import when the package has no matching file', async () => {
         fsReadFileStub.resolves(JAVA_CONTENT_WILDCARD_IMPORT);
         initTreeSitterStub.resolves(true);
         resolveTypeViaLSStub.resolves(null);
+
+        const result = await resolveFullyQualifiedType('/fake/UserMapper.java', 'User');
+        assert.strictEqual(result, null);
+    });
+
+    it('should resolve via wildcard import when the package contains the type', async () => {
+        fsReadFileStub.resolves(JAVA_CONTENT_WILDCARD_IMPORT);
+        initTreeSitterStub.resolves(true);
+        resolveTypeViaLSStub.resolves(null);
+        findFilesStub.callsFake(async (include: string) =>
+            include === '**/com/example/User.java'
+                ? [vscode.Uri.file('/fake/com/example/User.java')]
+                : []
+        );
+
+        const result = await resolveFullyQualifiedType('/fake/UserMapper.java', 'User');
+        assert.strictEqual(result, 'com.example.User');
+    });
+
+    it('should prefer same-package resolution over wildcard imports', async () => {
+        const content = `package com.example.mapper;
+
+import com.example.common.*;
+
+public interface UserMapper {
+    User selectById(Long id);
+}
+`;
+        fsReadFileStub.resolves(content);
+        initTreeSitterStub.resolves(true);
+        resolveTypeViaLSStub.resolves(null);
+        // Both the same-package file and the wildcard-package file exist
+        findFilesStub.callsFake(async (include: string) =>
+            include === '**/com/example/mapper/User.java' || include === '**/com/example/common/User.java'
+                ? [vscode.Uri.file('/fake/' + include.substring(3))]
+                : []
+        );
+
+        const result = await resolveFullyQualifiedType('/fake/UserMapper.java', 'User');
+        assert.strictEqual(result, 'com.example.mapper.User');
+    });
+
+    it('should ignore static wildcard imports', async () => {
+        const content = `package com.example.mapper;
+
+import static com.example.util.Constants.*;
+
+public interface UserMapper {
+    User selectById(Long id);
+}
+`;
+        fsReadFileStub.resolves(content);
+        initTreeSitterStub.resolves(true);
+        resolveTypeViaLSStub.resolves(null);
+        findFilesStub.callsFake(async (include: string) =>
+            include === '**/com/example/util/Constants/User.java' || include === '**/com/example/util/Constants.User.java'
+                ? [vscode.Uri.file('/fake/should-not-happen.java')]
+                : []
+        );
 
         const result = await resolveFullyQualifiedType('/fake/UserMapper.java', 'User');
         assert.strictEqual(result, null);

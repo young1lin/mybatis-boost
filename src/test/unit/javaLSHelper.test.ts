@@ -273,6 +273,20 @@ describe('javaLSHelper Unit Tests', () => {
             assert.strictEqual(result[2].name, 'email');
         });
 
+        it('should only return the named class symbol\'s fields when className is given', async () => {
+            stubLSReady();
+            const helperSymbol = createDocumentSymbol(
+                'Helper', '', vscode.SymbolKind.Class, 20, 13, 19, [
+                    createDocumentSymbol('helperField', 'String', vscode.SymbolKind.Field, 21, 19, 30, []),
+                ]
+            );
+            executeCommandStub.resolves([USER_CLASS_SYMBOL(), helperSymbol]);
+
+            const result = await getClassFieldsViaLS('/fake/User.java', 'User');
+            assert.ok(result !== null);
+            assert.deepStrictEqual(result.map(f => f.name), ['id', 'name', 'email']);
+        });
+
         it('should map detail to fieldType correctly', async () => {
             stubLSReady();
             executeCommandStub.resolves([USER_CLASS_SYMBOL()]);

@@ -10,10 +10,9 @@ import { extractStatementParameterInfo } from '../parsers/parameterParser';
 import { extractStatementIdFromPosition } from '../parsers/xmlParser';
 import { extractXmlStatements } from '../parsers/xmlParser';
 import { extractMethodParameters } from '../parsers/javaParser';
-import { findJavaField } from '../parsers/javaFieldParser';
 import { isBuiltInType, isCollectionType } from '../../utils/javaTypeUtils';
 import { resolveFullyQualifiedType } from '../../utils/javaTypeResolver';
-import { findJavaClassFile } from '../../utils/navigationUtils';
+import { findFieldInHierarchy } from '../../utils/javaFieldHierarchy';
 
 /**
  * Provides go-to-definition for parameter references in XML SQL statements
@@ -120,7 +119,7 @@ export class XmlParameterDefinitionProvider implements vscode.DefinitionProvider
     }
 
     /**
-     * Find a field in a Java class by fully-qualified class name
+     * Find a field in a Java class (or one of its superclasses) by fully-qualified class name
      */
     private async findJavaFieldInClass(
         className: string,
@@ -131,25 +130,17 @@ export class XmlParameterDefinitionProvider implements vscode.DefinitionProvider
         }
 
         try {
-            const javaUri = await findJavaClassFile(className);
-            if (!javaUri) {
-                console.log(`[XmlParameterDefinitionProvider] Java class not found: ${className}`);
+            const resolved = await findFieldInHierarchy(className, fieldName);
+            if (!resolved) {
+                console.log(`[XmlParameterDefinitionProvider] Field ${fieldName} not found in class ${className} or its superclasses`);
                 return null;
             }
 
-            console.log(`[XmlParameterDefinitionProvider] Found Java class: ${javaUri.fsPath}`);
-
-            // Find the field in the class
-            const field = await findJavaField(javaUri.fsPath, fieldName);
-            if (field) {
-                return new vscode.Location(
-                    javaUri,
-                    new vscode.Position(field.line, field.startColumn)
-                );
-            }
-
-            console.log(`[XmlParameterDefinitionProvider] Field ${fieldName} not found in class ${className}`);
-            return null;
+            console.log(`[XmlParameterDefinitionProvider] Found field ${fieldName} in ${resolved.className}`);
+            return new vscode.Location(
+                vscode.Uri.file(resolved.filePath),
+                new vscode.Position(resolved.field.line, resolved.field.startColumn)
+            );
 
         } catch (error) {
             console.error('[XmlParameterDefinitionProvider] Error finding Java field:', error);

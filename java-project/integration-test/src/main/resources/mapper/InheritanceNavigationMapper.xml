@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.young1lin.mybatis.boost.integration.test.mapper.InheritanceNavigationMapper">
+
+    <!--
+        Manual navigation expectations:
+        - taskName      -> NavigationTaskQuery (current class)
+        - updatedBy     -> NavigationAuditEntity (one level up)
+        - id/createdBy  -> NavigationBaseEntity (two levels up)
+        - astOnlyField  -> NavigationBaseEntity (annotated AST-only field)
+        - fieldA        -> NavigationAuditEntity (nearest declaration wins)
+    -->
+    <resultMap id="NavigationTaskResultMap"
+               type="com.young1lin.mybatis.boost.integration.test.inheritance.query.NavigationTaskQuery">
+        <id property="id" column="id"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="baseOnlyField" column="base_only_field"/>
+        <result property="astOnlyField" column="ast_only_field"/>
+        <result property="updatedBy" column="updated_by"/>
+        <result property="fieldA" column="field_a"/>
+        <result property="taskName" column="task_name"/>
+        <result property="status" column="status"/>
+    </resultMap>
+
+    <select id="selectByCondition" resultMap="NavigationTaskResultMap">
+        SELECT
+            id,
+            created_by,
+            base_only_field,
+            ast_only_field,
+            updated_by,
+            field_a,
+            task_name,
+            status
+        FROM navigation_task
+        <where>
+            <if test="taskName != null">
+                AND task_name = #{taskName}
+            </if>
+            <if test="updatedBy != null">
+                AND updated_by = #{updatedBy}
+            </if>
+            <if test="createdBy != null">
+                AND created_by = #{createdBy}
+            </if>
+            <if test="baseOnlyField != null">
+                AND base_only_field = #{baseOnlyField}
+            </if>
+            <if test="astOnlyField != null">
+                AND ast_only_field = #{astOnlyField}
+            </if>
+            <if test="fieldA != null">
+                AND field_a = #{fieldA}
+            </if>
+            <if test="id != null">
+                AND id = #{id}
+            </if>
+        </where>
+    </select>
+
+    <select id="countByCondition"
+            parameterType="com.young1lin.mybatis.boost.integration.test.inheritance.query.NavigationTaskQuery"
+            resultType="int">
+        SELECT COUNT(*)
+        FROM navigation_task
+        WHERE created_by = #{createdBy}
+          AND updated_by = #{updatedBy}
+          AND field_a = #{fieldA}
+    </select>
+
+</mapper>

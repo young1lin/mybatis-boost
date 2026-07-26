@@ -6,6 +6,23 @@ const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
 /**
+ * Force the CommonJS entry of web-tree-sitter when bundling the CommonJS
+ * extension. Its ESM entry depends on import.meta.url, which esbuild cannot
+ * preserve in CJS output and replaces with an empty object.
+ * @type {import('esbuild').Plugin}
+ */
+const webTreeSitterCjsPlugin = {
+	name: 'web-tree-sitter-cjs',
+
+	setup(build) {
+		const cjsEntry = require.resolve('web-tree-sitter');
+		build.onResolve({ filter: /^web-tree-sitter$/ }, () => ({
+			path: cjsEntry,
+		}));
+	},
+};
+
+/**
  * @type {import('esbuild').Plugin}
  */
 const esbuildProblemMatcherPlugin = {
@@ -110,6 +127,7 @@ async function main() {
 		external: ['vscode'],
 		logLevel: 'silent',
 		plugins: [
+			webTreeSitterCjsPlugin,
 			copyResourcesPlugin,
 			/* add to the end of plugins array */
 			esbuildProblemMatcherPlugin,
