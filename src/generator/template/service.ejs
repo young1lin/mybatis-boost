@@ -10,6 +10,10 @@ import <%= imp %>;
  * @author <%= author %>
  * @since <%= date %>
  */
+<%_ if (useMyBatisPlus) { -%>
+public interface <%= className %> extends IService<<%= entityClassName %>> {
+}
+<%_ } else { -%>
 @Service
 <%_ if (useLombok) { -%>
 @RequiredArgsConstructor
@@ -74,3 +78,4 @@ public class <%= className %> {
     }
 
 }
+<%_ } -%>

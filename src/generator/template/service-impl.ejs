@@ -1,0 +1,17 @@
+package <%= packageName %>;
+
+<%_ imports.forEach(function(imp) { -%>
+import <%= imp %>;
+<%_ }); -%>
+
+/**
+<%_ if (comment) { -%>
+ * <%= comment %>
+<%_ } -%>
+ *
+ * @author <%= author %>
+ * @since <%= since %>
+ */
+@Service
+public class <%= domainName %><%= classSuffix %> extends ServiceImpl<<%= mapperClassName %>, <%= entityClassName %>> implements <%= serviceClassName %> {
+}

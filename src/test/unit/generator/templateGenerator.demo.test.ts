@@ -222,7 +222,7 @@ describe('CodeGenerator - Demo Showcase', () => {
                 console.log(result.content);
             });
 
-            assert.strictEqual(results.length, 4);
+            assert.strictEqual(results.length, 6);
         });
     });
 

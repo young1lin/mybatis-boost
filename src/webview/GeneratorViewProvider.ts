@@ -167,12 +167,12 @@ export class GeneratorViewProvider implements vscode.WebviewViewProvider {
             const mapperXmlTemplatePath = settings.templatePathMapperXml || path.join(templateDir, 'mapper-xml.ejs');
             const serviceTemplatePath = settings.templatePathService || path.join(templateDir, 'service.ejs');
 
-            const results = [
-                generator.generateEntity(entityTemplatePath),
-                generator.generateMapper(mapperTemplatePath),
-                generator.generateMapperXml(mapperXmlTemplatePath),
-                generator.generateService(serviceTemplatePath)
-            ];
+            const results = generator.generateAll();
+            // Preserve existing custom template settings for the original four outputs.
+            results[0] = generator.generateEntity(entityTemplatePath);
+            results[1] = generator.generateMapper(mapperTemplatePath);
+            results[2] = generator.generateMapperXml(mapperXmlTemplatePath);
+            results[3] = generator.generateService(serviceTemplatePath);
 
             // Send preview results to webview (with full content)
             this._view?.webview.postMessage({

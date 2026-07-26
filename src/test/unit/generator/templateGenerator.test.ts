@@ -345,6 +345,27 @@ describe('CodeGenerator', () => {
                 console.log('---');
             });
         });
+
+        it('generates MyBatis-Plus service, implementation, and controller without extra configuration', () => {
+            const generatorWithMBP = new CodeGenerator({ ...config, useMyBatisPlus: true }, mockParsedSchema);
+            const results = generatorWithMBP.generateAll();
+
+            assert.strictEqual(results.length, 6);
+            const [, , , service, serviceImpl, controller] = results;
+
+            assert.strictEqual(service.name, 'UserInfoService.java');
+            assert.ok(service.content.includes('extends IService<UserInfoPO>'));
+            assert.ok(!service.content.includes('import com.example.mybatis.mapper.UserInfoMapper;'));
+            assert.strictEqual(serviceImpl.name, 'UserInfoServiceImpl.java');
+            assert.ok(serviceImpl.outputPath.includes(path.join('service', 'impl')));
+            assert.ok(serviceImpl.content.includes('extends ServiceImpl<UserInfoMapper, UserInfoPO>'));
+            assert.ok(serviceImpl.content.includes('implements UserInfoService'));
+            assert.strictEqual(controller.name, 'UserInfoController.java');
+            assert.ok(controller.outputPath.includes('controller'));
+            assert.ok(controller.content.includes('@RequestMapping("/user-info")'));
+            assert.ok(controller.content.includes('private final UserInfoService userInfoService;'));
+            assert.ok(controller.content.includes('public UserInfoPO getById(@PathVariable Long id)'));
+        });
     });
 
     describe('Edge Cases', () => {

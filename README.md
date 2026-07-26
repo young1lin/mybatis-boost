@@ -71,6 +71,7 @@ Generate complete MyBatis boilerplate code from DDL SQL statements with an inter
 - **Mapper interfaces** with CRUD methods
 - **XML mapping files** with complete SQL statements (insert, update, delete, select)
 - **Service classes** with common business logic
+- **MyBatis-Plus service interfaces, service implementations, and REST controllers** when MyBatis-Plus is enabled
 
 **Supported databases:**
 - MySQL (AUTO_INCREMENT, ENGINE, COMMENT syntax)

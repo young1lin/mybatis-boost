@@ -1,0 +1,54 @@
+package <%= packageName %>;
+
+<%_ imports.forEach(function(imp) { -%>
+import <%= imp %>;
+<%_ }); -%>
+
+/**
+<%_ if (comment) { -%>
+ * <%= comment %>
+<%_ } -%>
+ *
+ * @author <%= author %>
+ * @since <%= since %>
+ */
+@RestController
+@RequestMapping("<%= requestPath %>")
+<%_ if (useLombok) { -%>
+@RequiredArgsConstructor
+<%_ } -%>
+public class <%= domainName %><%= classSuffix %> {
+<%_ if (useLombok) { -%>
+
+    private final <%= serviceClassName %> <%= serviceClassName.charAt(0).toLowerCase() + serviceClassName.slice(1) %>;
+<%_ } else { -%>
+
+    @Autowired
+    private <%= serviceClassName %> <%= serviceClassName.charAt(0).toLowerCase() + serviceClassName.slice(1) %>;
+<%_ } -%>
+
+    @GetMapping("/{id}")
+    public <%= entityClassName %> getById(@PathVariable <%= primaryKeyType %> id) {
+        return <%= serviceClassName.charAt(0).toLowerCase() + serviceClassName.slice(1) %>.getById(id);
+    }
+
+    @GetMapping
+    public List<<%= entityClassName %>> list() {
+        return <%= serviceClassName.charAt(0).toLowerCase() + serviceClassName.slice(1) %>.list();
+    }
+
+    @PostMapping
+    public boolean save(@RequestBody <%= entityClassName %> entity) {
+        return <%= serviceClassName.charAt(0).toLowerCase() + serviceClassName.slice(1) %>.save(entity);
+    }
+
+    @PutMapping
+    public boolean update(@RequestBody <%= entityClassName %> entity) {
+        return <%= serviceClassName.charAt(0).toLowerCase() + serviceClassName.slice(1) %>.updateById(entity);
+    }
+
+    @DeleteMapping("/{id}")
+    public boolean remove(@PathVariable <%= primaryKeyType %> id) {
+        return <%= serviceClassName.charAt(0).toLowerCase() + serviceClassName.slice(1) %>.removeById(id);
+    }
+}
