@@ -62,9 +62,9 @@
 		},
 		{
 			"type": "shell",
-			"command": "pnpm run compile",
+			"command": "corepack pnpm run compile",
 			"problemMatcher": "$tsc",
-			"label": "pnpm: compile",
+			"label": "corepack: compile",
 			"detail": "Compile extension before launch",
 			"presentation": {
 				"reveal": "silent",
